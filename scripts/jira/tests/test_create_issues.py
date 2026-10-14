@@ -77,7 +77,7 @@ class FakeClient:
         if path == "/rest/api/3/issue/TEST-1":
             return {"fields": {"project": {"key": self.epic_project}, "issuetype": {"id": "10000", "name": "에픽", "hierarchyLevel": 1}}}
         if path == "/rest/api/3/user/assignable/search":
-            return [{"accountId": "user-1", "displayName": "Test User", "active": self.assignee_active}]
+            return [{"accountId": (params or {}).get("accountId", "user-1"), "displayName": "Test User", "active": self.assignee_active}]
         if path == "/rest/api/3/issue/TEST-22":
             fields = deepcopy(self.created_fields)
             if self.change_summary:
@@ -122,8 +122,43 @@ class WorkflowTests(unittest.TestCase):
     def test_check_and_catalog_are_read_only(self):
         self.assertTrue(self.workflow.check()["connected"])
         catalog = self.workflow.catalog("Test")
+        self.assertEqual(catalog["current_user"], {"accountId": "current-user", "displayName": "Test User", "assignable": True})
+        self.assertNotIn(CONFIG.email, json.dumps(catalog))
+        self.assertNotIn(CONFIG.token, json.dumps(catalog))
         self.assertEqual(catalog["assignable_users"][0]["accountId"], "user-1")
         self.assertFalse(self.writes())
+
+    def test_catalog_marks_inactive_current_user_unassignable(self):
+        self.client.assignee_active = False
+        self.assertFalse(self.workflow.catalog("")["current_user"]["assignable"])
+        self.assertFalse(self.writes())
+
+    def test_current_user_assignment_is_verified_after_create(self):
+        catalog = self.workflow.catalog("")
+        plan = self.workflow.prepare({**DRAFT, "assignee": catalog["current_user"]["accountId"]})
+        self.assertEqual(plan["fields"]["assignee"], {"accountId": "current-user"})
+        self.assertTrue(self.apply(plan)["verified"])
+
+    def test_catalog_identity_lookup_failure_asks_without_stopping(self):
+        original = self.client.request
+        for failure in (None, "identity", "assignability"):
+            with self.subTest(failure=failure):
+                def request(method, path, **kwargs):
+                    if path == "/rest/api/3/myself":
+                        if failure == "identity":
+                            raise jira.JiraError("SECRET_TOKEN")
+                        if failure is None:
+                            return {"displayName": "Test User"}
+                    if path == "/rest/api/3/user/assignable/search" and failure == "assignability":
+                        raise jira.JiraError("SECRET_TOKEN")
+                    return original(method, path, **kwargs)
+                with patch.object(self.client, "request", side_effect=request):
+                    catalog = self.workflow.catalog("")
+                self.assertEqual(catalog["current_user"]["question"], "누구를 담당자로 설정할까요?")
+                self.assertIsNone(catalog["current_user"]["assignable"])
+                self.assertTrue(catalog["issue_types"])
+                self.assertNotIn("SECRET_TOKEN", json.dumps(catalog))
+                self.assertFalse(self.writes())
 
     def test_check_fails_without_create_permission(self):
         self.client.permissions = False

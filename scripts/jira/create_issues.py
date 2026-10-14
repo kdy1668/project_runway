@@ -273,11 +273,25 @@ class Workflow:
             start += len(rows)
 
     def catalog(self, user_query: str) -> dict:
+        current_user = {"accountId": None, "displayName": None, "assignable": None}
+        try:
+            user = self.client.request("GET", "/rest/api/3/myself")
+            account_id = user.get("accountId")
+            if account_id:
+                current_user.update(accountId=account_id, displayName=user.get("displayName"))
+                assignable = self.client.request("GET", "/rest/api/3/user/assignable/search", params={
+                    "project": self.config.project, "accountId": account_id, "maxResults": 50})
+                current_user["assignable"] = any(x.get("accountId") == account_id and x.get("active") for x in assignable)
+        except JiraError:
+            # Identity lookup is optional; never echo raw errors or assume an assignee.
+            pass
+        if current_user["assignable"] is not True:
+            current_user["question"] = "누구를 담당자로 설정할까요?"
         types = self.types()
         epic_types = [x for x in types if x.get("name") in ("Epic", "에픽") or x.get("hierarchyLevel") == 1]
         epics = self.client.search(f"project = {jql_string(self.config.project)} AND issuetype = {jql_string(str(epic_types[0]['id']))}") if len(epic_types) == 1 else []
         sprints = self.client.pages(f"/rest/agile/1.0/board/{self.config.board}/sprint", "values", {"state": "active,future"})
-        return {"issue_types": types, "epics": epics, "sprints": sprints,
+        return {"current_user": current_user, "issue_types": types, "epics": epics, "sprints": sprints,
                 "assignable_users": self.users(user_query) if user_query else [],
                 "hint": "담당자 검색은 --user-query 이름 또는 이메일을 사용하세요."}
 
