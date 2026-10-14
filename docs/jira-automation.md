@@ -1,0 +1,149 @@
+# AI Jira 업무 등록 및 개발 연계
+
+자연어 요청을 AI가 업무 초안으로 정리하고, 사람의 확인을 받은 뒤 로컬 Python 스크립트가 Jira Cloud에 등록한다. 스크립트 자체가 자연어를 해석하거나 별도의 AI 서비스를 호출하지 않는다. AI가 `AGENTS.md`를 읽고 조회·제안·실행을 담당한다.
+
+## 개발자별 최초 설정
+
+저장소 최상위 폴더에서 Python 3.11 이상을 확인한다.
+
+```powershell
+python --version
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r scripts/jira/requirements.txt
+```
+
+기존 가상환경이 있으면 재사용한다. 현재 구현은 Python 표준 라이브러리만 사용하므로 추가 패키지는 없다. PowerShell에서 활성화가 차단되면 실행 정책을 변경하지 않고 `.\.venv\Scripts\python.exe`로 실행할 수 있다.
+
+`.env.example`을 참고해 **본인이** 로컬 `.env`에 값을 입력한다. 기존 `.env`는 덮어쓰지 않고 필요한 항목만 추가한다. 스크립트는 실행 위치와 관계없이 저장소 루트의 `.env`를 읽고, 같은 이름의 환경변수가 있으면 환경변수를 우선한다. 단순 `KEY=VALUE`, 한 줄 따옴표, 주석만 지원하며 변수 확장·명령 실행은 하지 않는다.
+
+| 항목 | 값 |
+| --- | --- |
+| `JIRA_BASE_URL` | `https://ssafy.atlassian.net` |
+| `JIRA_PROJECT_KEY` | `S15P31E105` |
+| `JIRA_BOARD_ID` | `16659` |
+| `JIRA_EMAIL` | 본인의 Atlassian 이메일 |
+| `JIRA_API_TOKEN` | 본인이 발급한 API Token |
+
+사이트 주소에 사용하는 일반 API Token과 scope가 있는 Token은 API 주소가 다르다. scoped token을 쓰면 예시 파일의 `JIRA_API_BASE_URL`도 설정한다. `JIRA_BASE_URL`은 이슈 링크를 위한 사이트 주소로 유지한다. Token의 권한에는 사용하는 프로젝트 조회·생성 및 필요한 Jira Software API 접근이 있어야 한다. [Atlassian Token 안내](https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account)를 참고한다.
+
+`.env`, Token, 개인 이메일, `.jira/`의 작업 초안·기록은 Git에 올리지 않는다. 인증정보를 AI에게 전달할 필요는 없다.
+
+모든 AI Agent는 `.env`와 실제 인증정보가 포함된 `.env.*` 파일을 직접 읽거나 검색·출력하지 않는다. 이메일·Token 입력과 수정은 사용자가 직접 한다. AI는 인증정보가 없는 `.env.example`만 참고하고, 저장소 스크립트 실행 결과로 연결 상태를 확인한다. 스크립트 내부의 인증용 `.env` 읽기는 허용하며 인증정보는 AI에게 반환하지 않는다. 공통 규칙은 `AGENTS.md`에 있고 `CLAUDE.md`가 이를 가져오므로 Claude도 같은 규칙을 적용한다.
+
+```powershell
+python scripts/jira/create_issues.py --check
+```
+
+인증, 프로젝트·보드·필터 접근, 조회·생성 권한, 생성 가능한 유형을 확인한다. **GET 요청만 보내며 Jira를 변경하지 않는다.** 보드 접근과 프로젝트 권한을 각각 확인하므로 운영자가 보드 필터에 해당 프로젝트가 포함되는지도 확인해야 한다. `--check`는 실제 생성 성공이나 모든 필드·스프린트 편집 권한을 보장하는 테스트는 아니다.
+
+## 평소 사용
+
+> “러닝 기록 조회 기능 만들려고 해. Jira에 등록해줘.”
+
+AI가 범위를 확인하고 유형·제목·완료 조건·SP·담당자·Epic·스프린트 및 중복 후보를 제안한다. 지정하지 않은 담당자·스프린트는 미지정으로 제안한다. 확인한 뒤:
+
+Epic은 기존 항목의 목적과 범위를 먼저 확인해 적절한 항목을 재사용한다. 적절한 Epic이 없으면 AI가 새 Epic의 제목·목적·범위를 제안하고 생성할지 물어본다. 사용자 확인 후 Epic을 생성·검증하고, 그 Epic에 연결할 Task/Story의 최종 내용을 확인받아 생성한다. 이미 구체적인 내용을 승인했다면 같은 확인을 반복하지 않는다.
+
+> “확인했어. 생성해줘.”
+
+AI가 생성하고 Key와 링크를 안내한다. 사용자가 JSON이나 실행 명령어를 작성할 필요는 없다. Jira 유형·제목·SP 기준은 팀의 Jira 사용 가이드를 따른다. 이 문서는 새 SP 척도를 정의하지 않는다.
+
+## AI 및 유지보수 담당자용 실행 방식
+
+```powershell
+# 모두 읽기 전용
+python scripts/jira/create_issues.py --catalog
+python scripts/jira/create_issues.py --catalog --user-query "팀원 이름"
+python scripts/jira/create_issues.py --input .jira/drafts/running-history.json
+```
+
+미리보기는 생성 화면 메타데이터로 유형·Story Points·필수 필드를 검사한다. Epic이 같은 프로젝트의 Epic인지, 담당자가 배정 가능한지, 스프린트가 지정 보드의 활성/예정 스프린트인지도 확인한다. 모든 프로젝트 이슈의 제목을 페이지 끝까지 조회해 `project_issues`로 반환하므로 AI가 의미상 중복을 검토한다. 같은 제목의 정확한 중복은 `exact_duplicates`에 표시한다. 제목만으로 업무 의미를 완벽하게 판단하지 못한다.
+
+초안 JSON은 AI가 다음 형식으로 작성한다. `description`은 일반 텍스트이며 Markdown 문법 변환은 하지 않는다. 완료 조건은 Jira의 글머리 목록으로 저장한다.
+
+```json
+{
+  "issue_type": "Task",
+  "summary": "[Jira] AI 업무 생성 및 개발 연계 자동화 코드 구현",
+  "description": "팀 가이드를 실제로 실행할 수 있도록 연동 코드를 구현한다.",
+  "acceptance_criteria": ["연결 확인은 Jira를 변경하지 않는다", "승인된 초안으로 이슈를 생성하고 검증한다"],
+  "story_points": 5,
+  "assignee": null,
+  "epic": "S15P31E105-21",
+  "sprint_id": null,
+  "labels": []
+}
+```
+
+- 로컬 스크립트 유형: `Task`/`작업`, `Story`/`스토리`, `Epic`/`에픽`. Subtask는 생성하지 않는다. 기존 Epic 중 적절한 항목이 없으면 AI가 사용자 확인 후 로컬 스크립트로 새 Epic을 생성하고, 생성된 Key를 Task/Story 초안에 반영한다.
+- SP: Task/Story는 팀 기준의 양의 숫자이며 프로젝트 생성 화면에 Story Points 필드가 있어야 한다. 후보가 여러 개면 `.env`의 `JIRA_STORY_POINTS_FIELD`로 지정한다. ID는 사이트별로 확인한다. Epic은 SP를 생략하거나 `null`로 지정한다.
+- 담당자: 조회 결과의 `accountId` 또는 `null`. 이메일을 ID 대신 넣지 않는다. `null`은 프로젝트 기본 담당자 자동 배정을 막기 위해 명시적으로 미지정한다.
+- Epic: Task/Story를 연결할 같은 프로젝트 Epic Key 또는 `null`. 생성 화면의 `parent`를 우선하고 구형 Epic Link 필드도 지원한다. 새 Epic을 생성할 때는 이 항목을 생략하거나 `null`로 지정한다.
+- 스프린트: Task/Story는 보드의 활성/예정 스프린트 숫자 ID 또는 `null`(스프린트 지정하지 않음). Epic은 생략하거나 `null`로 지정한다.
+- Epic 이름: 생성 화면에 별도 Epic Name 필드가 있으면 기본적으로 제목을 저장한다. `epic_name`으로 별도 이름을 지정할 수 있고, 이 값도 승인 해시와 생성 후 검증에 포함된다. Task/Story에는 `epic_name`을 지정하지 않는다.
+- 추가 필수 필드가 있는 프로젝트는 생성을 중단한다. 임의 기본값을 넣지 않고 해당 필드를 지원하도록 별도 확장한다.
+
+새 Epic 초안 예시:
+
+```json
+{
+  "issue_type": "Epic",
+  "summary": "[BE] 러닝 기록 관리",
+  "description": "러닝 기록 저장·조회·분석 기능을 묶어서 관리한다.",
+  "acceptance_criteria": ["관련 Task/Story가 완료되어 러닝 기록 관리 기능을 사용할 수 있다"],
+  "assignee": null,
+  "labels": []
+}
+```
+
+Epic도 같은 `--input` 미리보기 및 `--apply --approved-sha256` 명령을 사용한다. 생성된 Epic Key를 확인한 다음 Task/Story의 `epic`에 넣고 다시 미리보기한다. Epic과 Task/Story를 일괄로 생성하지 않으므로, Epic 생성만 성공하고 후속 업무 생성이 실패하면 기존 Epic을 재사용한다.
+
+사용자 확인 후 AI는 **해당 미리보기**의 `approval_sha256`를 넘긴다.
+
+```powershell
+python scripts/jira/create_issues.py --input .jira/drafts/running-history.json --apply --approved-sha256 <미리보기의_SHA256>
+```
+
+기본 실행은 조회이며 `--apply` 없이는 생성하지 않는다. 초안·사이트·프로젝트·보드가 바뀌면 해시가 바뀌어 실행이 차단된다. 해시는 변경 감지 수단으로, AI는 사람의 실제 확인도 받아야 한다. 동일 제목의 별개 업무를 사람이 확인한 경우에만 `--allow-duplicates`를 추가한다.
+
+생성 후 제목·본문·유형·SP·담당자·Epic·요청한 라벨을 다시 조회해 비교한다. 스프린트가 지정됐으면 생성 후 스프린트에 배정하고 배정 결과도 확인한다. 생성·스프린트 배정·검증은 하나의 트랜잭션이 아니므로 부분 성공이 가능하다.
+
+## 실패 및 중복 생성 복구
+
+HTTP 오류는 상태와 점검 항목만 출력하며 서버 응답 본문·Authorization·Token은 출력하지 않는다. 요청은 자동 재시도하지 않는다. 인증을 포함한 요청의 리다이렉트도 허용하지 않는다.
+
+생성 전 `.jira/receipts/`에 해시별 기록을 배타적으로 만든다. 같은 PC의 같은 초안 재실행과 동시 실행은 이 기록으로 방지한다. 다른 PC에서 동시에 생성하는 경쟁 조건까지 보장하지는 않으므로 AI의 Jira 중복 확인도 필요하다.
+
+- Key가 반환됐지만 스프린트 지정이나 검증이 실패하면 **이미 생성된 업무**다. 다시 생성하지 않는다. Key·링크를 알려주고 해당 이슈의 실패 항목만 수정한다.
+- 읽기 검증은 `python scripts/jira/create_issues.py --verify S15P31E105-123`으로 재실행한다. 이 PC에 저장된 생성 기록이 필요하다. 이 명령은 수정하지 않는다.
+- 생성 요청 타임아웃 또는 Key 저장 실패는 결과가 불확실하다. 같은 초안의 재생성을 차단한다. Jira에서 제목·본문·생성 시각·담당자 등을 확인한다. 초안을 수정해 차단을 우회하지 않는다.
+- 관리자가 Jira에서 해당 이슈를 찾았다면 로컬 기록의 `key`에 실제 Jira Key를 넣고 `--verify`로 검증한다. `fields`와 `sprint_id`는 변경하지 않는다.
+- **미생성을 확인한 경우에만** 관리자가 해당 기록 하나를 삭제하고 승인된 초안을 재실행한다. 기록을 일괄 삭제하지 않는다.
+- `.jira` 기록을 유지한다. 검증이 실패하면 성공으로 보고하지 않는다.
+
+종료 코드: `0` 조회/검증 성공, `1` 입력·연결·실행 오류, `2` 이슈는 존재하지만 검증 미완료 또는 불일치.
+
+## 개발까지 이어서 요청
+
+> “생성된 Jira 업무를 구현하고 검증해줘. 커밋·Push·MR 생성은 하지 말아줘.”
+
+또는:
+
+> “구현과 검증이 끝나면 팀 규칙에 맞춰 커밋·Push하고 MR도 생성해줘.”
+
+AI는 최신 `dev`에서 `<type>/<JIRA-KEY>-<description>` 브랜치를 만들어 요청 범위까지만 진행한다. MR 제목에는 Jira Key, 작업 MR 본문에는 `Closes <JIRA-KEY>`를 넣는다.
+
+다른 팀원의 승인은 필수가 아니다. 필요한 경우에만 팀원에게 리뷰를 요청한다. 작성자는 MR의 변경 내용과 검증 결과를 한 번 더 확인하고, 병합해도 괜찮다고 판단하면 직접 병합할 수 있다. 작업 MR은 squash와 source branch 삭제를 적용하며, `dev` → `master` 통합은 squash하지 않는다. 구현만 끝났다고 AI가 임의로 Jira를 완료 처리하지 않는다.
+
+## 검증
+
+```powershell
+python -m unittest discover -s scripts/jira/tests -v
+```
+
+모의 Jira로 읽기 전용 동작, 생성 결과 검증, 중복·변경된 초안 차단, 동시 재실행 기록, 타임아웃·부분 성공 처리를 확인한다. 개인 `.env` 설정 후 `--check`, 카탈로그 및 실제 승인된 업무 생성으로 실환경 동작을 별도로 확인한다. 테스트용 이슈를 승인 없이 생성하지 않는다.
+
+2026-10-14 실환경 검증: 저장소 스크립트로 Epic `S15P31E105-23`, Story `S15P31E105-24`, Task `S15P31E105-25`를 생성했다. 제목·본문·유형·담당자 및 Epic 이름, Story/Task의 SP·Epic 연결을 재조회해 검증했다. 각 초안의 재실행이 기존 Key를 반환하고 새 이슈를 생성하지 않는 것도 확인했다. 검증 후 담당자를 지정하고 완료 상태로 정리했다. 스프린트 배정의 실환경 검증은 별도로 진행해야 한다.
+
+참고: [Jira Cloud 이슈 API](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/), [검색 API](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-search/), [스프린트 API](https://developer.atlassian.com/cloud/jira/software/rest/api-group-sprint/).
