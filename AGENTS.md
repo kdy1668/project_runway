@@ -16,6 +16,7 @@
 - type: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `ci`. Jira Task/Story 하나당 브랜치 하나와 MR 하나를 사용한다.
 - `master`, `dev`에 직접 Push하지 않는다. 최종 승인·병합은 사람이 한다.
 - 커밋 형식: `<type>(<scope>): <내용>`. scope는 실제 변경 영역 `fe`, `be`, `ai`, `infra`, `docs`를 사용하고 불필요하면 생략한다. 새 scope를 임의로 만들지 않는다. 커밋에 Jira Key는 필수가 아니다.
+- 여러 영역을 함께 변경하는 커밋과 MR은 제목에서 scope를 생략한다. 변경 영역은 MR 본문에 적는다.
 - 작업 MR은 `dev`로 생성한다. 제목은 `[<JIRA-KEY>] <type>(<scope>): <내용>`, 본문은 `.gitlab/merge_request_templates/Default.md`를 따르고 `Closes <JIRA-KEY>`를 넣는다.
 - MR 전 최신 `dev`를 반영하고 충돌 및 관련 검증을 확인한다. 팀 규칙은 Merge commit 방식에 작업 MR squash와 source branch 삭제를 적용한다.
 - 다른 팀원의 승인은 필수가 아니다. 필요한 경우에만 다른 팀원에게 리뷰를 요청한다. 작성자는 MR의 변경 내용과 검증 결과를 한 번 더 확인하고, 병합해도 괜찮다고 판단하면 직접 병합할 수 있다. AI의 병합 실행은 사용자가 명시적으로 요청한 경우에만 한다.
