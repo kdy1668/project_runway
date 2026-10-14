@@ -30,3 +30,9 @@
 ├── docs/       # 기획·설계 문서
 └── exec/       # 포팅 매뉴얼
 ```
+
+## Jira 업무 자동화
+
+자연어로 AI에게 업무 등록을 요청하면 내용을 제안하고, 사용자 확인 후 Jira에 생성한다.
+개발자별 최초 설정과 사용 방법은 [Jira 자동화 가이드](docs/jira-automation.md)를 참고한다.
+AI의 Jira·브랜치·MR 작업 규칙은 [AGENTS.md](AGENTS.md)에 정리되어 있다.
