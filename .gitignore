@@ -50,6 +50,7 @@ venv/
 .mypy_cache/
 .ruff_cache/
 .jira/
+.gitlab-local/
 *.egg-info/
 .ipynb_checkpoints/
 
