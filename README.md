@@ -36,3 +36,8 @@
 자연어로 AI에게 업무 등록을 요청하면 내용을 제안하고, 사용자 확인 후 Jira에 생성한다.
 개발자별 최초 설정과 사용 방법은 [Jira 자동화 가이드](docs/jira-automation.md)를 참고한다.
 AI의 Jira·브랜치·MR 작업 규칙은 [AGENTS.md](AGENTS.md)에 정리되어 있다.
+
+## 기술 결정 기록 (ADR)
+
+아키텍처와 핵심 기술 선택의 배경·대안·결과는 [ADR 운영 규칙과 목록](docs/adr/README.md)에 기록한다.
+새 결정은 [공통 템플릿](docs/adr/0000-template.md)을 사용하고, 합의 여부와 변경 이력을 함께 관리한다.
