@@ -51,6 +51,10 @@ venv/
 .ruff_cache/
 .jira/
 .gitlab-local/
+.superpowers/
+# Local implementation plans and raw review notes (Feelm convention)
+/plans/
+/*/plans/
 *.egg-info/
 .ipynb_checkpoints/
 
@@ -76,3 +80,7 @@ temp/
 *.tmp
 *.bak
 *.orig
+
+# Local watch experiment exports (UUID filenames at repository root)
+/????????-????-????-????-????????????.json
+/watch-exports/
