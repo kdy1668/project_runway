@@ -25,11 +25,18 @@
 .
 ├── backend/    # 백엔드 서버
 ├── frontend/   # 프론트엔드
+├── wear/       # Wear OS 워치 앱 (Android Studio 프로젝트)
 ├── ai/         # AI 모델·파이프라인
 ├── infra/      # 배포·인프라 설정
 ├── docs/       # 기획·설계 문서
 └── exec/       # 포팅 매뉴얼
 ```
+
+## 워치 앱 문서
+
+- [워치 실험 앱 안내](docs/wear-app.md): 구조·설계 결정·설치·추출·검증 결과
+- [워치 업로드 API와 JSON 필드](docs/wear-upload-api.md): 백엔드·데이터 분석 공유 규격
+- [워치 앱 검증 보고서](wear/verification/S15P31E105-53.md): 테스트·독립 리뷰·실기기 확인 결과
 
 ## Jira 업무 자동화
 
