@@ -61,12 +61,20 @@ ADR에는 선택 이유를 기록하고, 구체적인 계약은 해당 기준 �
 
 ## ADR 목록
 
-현재 등록된 ADR은 없다.
+현재 확정된 기술스택과 선택 이유를 소급 기록한다. 결정일은 2026-10-20으로 통일한다.
 
 | ADR | 결정 | 상태 | 대체 관계 |
 | --- | --- | --- | --- |
+| [ADR-0001](0001-react-native-mobile-app.md) | 모바일 앱은 React Native로 구현한다 | 채택 | — |
+| [ADR-0002](0002-kotlin-wear-os-app.md) | Galaxy Watch 앱은 Kotlin으로 구현한다 | 채택 | — |
+| [ADR-0003](0003-java-spring-backend.md) | 서비스 백엔드는 Java와 Spring으로 구현한다 | 채택 | — |
+| [ADR-0004](0004-python-fastapi-ai-service.md) | AI 서비스는 Python과 FastAPI로 구현한다 | 채택 | — |
 
 새 ADR을 추가할 때 번호에는 문서 링크를 연결하고, 대체 관계에는 `대체함: ADR-NNNN` 또는 `대체됨: ADR-NNNN`을 문서 링크와 함께 적는다. 관계가 없으면 `—`로 표시한다.
+
+AI 모델·학습 프레임워크와 인프라 기술은 미정이며, 확정 후 별도 ADR로 기록한다.
+
+정리 업무: [S15P31E105-58](https://ssafy.atlassian.net/browse/S15P31E105-58).
 
 ## 관련 문서
 
