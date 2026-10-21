@@ -24,7 +24,7 @@
 ```
 .
 ├── backend/    # 백엔드 서버
-├── frontend/   # 프론트엔드
+├── frontend/   # React Native 모바일 앱
 ├── wear/       # Wear OS 워치 앱 (Android Studio 프로젝트)
 ├── ai/         # AI 모델·파이프라인
 ├── infra/      # 배포·인프라 설정
@@ -33,6 +33,8 @@
 ```
 
 ## 워치 앱 문서
+
+- [모바일 건강 데이터 검증 앱](docs/health-connect-app.md): 삼성 헬스·Health Connect / Apple 건강 조회, 권한, 빌드 및 검증 안내
 
 - [워치 실험 앱 안내](docs/wear-app.md): 구조·설계 결정·설치·추출·검증 결과
 - [워치 업로드 API와 JSON 필드](docs/wear-upload-api.md): 백엔드·데이터 분석 공유 규격

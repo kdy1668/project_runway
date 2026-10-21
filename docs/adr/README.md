@@ -69,6 +69,8 @@ ADR에는 선택 이유를 기록하고, 구체적인 계약은 해당 기준 �
 | [ADR-0002](0002-kotlin-wear-os-app.md) | Galaxy Watch 앱은 Kotlin으로 구현한다 | 채택 | — |
 | [ADR-0003](0003-java-spring-backend.md) | 서비스 백엔드는 Java와 Spring으로 구현한다 | 채택 | — |
 | [ADR-0004](0004-python-fastapi-ai-service.md) | AI 서비스는 Python과 FastAPI로 구현한다 | 채택 | — |
+| [ADR-0005](0005-health-connect-mobile-read.md) | 건강 데이터는 Android Health Connect와 iOS HealthKit으로 조회한다 | 제안 | — |
+| [ADR-0006](0006-samsung-health-direct-read.md) | 삼성 헬스 기존 기록은 SDK로 직접 읽고 Health Connect로 보완한다 | 제안 | ADR-0005의 후속 제안 |
 
 새 ADR을 추가할 때 번호에는 문서 링크를 연결하고, 대체 관계에는 `대체함: ADR-NNNN` 또는 `대체됨: ADR-NNNN`을 문서 링크와 함께 적는다. 관계가 없으면 `—`로 표시한다.
 
