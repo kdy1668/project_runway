@@ -80,6 +80,6 @@ AI 모델·학습 프레임워크와 인프라 기술은 미정이며, 확정 �
 
 ## 관련 문서
 
-- [1차 MVP 요구사항](../requirements/mvp.md)
-- [서비스 API 검토안](../api/service-api.md)
-- [데이터 모델 문서 안내](../architecture/data-model/README.md): ERD 원본은 아직 저장소에 등록되지 않음
+- [1차 MVP 기능](../requirements/mvp.md)
+- [1차 MVP API 명세](../api/README.md)
+- [데이터 모델](../architecture/data-model/README.md): ERD 스키마 원본과 테이블 설명
