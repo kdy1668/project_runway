@@ -2,7 +2,7 @@
 
 러닝 기록과 워치 데이터를 기반으로 개인에게 맞는 코스와 페이스를 제안하고, 개인·그룹 러닝 중 실시간 페이스 조정을 돕는 **AI 러닝 코치 서비스**
 
-1차 MVP 범위는 [MVP 기능 기준 문서](docs/requirements/mvp.md)를 따른다. 기술 결정과 검토 중인 계약은 [문서 안내](docs/README.md)에서 상태와 우선순위를 확인한다.
+1차 MVP 범위는 [MVP 기능 기준 문서](docs/design/mvp.md)를 따른다. 기술 결정과 검토 중인 계약은 [문서 안내](docs/README.md)에서 상태와 우선순위를 확인한다.
 
 ## 1차 MVP 기능
 
@@ -35,18 +35,17 @@
 
 ## 프로젝트 문서
 
-- [문서 전체 안내](docs/README.md): 기준 문서, 검토안, 기술 결정과 실험 기록의 위치
-- [1차 MVP 기능](docs/requirements/mvp.md): 1차 MVP 기능 범위
-- [상세 요구사항](docs/requirements/detailed-requirements.md): 1·2차 MVP 요구사항과 향후 검토 기능
-- [데이터 모델](docs/architecture/data-model/README.md): ERD 스키마 원본과 테이블 설명
-- [1차 MVP API 명세](docs/api/README.md): 공통 규약, 전체 API 색인 및 도메인별 상세 초안
+- [문서 전체 안내](docs/README.md): 설계 및 개발 운영 문서 목록
+- [1차 MVP 기능](docs/design/mvp.md): 1차 MVP 기능 범위
+- [상세 요구사항](docs/design/requirements.md): 1·2차 MVP 요구사항과 향후 검토 기능
+- [데이터 모델](docs/design/erd.md): ERD 설명과 기준 스키마
+- [1차 MVP API 명세](docs/design/api/README.md): 공통 규약, 전체 API 색인 및 도메인별 상세 초안
 
-## 워치 앱 문서
+## 앱 문서
 
-- [모바일 건강 데이터 검증 앱](docs/experiments/health-connect-app.md): 삼성 헬스·Health Connect / Apple 건강 조회, 권한, 빌드 및 검증 안내
-
-- [워치 실험 앱 안내](docs/experiments/wear-app.md): 구조·설계 결정·설치·추출·검증 결과
-- [워치 업로드 API와 JSON 필드](docs/api/wear-upload-api.md): 백엔드·데이터 분석 공유 규격
+- [모바일 앱 안내](frontend/README.md): 건강 데이터 PoC의 실행·빌드·검증 안내
+- [워치 앱 안내](wear/README.md): 워치 앱의 실행·빌드 안내
+- [워치 업로드 API와 JSON 필드](docs/design/api/wear-upload-api.md): 백엔드·데이터 분석 공유 규격
 - [워치 앱 검증 보고서](wear/verification/S15P31E105-53.md): 테스트·독립 리뷰·실기기 확인 결과
 
 ## Jira 업무 자동화
@@ -57,5 +56,5 @@ AI의 Jira·브랜치·MR 작업 규칙은 [AGENTS.md](AGENTS.md)에 정리되�
 
 ## 기술 결정 기록 (ADR)
 
-아키텍처와 핵심 기술 선택의 배경·대안·결과는 [ADR 운영 규칙과 목록](docs/adr/README.md)에 기록한다.
-새 결정은 [공통 템플릿](docs/adr/0000-template.md)을 사용하고, 합의 여부와 변경 이력을 함께 관리한다.
+아키텍처와 핵심 기술 선택의 배경·대안·결과는 [ADR 운영 규칙과 목록](docs/design/adr.md)에 기록한다.
+새 결정은 [공통 템플릿](docs/design/0000-template.md)을 사용하고, 합의 여부와 변경 이력을 함께 관리한다.

@@ -2,7 +2,6 @@
 
 Android 삼성 헬스 직접 조회·Health Connect 보완과 iOS HealthKit의 실제 기록을 확인하는 React Native 앱입니다.
 
-- [사용·권한·개발·빌드 안내](../docs/experiments/health-connect-app.md)
 - [이번 작업의 검증 결과 및 남은 실기기 확인](verification/S15P31E105-60.md)
 
 Node22.11 이상 / pnpm11 / Android JDK17을 사용합니다.
