@@ -8,7 +8,7 @@ RunWay의 제품 범위, 기술 결정, 인터페이스 계약, 실험 결과와
 2. [상세 요구사항](requirements/detailed-requirements.md)에서 1·2차 MVP 요구사항 ID와 세부 조건을 확인한다.
 3. [기술 결정 기록](adr/README.md)에서 현재 채택되거나 제안된 기술 결정을 확인한다.
 4. [데이터 모델](architecture/data-model/README.md)에서 ERD 스키마를 확인하고, [1차 MVP API 명세](api/README.md)에서 인터페이스 초안의 현재 상태를 확인한다.
-5. 작업 방식은 [개발 운영 문서](development/README.md), AI 작업 범위는 [AI 개발 문서](ai/README.md)를 따른다.
+5. 작업 방식은 [개발 운영 문서](development/README.md), 개발용 AI 도구의 범위는 [AI 도구 운영 문서](development/ai-tooling/README.md)를 따른다.
 
 `requirements/mvp.md`와 `requirements/detailed-requirements.md`는 동일한 1차 MVP 범위를 유지해야 한다. 두 문서가 충돌하면 임의로 우선순위를 정하지 않고 제품 결정을 확인해 함께 수정한다. 데이터 모델 내부가 충돌하면 `architecture/data-model/schema.sql`을 우선하며, API 검토안은 확정된 계약으로 간주하지 않는다.
 
@@ -22,7 +22,29 @@ RunWay의 제품 범위, 기술 결정, 인터페이스 계약, 실험 결과와
 | [`adr/`](adr/) | 기술 선택의 배경·대안·결과 | ADR 상태와 대체 관계가 기준 |
 | [`experiments/`](experiments/) | PoC 실행 방법과 검증 범위 | 제품 계약이 아닌 실험 기록 |
 | [`development/`](development/) | Git·Jira·GitLab 운영 방법 | 팀 개발 절차의 기준 문서 |
-| [`ai/`](ai/) | 개발용 AI 도구 조사와 검증 기록 | 서비스 내부 AI 설계와 분리 |
+| [`development/ai-tooling/`](development/ai-tooling/) | 개발용 AI 도구 조사와 검증 기록 | 서비스 내부 AI 설계와 분리 |
+
+## 문서 배치 기준
+
+`docs/`는 FE·BE·AI 같은 담당 팀이 아니라 **문서의 목적과 기준 성격**으로 구분한다. 새 문서는 다음 순서로 위치를 판단한다.
+
+1. 제품 기능, 범위와 인수 조건을 정의하면 `requirements/`에 둔다.
+2. 요청·응답, 오류 코드와 영역 간 인터페이스를 정의하면 `api/`에 둔다.
+3. 시스템 구성, 데이터 모델과 서비스 관계를 설명하면 `architecture/`에 둔다.
+4. 기술이나 구조를 선택한 이유와 대안을 기록하면 `adr/`에 둔다.
+5. 아직 제품 계약으로 확정하지 않은 PoC와 검증 결과는 `experiments/`에 둔다.
+6. Git·Jira·MR·개발 도구처럼 작업 방법을 설명하면 `development/`에 둔다.
+
+AI 관련 문서도 하나의 `docs/ai/` 폴더에 모으지 않고 같은 기준을 적용한다.
+
+- AI 기능 요구사항은 `requirements/`에서 관리한다.
+- AI 서비스의 외부 인터페이스는 `api/`에서 관리한다.
+- AI 서비스 경계와 데이터 구조는 `architecture/`에서 관리한다.
+- 모델·프레임워크 등 핵심 기술 선택은 `adr/`에서 관리한다.
+- 모델과 데이터의 실험 결과는 `experiments/`에서 관리한다.
+- Context7, Superpowers, Maestro MCP처럼 개발을 돕는 도구는 `development/ai-tooling/`에서 관리한다.
+
+한 내용이 여러 범주에 걸치면 가장 직접적인 책임을 가진 문서 하나를 기준 원본으로 정하고, 다른 문서에서는 내용을 복사하지 않고 링크한다. 서비스 코드의 실행·빌드 방법처럼 구현과 함께 바뀌는 내용은 해당 코드 디렉터리의 `README.md`에서 관리한다.
 
 ## 상태와 관리 원칙
 
