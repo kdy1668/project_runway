@@ -4,7 +4,7 @@
 
 ## 작업 흐름
 
-1. `AGENTS.md`, `docs/git-convention.md`, `.gitlab/merge_request_templates/Default.md`와 관련 Jira 업무를 확인한다. 사용자의 요청 범위를 우선한다.
+1. `AGENTS.md`, `docs/development/git-convention.md`, `.gitlab/merge_request_templates/Default.md`와 관련 Jira 업무를 확인한다. 사용자의 요청 범위를 우선한다.
 2. 사용자가 MR 생성을 요청한 경우 실제 커밋·차이·검증 결과를 확인해 변경 목적을 설명하는 제목과 본문을 작성한다. 커밋·Push가 필요하지만 아직 요청되지 않았다면 먼저 로컬 작업과 검증을 마치고 필요한 다음 동작만 확인한다.
 3. AI가 `.gitlab-local/drafts/`에 초안을 작성한다. 제목은 요청의 목적을, 본문은 실제 변경과 검증 결과를 담는다. 실행하지 않은 검증을 통과했다고 쓰거나 체크하지 않는다. 여러 영역을 바꾸면 제목 scope를 생략하고 본문에 변경 영역을 적는다.
 4. 읽기 전용 미리보기로 제목·본문·브랜치·담당자·옵션을 확인한다. 사용자가 이미 MR 생성을 요청했고 초안이 그 범위 안이면 별도 승인을 반복해서 묻지 않는다. 범위 밖 변경이나 부족한 정보만 확인한다.

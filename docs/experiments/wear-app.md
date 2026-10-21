@@ -8,7 +8,7 @@
 
 사용자가 설정한 BPM으로 소리·진동을 제공하고 달리는 동안 SPM, 속도, 거리, 걸음 수, 심박수, 보폭 데이터를 수집한다. 휴대폰 중계와 인터넷 없이 워치에 저장하고 운동 종료 후 JSON을 추출하거나 서버에 수동 전송한다.
 
-Spring Boot 수신 API·서버 DB·운영 인증·자동 전송은 포함하지 않는다. 서버 구현과 데이터 분석은 [업로드 API 및 전체 JSON 필드 명세](wear-upload-api.md)를 기준으로 한다.
+Spring Boot 수신 API·서버 DB·운영 인증·자동 전송은 포함하지 않는다. 서버 구현과 데이터 분석은 [업로드 API 및 전체 JSON 필드 명세](../api/wear-upload-api.md)를 기준으로 한다.
 
 ## 프로젝트와 개발 환경
 
@@ -90,7 +90,7 @@ Kotlin 경로는 `wear/app/src/main/java/com/runway/watchdemo/` 기준이다.
 | 보폭 추정 구분 | 직접 지표가 미지원일 때만 같은 구간의 거리÷걸음 수 사용. 출처와 원본 품질 기록 |
 | 세션 행을 쓰는 간단한 아웃박스 | 별도 테이블 없이 전송 상태를 지속 저장. 수동 재전송과 서버 중복 방지 사용 |
 
-측정값의 단위·출처·품질 및 계산 기준은 [API 명세](wear-upload-api.md)의 데이터 품질 절을 따른다.
+측정값의 단위·출처·품질 및 계산 기준은 [API 명세](../api/wear-upload-api.md)의 데이터 품질 절을 따른다.
 
 ## 종료·복구·전송
 
@@ -100,7 +100,7 @@ Kotlin 경로는 `wear/app/src/main/java/com/runway/watchdemo/` 기준이다.
 
 전송은 같은 SQLite 세션 행의 `PENDING / UPLOADING / UPLOADED / FAILED`를 사용한다. 상태 변경과 전송 데이터 읽기는 하나의 트랜잭션이며 읽기 실패 시 롤백한다. 앱 시작 시 결과가 불확실한 UPLOADING을 FAILED로 복구한다. 실패한 원본을 남기고 같은 sessionId로 수동 재전송한다.
 
-자동 재시도는 하지 않는다. 서버는 sessionId로 중복을 방지해야 하며 요청·응답·시간 제한·인증 조건은 [API 명세](wear-upload-api.md)를 따른다.
+자동 재시도는 하지 않는다. 서버는 sessionId로 중복을 방지해야 하며 요청·응답·시간 제한·인증 조건은 [API 명세](../api/wear-upload-api.md)를 따른다.
 
 ## 빌드와 실기기 설치
 
@@ -222,7 +222,7 @@ Android Studio에서 설치할 경우 실행 대상을 실제 워치로 선택�
 2. 기존 기록이 있으면 기록 조회·파일 추출이 되는지 확인한다. 새 워치라 기록이 없다면 기존 기록 업데이트 호환은 미검증으로 남긴다.
 3. 참가자 ID를 가명으로 설정하고 1~2분 기록한다. 운동 중 BPM을 한 번 변경하고 정상 종료한다.
 4. **전송** 탭에서 종료한 기록을 선택하고 **파일 추출**을 누른다.
-5. PC로 가져온 JSON에서 schemaVersion 2, 숫자 api·bootCount, Boolean synthetic과 BPM 변경 이력을 확인한다. bootCount 조회 불가 또는 과거 기록에 정보가 없는 경우의 null 규칙은 [API 명세](wear-upload-api.md)를 따른다. 센서 권한·지원 상태에 따라 결측이 있을 수 있다.
+5. PC로 가져온 JSON에서 schemaVersion 2, 숫자 api·bootCount, Boolean synthetic과 BPM 변경 이력을 확인한다. bootCount 조회 불가 또는 과거 기록에 정보가 없는 경우의 null 규칙은 [API 명세](../api/wear-upload-api.md)를 따른다. 센서 권한·지원 상태에 따라 결측이 있을 수 있다.
 
 ### 날짜·시각 맞추기
 
@@ -307,4 +307,4 @@ $watchAddress = '{0}:{1}' -f $watchIp.Trim(), $watchPort.Trim()
 
 ## 검증 결과
 
-자동 테스트·독립 리뷰·실기기 확인 결과와 미검증 범위는 [S15P31E105-53 검증 보고서](../wear/verification/S15P31E105-53.md)를 참고한다.
+자동 테스트·독립 리뷰·실기기 확인 결과와 미검증 범위는 [S15P31E105-53 검증 보고서](../../wear/verification/S15P31E105-53.md)를 참고한다.

@@ -180,7 +180,7 @@ def load_draft(path: Path) -> dict:
 def validate_draft(draft: dict) -> dict:
     allowed = {"issue_type", "summary", "description", "acceptance_criteria", "story_points", "assignee", "epic", "sprint_id", "labels", "epic_name"}
     if not isinstance(draft, dict) or set(draft) - allowed:
-        raise JiraError("지원하지 않는 초안 항목입니다. docs/jira-automation.md를 확인하세요.")
+        raise JiraError("지원하지 않는 초안 항목입니다. docs/development/jira-automation.md를 확인하세요.")
     for key in ("issue_type", "summary", "description"):
         if not isinstance(draft.get(key), str) or not draft[key].strip():
             raise JiraError(f"초안에 {key} 문자열이 필요합니다.")

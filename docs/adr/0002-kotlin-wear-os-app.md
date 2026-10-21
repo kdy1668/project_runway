@@ -5,7 +5,7 @@
 | 상태 | 채택 |
 | 결정일 | 2026-10-20 |
 | 결정자 | 워치 담당, 팀 합의 |
-| 관련 | [S15P31E105-58](https://ssafy.atlassian.net/browse/S15P31E105-58), [S15P31E105-53](https://ssafy.atlassian.net/browse/S15P31E105-53), [워치 앱 안내](../wear-app.md), [Android의 Kotlin 우선 지원](https://developer.android.com/kotlin/first), [Compose for Wear OS](https://developer.android.com/training/wearables/compose) |
+| 관련 | [S15P31E105-58](https://ssafy.atlassian.net/browse/S15P31E105-58), [S15P31E105-53](https://ssafy.atlassian.net/browse/S15P31E105-53), [워치 앱 안내](../experiments/wear-app.md), [Android의 Kotlin 우선 지원](https://developer.android.com/kotlin/first), [Compose for Wear OS](https://developer.android.com/training/wearables/compose) |
 
 ## 맥락
 
