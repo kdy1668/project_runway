@@ -1,6 +1,6 @@
 # API 명세 — 인증·사용자·러닝 프로필
 
-[API 명세 색인](./README.md)으로 돌아가기. 공통 규약은 [README.md](./README.md#공통-규약)를 따른다.
+[API 명세 색인](README.md)으로 돌아가기. 공통 규약은 [API 명세](README.md#공통-규약)를 따른다.
 
 | ID | 이름 | Method | Endpoint | 단계 | 인증 |
 |---|---|---|---|---|---|

@@ -5,7 +5,7 @@
 | 상태 | 채택 |
 | 결정일 | 2026-10-20 |
 | 결정자 | BE 담당, 팀 합의 |
-| 관련 | [S15P31E105-58](https://ssafy.atlassian.net/browse/S15P31E105-58), [워치 업로드 API 명세](../api/wear-upload-api.md), [ADR-0001](0001-react-native-mobile-app.md), [ADR-0004](0004-python-fastapi-ai-service.md) |
+| 관련 | [S15P31E105-58](https://ssafy.atlassian.net/browse/S15P31E105-58), [워치 업로드 API 명세](api/wear-upload-api.md), [ADR-0001](0001-react-native-mobile-app.md), [ADR-0004](0004-python-fastapi-ai-service.md) |
 
 ## 맥락
 

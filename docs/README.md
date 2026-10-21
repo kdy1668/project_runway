@@ -1,56 +1,22 @@
-# RunWay 문서 안내
+# RunWay 문서
 
-RunWay의 제품 범위, 기술 결정, 인터페이스 계약, 실험 결과와 개발 운영 문서를 목적별로 관리한다. 새 문서를 추가하거나 기존 문서를 이동할 때는 이 문서의 분류와 링크를 함께 갱신한다.
+현재 사용하는 문서만 두 영역으로 관리한다.
 
-## 먼저 읽을 문서
+## 설계
 
-1. [1차 MVP 기능](requirements/mvp.md)에서 구현할 기능 범위를 확인한다.
-2. [상세 요구사항](requirements/detailed-requirements.md)에서 1·2차 MVP 요구사항 ID와 세부 조건을 확인한다.
-3. [기술 결정 기록](adr/README.md)에서 현재 채택되거나 제안된 기술 결정을 확인한다.
-4. [데이터 모델](architecture/data-model/README.md)에서 ERD 스키마를 확인하고, [1차 MVP API 명세](api/README.md)에서 인터페이스 초안의 현재 상태를 확인한다.
-5. 작업 방식은 [개발 운영 문서](development/README.md), 개발용 AI 도구의 범위는 [AI 도구 운영 문서](development/ai-tooling/README.md)를 따른다.
+- [1차 MVP 기능](design/mvp.md)
+- [상세 요구사항](design/requirements.md)
+- [데이터 모델 설명](design/erd.md) · [기준 스키마](design/schema.sql)
+- [API 명세](design/api/README.md)
+- [기술 결정 기록](design/adr.md)
 
-`requirements/mvp.md`와 `requirements/detailed-requirements.md`는 동일한 1차 MVP 범위를 유지해야 한다. 두 문서가 충돌하면 임의로 우선순위를 정하지 않고 제품 결정을 확인해 함께 수정한다. 데이터 모델 내부가 충돌하면 `architecture/data-model/schema.sql`을 우선하며, API 검토안은 확정된 계약으로 간주하지 않는다.
+설계 문서는 모두 `design/`에 둔다. 기능 구현 시 현재 Jira와 관련된 문서만 확인한다. 요구사항이 충돌하면 임의로 정하지 않고 제품 결정을 확인하며, 데이터 모델 내부가 충돌하면 `schema.sql`을 우선한다. API 문서는 문서에 표시된 상태를 확인한다.
 
-## 문서 구조
+## 개발 운영
 
-| 위치 | 역할 | 현재 기준 상태 |
-| --- | --- | --- |
-| [`requirements/`](requirements/) | MVP 기능 범위와 상세 요구사항 | `mvp.md`가 제품 범위의 기준 문서 |
-| [`architecture/`](architecture/) | 시스템 개요와 데이터 모델 | `data-model/schema.sql`이 데이터 모델 기준 원본 |
-| [`api/`](api/) | 서비스 및 실험용 인터페이스 계약 | 문서별 상태를 확인 |
-| [`adr/`](adr/) | 기술 선택의 배경·대안·결과 | ADR 상태와 대체 관계가 기준 |
-| [`experiments/`](experiments/) | PoC 실행 방법과 검증 범위 | 제품 계약이 아닌 실험 기록 |
-| [`development/`](development/) | Git·Jira·GitLab 운영 방법 | 팀 개발 절차의 기준 문서 |
-| [`development/ai-tooling/`](development/ai-tooling/) | 개발용 AI 도구 조사와 검증 기록 | 서비스 내부 AI 설계와 분리 |
+- [Git 규칙](development/git-convention.md)
+- [Jira 자동화](development/jira-automation.md)
+- [GitLab 자동화](development/gitlab-automation.md)
+- [개발용 AI 도구](development/ai-tooling.md)
 
-## 문서 배치 기준
-
-`docs/`는 FE·BE·AI 같은 담당 팀이 아니라 **문서의 목적과 기준 성격**으로 구분한다. 새 문서는 다음 순서로 위치를 판단한다.
-
-1. 제품 기능, 범위와 인수 조건을 정의하면 `requirements/`에 둔다.
-2. 요청·응답, 오류 코드와 영역 간 인터페이스를 정의하면 `api/`에 둔다.
-3. 시스템 구성, 데이터 모델과 서비스 관계를 설명하면 `architecture/`에 둔다.
-4. 기술이나 구조를 선택한 이유와 대안을 기록하면 `adr/`에 둔다.
-5. 아직 제품 계약으로 확정하지 않은 PoC와 검증 결과는 `experiments/`에 둔다.
-6. Git·Jira·MR·개발 도구처럼 작업 방법을 설명하면 `development/`에 둔다.
-
-AI 관련 문서도 하나의 `docs/ai/` 폴더에 모으지 않고 같은 기준을 적용한다.
-
-- AI 기능 요구사항은 `requirements/`에서 관리한다.
-- AI 서비스의 외부 인터페이스는 `api/`에서 관리한다.
-- AI 서비스 경계와 데이터 구조는 `architecture/`에서 관리한다.
-- 모델·프레임워크 등 핵심 기술 선택은 `adr/`에서 관리한다.
-- 모델과 데이터의 실험 결과는 `experiments/`에서 관리한다.
-- Context7, Superpowers, Maestro MCP처럼 개발을 돕는 도구는 `development/ai-tooling/`에서 관리한다.
-
-한 내용이 여러 범주에 걸치면 가장 직접적인 책임을 가진 문서 하나를 기준 원본으로 정하고, 다른 문서에서는 내용을 복사하지 않고 링크한다. 서비스 코드의 실행·빌드 방법처럼 구현과 함께 바뀌는 내용은 해당 코드 디렉터리의 `README.md`에서 관리한다.
-
-## 상태와 관리 원칙
-
-- 각 문서 상단에 상태, 기준일 또는 관련 Jira를 기록한다.
-- 같은 내용을 여러 문서에 복사하지 않고 기준 문서를 링크한다.
-- 아키텍처와 핵심 기술 선택은 [ADR 운영 규칙](adr/README.md)에 따라 기록한다.
-- 실험 결과는 실제로 확인한 범위와 미검증 범위를 구분한다.
-- 파일을 이동하거나 이름을 바꾸면 저장소 내부 링크와 자동화 스크립트의 안내 경로도 함께 수정한다.
-- 인증정보가 포함된 `.env`와 `.env.*`는 문서, 로그, 예시에 포함하지 않는다.
+AI Agent의 공통 보안·작업 규칙은 루트 [`AGENTS.md`](../AGENTS.md)를 따른다. 코드 실행·빌드 방법은 해당 코드 디렉터리의 `README.md`에서 관리한다. 아직 사용하지 않는 문서 분류나 빈 폴더는 미리 만들지 않는다.

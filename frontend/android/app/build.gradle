@@ -112,7 +112,7 @@ android {
 dependencies {
     // User-downloaded SDK stays outside Git; override with -PsamsungHealthSdk=/absolute/path.
     def samsungSdk = file(project.findProperty('samsungHealthSdk') ?: '../../../tmp/samsung-sdk/1.1.0/1.1.0/libs/samsung-health-data-api-1.1.0.aar')
-    if (!samsungSdk.exists()) { throw new GradleException('Download Samsung Health Data SDK 1.1.0 and set -PsamsungHealthSdk=<aar path>. See docs/experiments/health-connect-app.md.') }
+    if (!samsungSdk.exists()) { throw new GradleException('Download Samsung Health Data SDK 1.1.0 and set -PsamsungHealthSdk=<aar path>. See frontend/README.md.') }
     implementation files(samsungSdk)
     implementation 'com.google.code.gson:gson:2.9.0'
     // The version of react-native is set by the React Native Gradle Plugin
