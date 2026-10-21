@@ -52,12 +52,12 @@ ADR에는 선택 이유를 기록하고, 구체적인 계약은 해당 기준 �
 
 1. 기존 ADR 목록과 관련 Jira·요구사항·API 명세·ERD를 확인해 중복·충돌과 영향을 받는 영역을 파악한다.
 2. 결정의 작성·확정·변경을 Jira Task/Story로 관리한다.
-3. [팀 Git 규칙](../git-convention.md)에 따라 최신 `dev` 기준의 `<type>/<JIRA-KEY>-<description>` 브랜치를 사용한다. ADR만 변경하는 업무는 `docs` type을 사용한다.
+3. [팀 Git 규칙](../development/git-convention.md)에 따라 최신 `dev` 기준의 `<type>/<JIRA-KEY>-<description>` 브랜치를 사용한다. ADR만 변경하는 업무는 `docs` type을 사용한다.
 4. 템플릿으로 초안을 작성하고 관련 Jira·설계 문서·기존 ADR을 연결한다. 새 문서와 상태 변경을 목록에도 반영한다.
 5. 합의가 필요한 항목은 영향받는 담당자와 확인한다. 합의 전에는 제안 상태를 유지하고, 채택할 때 확인된 근거를 기록한다.
 6. 링크·번호·상태·대체 관계와 기준 문서의 정합성을 확인하고, [팀 MR 템플릿](../../.gitlab/merge_request_templates/Default.md)에 변경 내용과 실제 검증 결과를 적어 `dev` 대상 MR로 반영한다.
 
-브랜치·MR 운영과 Jira 완료 처리는 [팀 Git 규칙](../git-convention.md)을 따른다.
+브랜치·MR 운영과 Jira 완료 처리는 [팀 Git 규칙](../development/git-convention.md)을 따른다.
 
 ## ADR 목록
 
@@ -80,4 +80,6 @@ AI 모델·학습 프레임워크와 인프라 기술은 미정이며, 확정 �
 
 ## 관련 문서
 
-요구사항 정의서·API 명세·ERD 문서는 추후 연결할 예정이다.
+- [1차 MVP 요구사항](../requirements/mvp.md)
+- [서비스 API 검토안](../api/service-api.md)
+- [데이터 모델 문서 안내](../architecture/data-model/README.md): ERD 원본은 아직 저장소에 등록되지 않음

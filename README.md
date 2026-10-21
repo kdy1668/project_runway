@@ -2,7 +2,7 @@
 
 러닝 기록과 워치 데이터를 기반으로 개인에게 맞는 코스와 페이스를 제안하고, 개인·그룹 러닝 중 실시간 페이스 조정을 돕는 **AI 러닝 코치 서비스**
 
-> 기획 확정 전 초안
+1차 MVP 범위는 [요구사항 기준 문서](docs/requirements/mvp.md)를 따른다. 기술 결정과 검토 중인 계약은 [문서 안내](docs/README.md)에서 상태와 우선순위를 확인한다.
 
 ## 1차 MVP 기능
 
@@ -32,18 +32,24 @@
 └── exec/       # 포팅 매뉴얼
 ```
 
+## 프로젝트 문서
+
+- [문서 전체 안내](docs/README.md): 기준 문서, 검토안, 기술 결정과 실험 기록의 위치
+- [1차 MVP 요구사항](docs/requirements/mvp.md): 구현 범위와 제외 범위
+- [서비스 API 검토안](docs/api/service-api.md): 모바일·워치 연동 앱과 백엔드 사이의 API 초안
+
 ## 워치 앱 문서
 
-- [모바일 건강 데이터 검증 앱](docs/health-connect-app.md): 삼성 헬스·Health Connect / Apple 건강 조회, 권한, 빌드 및 검증 안내
+- [모바일 건강 데이터 검증 앱](docs/experiments/health-connect-app.md): 삼성 헬스·Health Connect / Apple 건강 조회, 권한, 빌드 및 검증 안내
 
-- [워치 실험 앱 안내](docs/wear-app.md): 구조·설계 결정·설치·추출·검증 결과
-- [워치 업로드 API와 JSON 필드](docs/wear-upload-api.md): 백엔드·데이터 분석 공유 규격
+- [워치 실험 앱 안내](docs/experiments/wear-app.md): 구조·설계 결정·설치·추출·검증 결과
+- [워치 업로드 API와 JSON 필드](docs/api/wear-upload-api.md): 백엔드·데이터 분석 공유 규격
 - [워치 앱 검증 보고서](wear/verification/S15P31E105-53.md): 테스트·독립 리뷰·실기기 확인 결과
 
 ## Jira 업무 자동화
 
 자연어로 AI에게 업무 등록을 요청하면 내용을 제안하고, 사용자 확인 후 Jira에 생성한다.
-개발자별 최초 설정과 사용 방법은 [Jira 자동화 가이드](docs/jira-automation.md)를 참고한다.
+개발자별 최초 설정과 사용 방법은 [Jira 자동화 가이드](docs/development/jira-automation.md)를 참고한다.
 AI의 Jira·브랜치·MR 작업 규칙은 [AGENTS.md](AGENTS.md)에 정리되어 있다.
 
 ## 기술 결정 기록 (ADR)

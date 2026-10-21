@@ -20,7 +20,7 @@ class FakeClient:
         self.behind = False
         self.head = 'a' * 40
         self.target = 'b' * 40
-        self.paths = ['scripts/gitlab/manage_mr.py', 'docs/gitlab-automation.md']
+        self.paths = ['scripts/gitlab/manage_mr.py', 'docs/development/gitlab-automation.md']
         self.fail_write = False
         self.fail_readback = False
         self.written = False

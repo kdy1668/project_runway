@@ -1,8 +1,8 @@
 # 모바일 건강 데이터 검증 앱
 
-관련 업무: [S15P31E105-60](https://ssafy.atlassian.net/browse/S15P31E105-60), [ADR 제안](adr/0005-health-connect-mobile-read.md).
+관련 업무: [S15P31E105-60](https://ssafy.atlassian.net/browse/S15P31E105-60), [ADR 제안](../adr/0005-health-connect-mobile-read.md).
 
-`frontend/`의 React Native 앱은 OS를 자동 감지해 Android에서는 Samsung Health Data SDK1.1.0 우선·Health Connect 보완, iOS에서는 HealthKit을 읽는다. 서버·FastAPI 없이 수집 가능 여부를 확인하는 PoC다. 건강 기록을 서버로 보내거나 별도로 저장하지 않는다. 로그에 원본 건강값을 출력하지 않는다. [ADR0006 제안](adr/0006-samsung-health-direct-read.md)을 따른다.
+`frontend/`의 React Native 앱은 OS를 자동 감지해 Android에서는 Samsung Health Data SDK1.1.0 우선·Health Connect 보완, iOS에서는 HealthKit을 읽는다. 서버·FastAPI 없이 수집 가능 여부를 확인하는 PoC다. 건강 기록을 서버로 보내거나 별도로 저장하지 않는다. 로그에 원본 건강값을 출력하지 않는다. [ADR0006 제안](../adr/0006-samsung-health-direct-read.md)을 따른다.
 
 | 항목 | Android | iOS |
 | --- | --- | --- |
@@ -72,7 +72,7 @@ Xcode의 RunwayHealth 타깃에서 본인 팀/서명, HealthKit capability와 �
 
 ## 검증과 배포 범위
 
-[이번 실행의 검증 기록](../frontend/verification/S15P31E105-60.md)을 확인한다. 테스트 통과와 실제 삼성/Apple 건강 데이터 수집 성공은 별개다. 사용자 본인이 권한과 화면 값을 확인해야 하며, 건강 원본을 채팅이나 로그에 전달할 필요는 없다.
+[이번 실행의 검증 기록](../../frontend/verification/S15P31E105-60.md)을 확인한다. 테스트 통과와 실제 삼성/Apple 건강 데이터 수집 성공은 별개다. 사용자 본인이 권한과 화면 값을 확인해야 하며, 건강 원본을 채팅이나 로그에 전달할 필요는 없다.
 
 공개 배포 전에는 Google Play 건강 데이터 정책·Health Connect 사용 목적/데이터 보안 신고, Apple HealthKit 사용 목적·개인정보 처리방침·App Store 심사와 서명을 별도로 준비한다. 이번 PoC는 배포 승인을 받은 상태가 아니다. GPS 경로·운동 센서 스트리밍·칼로리·산소포화도·체중·모델 점수/서버 연동은 포함하지 않는다.
 
