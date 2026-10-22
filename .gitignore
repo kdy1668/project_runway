@@ -52,7 +52,7 @@ venv/
 .jira/
 .gitlab-local/
 .superpowers/
-# Local implementation plans and raw review notes (Feelm convention)
+# Local implementation plans and raw review notes
 /plans/
 /*/plans/
 *.egg-info/
