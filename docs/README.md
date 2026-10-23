@@ -9,6 +9,7 @@
 - [데이터 모델 설명](design/db/erd.md) · [기준 스키마](design/db/schema.sql) · [ERD 이미지](design/db/erd.png)
 - [API 명세](design/api/README.md)
 - [기술 결정 기록](adr/README.md)
+- [일상 심박·IBI 기술 검증 결과](design/watch-passive-health-feasibility.md)
 
 설계 문서는 `design/`, 기술 결정 기록은 `adr/`에 둔다. 기능 구현 시 현재 Jira와 관련된 문서만 확인한다. 요구사항이 충돌하면 임의로 정하지 않고 제품 결정을 확인하며, 데이터 모델 내부가 충돌하면 `schema.sql`을 우선한다. API 문서는 문서에 표시된 상태를 확인한다.
 
