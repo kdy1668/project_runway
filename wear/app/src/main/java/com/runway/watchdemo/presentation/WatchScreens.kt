@@ -195,7 +195,7 @@ private fun ColumnScope.BpmScreen(state: RecordingSnapshot, participant: String,
     val adjustable = state.state !in setOf(SessionState.STARTING, SessionState.STOPPING)
     Row(Modifier.fillMaxWidth().height(46.dp), horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically) {
-        Pill("−5", Modifier.width(32.dp), enabled = adjustable, height = 32) { onCue(state.cue.copy(bpm = MetricMath.clampBpm(state.cue.bpm - 5))) }
+        Pill("−1", Modifier.width(32.dp), enabled = adjustable, height = 32) { onCue(state.cue.copy(bpm = MetricMath.clampBpm(state.cue.bpm - 1))) }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(state.cue.bpm.toString(), color = Accent, fontSize = 30.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold)
             Text(if (participant.isBlank()) "참가자 ID" else participant.take(9) + " ✎", color = Muted,
@@ -203,7 +203,7 @@ private fun ColumnScope.BpmScreen(state: RecordingSnapshot, participant: String,
                 modifier = Modifier.semantics { contentDescription = "참가자 변경" }
                     .clickable(enabled = !state.busy, role = Role.Button, onClick = onParticipant))
         }
-        Pill("+5", Modifier.width(32.dp), enabled = adjustable, height = 32) { onCue(state.cue.copy(bpm = MetricMath.clampBpm(state.cue.bpm + 5))) }
+        Pill("+1", Modifier.width(32.dp), enabled = adjustable, height = 32) { onCue(state.cue.copy(bpm = MetricMath.clampBpm(state.cue.bpm + 1))) }
     }
     Label("한 박자마다 한 걸음")
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
