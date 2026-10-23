@@ -31,7 +31,7 @@ DB 구조와 변경 이력의 관리 기준을 정리할 문서다. 현재 ERD�
 
 ## 3. 작성 재개 시 확인
 
-- 변경이 정리된 [ERD](../design/erd.md)와 [기준 스키마](../design/schema.sql)의 합의 상태
+- 변경이 정리된 [ERD](../design/db/erd.md)와 [기준 스키마](../design/db/schema.sql)의 합의 상태
 - 실제 사용할 DB 환경과 버전, 기존 DB·보존할 데이터 유무
 - 관련 API 계약 및 도메인·공통 기반 담당 범위
 

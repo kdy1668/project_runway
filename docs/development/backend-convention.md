@@ -10,7 +10,7 @@
 
 - 요구사항: [상세 요구사항](../design/requirements.md), [1차 MVP](../design/mvp.md)
 - API 요청·응답·오류: [API 명세](../design/api/README.md), [워치 업로드 계약](../design/api/wear-upload-api.md)
-- Entity·관계·제약: [ERD](../design/erd.md), [기준 스키마](../design/schema.sql)
+- Entity·관계·제약: [ERD](../design/db/erd.md), [기준 스키마](../design/db/schema.sql)
 - 설정·Secret: [Secret 및 환경변수 관리 규칙](secret-environment-variables.md)
 - 기술 선택과 상태: [ADR 목록](../adr/README.md), [Java·Spring 채택](../adr/0003-java-spring-backend.md)
   · [Gradle](../adr/0007-gradle-backend-build.md) · [JPA](../adr/0008-spring-data-jpa.md)
@@ -225,7 +225,7 @@ JPA Entity에는 다음 규칙을 적용한다.
 
 - 테이블·컬럼·제약의 생성과 변경은 Flyway의 버전별 SQL로 관리한다. JPA의 자동 스키마 변경과
   병행하지 않는다. JPA는 `ddl-auto=validate`로 Entity와 DB 매핑을 검사하는 방향으로 구성한다.
-- `docs/design/schema.sql`은 현재 구조를 설명하는 기준 문서이고, Flyway 파일은 실제 적용할
+- `docs/design/db/schema.sql`은 현재 구조를 설명하는 기준 문서이고, Flyway 파일은 실제 적용할
   변경 이력이다. 구조 변경 시 두 문서의 역할에 맞게 정합성을 유지한다.
 - 이미 공유 환경에 적용한 버전별 SQL은 수정하지 않고 후속 변경 파일을 추가한다.
   번호 충돌 방지·적용 시점·실패 복구 절차는 초기 DB 구성에서 정한다.
