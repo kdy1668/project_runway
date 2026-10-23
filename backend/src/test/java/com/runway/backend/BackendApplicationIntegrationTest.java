@@ -1,0 +1,60 @@
+package com.runway.backend;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import jakarta.persistence.EntityManagerFactory;
+import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.env.Environment;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Testcontainers
+class BackendApplicationIntegrationTest {
+
+    @Container
+    static final PostgreSQLContainer DATABASE =
+            new PostgreSQLContainer(
+                    DockerImageName.parse("postgis/postgis:17-3.6")
+                            .asCompatibleSubstituteFor("postgres"));
+
+    @DynamicPropertySource
+    static void databaseProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", DATABASE::getJdbcUrl);
+        registry.add("spring.datasource.username", DATABASE::getUsername);
+        registry.add("spring.datasource.password", DATABASE::getPassword);
+    }
+
+    @Autowired private JdbcTemplate jdbc;
+    @Autowired private EntityManagerFactory entityManagerFactory;
+    @Autowired private Flyway flyway;
+    @Autowired private Environment environment;
+
+    @Test
+    void 빈DB_기동_연결구성과확장을확인한다() {
+        assertThat(jdbc.queryForObject("SELECT 1", Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT postgis_version()", String.class)).startsWith("3.6");
+        assertThat(entityManagerFactory.isOpen()).isTrue();
+        assertThat(entityManagerFactory.getMetamodel().getEntities()).isEmpty();
+        assertThat(flyway.info().pending()).isEmpty();
+        assertThat(environment.getProperty("spring.jpa.hibernate.ddl-auto")).isEqualTo("validate");
+        assertThat(environment.getProperty("spring.jpa.open-in-view", Boolean.class)).isFalse();
+        assertThat(
+                        jdbc.queryForList(
+                                """
+                SELECT tablename FROM pg_tables
+                WHERE schemaname = 'public'
+                  AND tablename NOT IN ('spatial_ref_sys', 'flyway_schema_history')
+                """,
+                                String.class))
+                .isEmpty();
+    }
+}

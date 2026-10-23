@@ -17,6 +17,10 @@
 - [Git 규칙](development/git-convention.md)
 - [Jira 자동화](development/jira-automation.md)
 - [GitLab 자동화](development/gitlab-automation.md)
+- [백엔드 코드 컨벤션](development/backend-convention.md)
+- [백엔드 역할 분담](development/backend-role-assignment.md) — 작성 틀, 담당 미정
+- [물리 스키마·마이그레이션 규칙](development/db-schema-convention.md) — 작성 틀, ERD 변경 정리 후 작성
+- [Secret 및 환경변수 관리 규칙](development/secret-environment-variables.md)
 - [백엔드 개발 지침](../backend/AGENTS.md)
 
 AI Agent의 공통 보안·작업 규칙은 루트 [`AGENTS.md`](../AGENTS.md)를 따른다. 코드 실행·빌드 방법은 해당 코드 디렉터리의 `README.md`에서 관리한다. 아직 사용하지 않는 문서 분류나 빈 폴더는 미리 만들지 않는다.

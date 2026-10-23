@@ -16,19 +16,23 @@
   - 구현은 계약을 따른다. 계약과 다르게 구현해야 하면 임의로 진행하지 않고
     합의 후 문서를 먼저 수정한다. API 초안을 확정 계약으로 취급하지 않는다.
   - 명세에 없는 API, Entity, 필드를 임의로 추가하지 않는다.
-- 코드 규칙과 담당 도메인: 현재 Jira와 팀에서 확정한 백엔드 규칙·소유권을 확인한다.
-  - 전용 컨벤션·역할 분담 문서는 아직 없다. 미확정 규칙을 추정하지 않는다.
+- 코드 규칙: [백엔드 코드 컨벤션](../docs/development/backend-convention.md)
+  - 문서의 상태를 확인한다. 특정 기술의 작성법이 있다는 이유만으로 해당 기술이 도입·설정됐다고 가정하지 않는다.
+  - 담당 도메인·공통 코드 소유권은 [역할 분담 문서](../docs/development/backend-role-assignment.md)와
+    현재 Jira·팀 합의를 확인한다. 역할 문서는 작성 틀만 준비된 상태이며 미정 항목을 임의 배정하지 않는다.
   - 컨벤션 예외는 구현 전에 이유와 대안을 제시한다. 다른 담당자 소유 도메인과 공통 설정을 임의로 수정하지 않는다.
 - 아키텍처 결정: `docs/adr/`
-- 실행·빌드 명령은 프로젝트 초기 구성 시 `backend/README.md`에 확정한다.
+- 실행·빌드 명령은 [백엔드 README](README.md)를 따른다.
 
 ## 2. 검증
 
-현재 백엔드는 Java·Spring 채택만 확정되어 있고 실행 코드, 빌드 도구와 `backend/README.md`는 없다.
-Java 버전·Gradle·Spotless 등의 도입이나 명령을 추정하지 않는다. 초기 구성에서 실제 실행 가능한
-테스트·정적 검사·빌드 명령을 README에 기록하고 이후 완료 검증에 모두 적용한다.
-그 전에는 계획에서 실행 가능한 검증 명령·대체 검증과 통과 조건을 정한다.
-3장에서 플랜 파일을 생략하는 작업은 대화에 이를 기록한다.
+현재 백엔드는 Java 21·Spring MVC, Gradle(`build.gradle`), Spring Data JPA, Flyway를 사용하기로 결정했다.
+코드 작성 도구와 방식은 컨벤션에 따라 Spotless·AOSP, Lombok, record DTO, Bean Validation을 사용한다.
+설정 버전·준비 사항은 `backend/README.md`를 따른다. `backend`에서 완료 검증으로
+`./gradlew clean build`를 실행한다. Windows PowerShell에서는 `.\gradlew.bat clean build`를 쓴다.
+빌드는 읽기 전용 `spotlessCheck`와 DB 통합 테스트를 포함한 전체 테스트를 실행한다.
+포맷 수정은 `spotlessApply`로 별도 수행한다. Docker Linux 엔진이 필요하며 실행하지 못한
+DB 테스트를 건너뛰어 완료 처리하지 않는다. IntelliJ 실행·운영 배포 검증과 빌드 결과는 구분한다.
 
 작은 코드 변경도 관련 테스트 통과는 필수다. 문서 등 실행 코드가 없는 변경은 링크·내용 정합성 등
 사전에 정한 대체 검증을 수행한다. 테스트 코드만 바꾸어도 해당 테스트를 실행한다.
