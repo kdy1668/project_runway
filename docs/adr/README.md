@@ -61,7 +61,8 @@ ADR에는 선택 이유를 기록하고, 구체적인 계약은 해당 기준 �
 
 ## ADR 목록
 
-현재 확정된 기술스택과 선택 이유를 소급 기록한다. 결정일은 2026-10-20으로 통일한다.
+초기 기술 선택의 소급 기록은 결정일을 2026-10-20으로 통일했다. 이후 결정은 실제 확인한
+결정일과 합의 근거를 각 문서에 기록한다.
 
 | ADR | 결정 | 상태 | 대체 관계 |
 | --- | --- | --- | --- |
@@ -71,6 +72,11 @@ ADR에는 선택 이유를 기록하고, 구체적인 계약은 해당 기준 �
 | [ADR-0004](0004-python-fastapi-ai-service.md) | AI 서비스는 Python과 FastAPI로 구현한다 | 채택 | — |
 | [ADR-0005](0005-health-connect-mobile-read.md) | 건강 데이터는 Android Health Connect와 iOS HealthKit으로 조회한다 | 제안 | — |
 | [ADR-0006](0006-samsung-health-direct-read.md) | 삼성 헬스 기존 기록은 SDK로 직접 읽고 Health Connect로 보완한다 | 제안 | ADR-0005의 후속 제안 |
+| [ADR-0007](0007-gradle-backend-build.md) | 백엔드 빌드는 Gradle과 Groovy DSL을 사용한다 | 채택 | — |
+| [ADR-0008](0008-spring-data-jpa.md) | 백엔드의 기본 DB 접근은 Spring Data JPA를 사용한다 | 채택 | — |
+| [ADR-0009](0009-flyway-schema-migrations.md) | DB 구조 변경 이력은 Flyway로 관리한다 | 채택 | — |
+| [ADR-0010](0010-spring-mvc-backend.md) | 백엔드 HTTP API는 Spring MVC로 구현한다 | 채택 | — |
+| [ADR-0011](0011-local-postgresql-postgis.md) | 개발·테스트 DB는 PostgreSQL 17과 PostGIS 3.6을 사용한다 | 채택 | — |
 
 새 ADR을 추가할 때 번호에는 문서 링크를 연결하고, 대체 관계에는 `대체함: ADR-NNNN` 또는 `대체됨: ADR-NNNN`을 문서 링크와 함께 적는다. 관계가 없으면 `—`로 표시한다.
 
