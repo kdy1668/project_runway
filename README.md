@@ -38,7 +38,7 @@
 - [문서 전체 안내](docs/README.md): 설계 및 개발 운영 문서 목록
 - [1차 MVP 기능](docs/design/mvp.md): 1차 MVP 기능 범위
 - [상세 요구사항](docs/design/requirements.md): 1·2차 MVP 요구사항과 향후 검토 기능
-- [데이터 모델](docs/design/erd.md): ERD 설명과 기준 스키마
+- [데이터 모델](docs/design/db/erd.md): 테이블 설명 · [기준 스키마](docs/design/db/schema.sql) · [ERD 이미지](docs/design/db/erd.png)
 - [1차 MVP API 명세](docs/design/api/README.md): 공통 규약, 전체 API 색인 및 도메인별 상세 초안
 
 ## 앱 문서

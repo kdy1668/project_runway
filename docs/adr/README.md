@@ -88,4 +88,4 @@ AI 모델·학습 프레임워크와 인프라 기술은 미정이며, 확정 �
 
 - [1차 MVP 기능](../design/mvp.md)
 - [1차 MVP API 명세](../design/api/README.md)
-- [데이터 모델](../design/erd.md): ERD 스키마 원본과 테이블 설명
+- [데이터 모델](../design/db/erd.md): ERD 스키마 원본과 테이블 설명

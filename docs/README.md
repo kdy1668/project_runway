@@ -6,7 +6,7 @@
 
 - [1차 MVP 기능](design/mvp.md)
 - [상세 요구사항](design/requirements.md)
-- [데이터 모델 설명](design/erd.md) · [기준 스키마](design/schema.sql)
+- [데이터 모델 설명](design/db/erd.md) · [기준 스키마](design/db/schema.sql) · [ERD 이미지](design/db/erd.png)
 - [API 명세](design/api/README.md)
 - [기술 결정 기록](adr/README.md)
 

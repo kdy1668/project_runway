@@ -12,7 +12,7 @@
 ## 1. 기준 문서
 
 - 요구사항: `docs/design/requirements.md`, `docs/design/mvp.md`
-- API 계약: `docs/design/api/`, 논리 스키마: `docs/design/erd.md`, 물리 스키마: `docs/design/schema.sql`
+- API 계약: `docs/design/api/`, 논리 스키마: `docs/design/db/erd.md`, 물리 스키마: `docs/design/db/schema.sql`
   - 구현은 계약을 따른다. 계약과 다르게 구현해야 하면 임의로 진행하지 않고
     합의 후 문서를 먼저 수정한다. API 초안을 확정 계약으로 취급하지 않는다.
   - 명세에 없는 API, Entity, 필드를 임의로 추가하지 않는다.
@@ -64,7 +64,7 @@ DB 테스트를 건너뛰어 완료 처리하지 않는다. IntelliJ 실행·운
 
 트리거. diff 또는 플랜에 하나라도 있으면 해당한다.
 
-- `docs/design/api/`, `docs/design/erd.md`, `docs/design/schema.sql` 변경 또는 그 계약과 다른 구현
+- `docs/design/api/`, `docs/design/db/erd.md`, `docs/design/db/schema.sql` 변경 또는 그 계약과 다른 구현
 - DB 마이그레이션, 공통 모듈·보안 설정, 다른 담당자 소유 도메인
 - `@Transactional` 경계의 신설·변경, 한 유스케이스에서 둘 이상의 Repository 쓰기
 - 인증·인가 코드, 토큰·쿠키, 건강·GPS 개인정보 접근
@@ -193,7 +193,7 @@ DB 테스트를 건너뛰어 완료 처리하지 않는다. IntelliJ 실행·운
   파일 생략 작업은 대화의 짧은 계획·검증 결과와 생략 근거를 옮긴다. 로컬 파일 경로만 전달하지 않는다.
 - 플랜에서 프로젝트 수준 결정이 나오면 `docs/adr/`로 승격한다.
 - 미래 작업에 필요한 사실을 플랜이나 MR 본문에만 남기지 않는다. 계약, 스키마와
-  코드 규칙 변경은 반드시 정본 문서(`docs/design/api/`, `docs/design/erd.md`, `docs/design/schema.sql`,
+  코드 규칙 변경은 반드시 정본 문서(`docs/design/api/`, `docs/design/db/erd.md`, `docs/design/db/schema.sql`,
   확정된 백엔드 규칙과 `docs/adr/`)에 반영한다.
 
 - 아직 관찰할 수 없는 측정값은 사유와 함께 미확인으로 적는다. 작은 변경의 리뷰 생략도 MR에 명시한다.

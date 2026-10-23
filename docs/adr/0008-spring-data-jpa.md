@@ -5,7 +5,7 @@
 | 상태 | 채택 |
 | 결정일 | 2026-10-22 |
 | 결정자 | 작업 요청자 — S15P31E105-96 컨벤션 검토 대화에서 승인 |
-| 관련 | [S15P31E105-96](https://ssafy.atlassian.net/browse/S15P31E105-96), [ADR-0003](0003-java-spring-backend.md), [기준 스키마](../design/schema.sql), [백엔드 컨벤션](../development/backend-convention.md) |
+| 관련 | [S15P31E105-96](https://ssafy.atlassian.net/browse/S15P31E105-96), [ADR-0003](0003-java-spring-backend.md), [기준 스키마](../design/db/schema.sql), [백엔드 컨벤션](../development/backend-convention.md) |
 
 ## 맥락
 
