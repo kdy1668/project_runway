@@ -4,17 +4,11 @@
 
 | ID | 이름 | Method | Endpoint | 단계 | 인증 |
 |---|---|---|---|---|---|
-| [P01](#p01-초기-페이스-계획-생성) | 초기 페이스 계획 생성 | POST | `/running-sessions/{sessionId}/pace-plans` | 1차 MVP | 회원 |
-| [P02](#p02-현재-페이스-계획-조회) | 현재 페이스 계획 조회 | GET | `/running-sessions/{sessionId}/pace-plans/current` | 1차 MVP | 회원 |
-| [P03](#p03-러닝-측정값-수신) | 러닝 측정값 수신 | POST | `/running-sessions/{sessionId}/metrics` | 1차 MVP | 회원 |
-| [P04](#p04-실시간-운동-코칭-상태) | 실시간 운동·코칭 상태 | GET | `/running-sessions/{sessionId}/live` | 1차 MVP | 회원 |
-| [P05](#p05-과거-동일-코스-기록-비교) | 과거 동일 코스 기록 비교 | GET | `/running-sessions/{sessionId}/past-record-comparison` | 1차 MVP | 회원 |
-| [P06](#p06-bpm-프로필-조회) | BPM 프로필 조회 | GET | `/users/me/bpm-profile` | 1차 MVP | 회원 |
-| [P07](#p07-bpm-초기값-설정) | BPM 초기값 설정 | PUT | `/users/me/bpm-profile` | 1차 MVP | 회원 |
+| [P07](#p07-세션-bpm-조절) | 세션 BPM 조절 | PUT | `/running-sessions/{sessionId}/bpm` | 1차 MVP | 회원 |
 
-## P01 초기 페이스 계획 생성
+## P07 세션 BPM 조절
 
-`POST` `/api/v1/running-sessions/{sessionId}/pace-plans`
+`PUT` `/api/v1/running-sessions/{sessionId}/bpm`
 
 | 항목 | 값 |
 |---|---|
@@ -26,172 +20,18 @@
 
 ### 설명
 
-READY 상태에서 최초 페이스 전략 생성. AI 조정은 러닝 중 안내 페이스에만 적용.
+운동 전 또는 운동 중 사용자가 올리거나 내린 BPM을 해당 개인 세션에 적용한다. 그룹런에서도 개인 BPM만 조절하며 공동 안내 페이스는 변경하지 않는다.
 
 ### 인증 및 권한
 
-- 로그인 사용자 본인 또는 서비스 리소스 접근 권한 검사.
+- 해당 개인 세션 소유자만 조절할 수 있다. 그룹장도 다른 참가자의 개인 BPM을 조절할 수 없다.
 - 건강정보·실시간 위치·타인 기록 조회 시 동의 상태 및 공개 범위가 우선한다.
 
 ### Path Parameters
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `sessionId` | string (UUID) | O | 러닝 세션 UUID |
-
-### Query Parameters
-
-없음
-
-### Request Body
-
-없음
-
-
-### Response
-
-`201 Created (제안)`
-
-```json
-{}
-```
-
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
-
-| 필드 | 타입 | 필수 | 설명 |
-|---|---|:---:|---|
-| `planId` | string (UUID) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `revision` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `planKind` | string (제안) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `initialPaceSecPerKm` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `estimatedDurationSec` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `segments` | array | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-
-### 오류 응답
-
-- `409 INVALID_STATE`
-- `422 INSUFFICIENT_PROFILE`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
-
-### 처리 규칙
-
-- READY 상태에서 최초 페이스 전략 생성. AI 조정은 러닝 중 안내 페이스에만 적용.
-- 사용자 소유권·그룹 참가 권한·상태 전이·재요청 여부를 검증한다(적용 범위는 API별로 결정).
-- 예시는 **명세 구조를 보여주는 가상 값**이며, 확정되지 않은 제한·동기화 주기·AI 호출 주기를 의미하지 않는다.
-
-### 상태값
-
-- PUBLIC / PRIVATE 또는 기능별 ERD CHECK 값, 해당 없으면 별도 상태 없음.
-
-### 미정 사항
-
-- [ ] 요청·응답의 세부 필드 타입, 허용 범위, nullable 규칙 및 실제 JSON 구조 검토
-- [ ] HTTP 성공 코드 및 각 예외의 오류 코드 최종 확정
-- [ ] 실시간 전달 채널, 선두 경로 기준 순위·동기화 처리 확정
-
-## P02 현재 페이스 계획 조회
-
-`GET` `/api/v1/running-sessions/{sessionId}/pace-plans/current`
-
-| 항목 | 값 |
-|---|---|
-| 단계 | 1차 MVP |
-| 인증 | 회원 |
-| 관련 요구사항 | PAC-001~007 / BPM-001~003 / REC-005 |
-| 미정 사항 | 있음 |
-| 비고 | API 요청/응답 필드와 값 제한은 검토용 제안 |
-
-### 설명
-
-최신 유효한 계획 버전과 구간별 권장 페이스.
-
-### 인증 및 권한
-
-- 로그인 사용자 본인 또는 서비스 리소스 접근 권한 검사.
-- 건강정보·실시간 위치·타인 기록 조회 시 동의 상태 및 공개 범위가 우선한다.
-
-### Path Parameters
-
-| 필드 | 타입 | 필수 | 설명 |
-|---|---|:---:|---|
-| `sessionId` | string (UUID) | O | 러닝 세션 UUID |
-
-### Query Parameters
-
-없음
-
-### Request Body
-
-없음
-
-
-### Response
-
-`200 OK (제안)`
-
-```json
-{}
-```
-
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
-
-| 필드 | 타입 | 필수 | 설명 |
-|---|---|:---:|---|
-| `planId` | string (UUID) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `revision` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `planKind` | string (제안) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `effectiveAt` | string (ISO 8601) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `initialPaceSecPerKm` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `segments` | array | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-
-### 오류 응답
-
-- `404 PLAN_NOT_FOUND`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
-
-### 처리 규칙
-
-- 최신 유효한 계획 버전과 구간별 권장 페이스.
-- 사용자 소유권·그룹 참가 권한·상태 전이·재요청 여부를 검증한다(적용 범위는 API별로 결정).
-- 예시는 **명세 구조를 보여주는 가상 값**이며, 확정되지 않은 제한·동기화 주기·AI 호출 주기를 의미하지 않는다.
-
-### 상태값
-
-- PUBLIC / PRIVATE 또는 기능별 ERD CHECK 값, 해당 없으면 별도 상태 없음.
-
-### 미정 사항
-
-- [ ] 요청·응답의 세부 필드 타입, 허용 범위, nullable 규칙 및 실제 JSON 구조 검토
-- [ ] HTTP 성공 코드 및 각 예외의 오류 코드 최종 확정
-- [ ] 실시간 전달 채널, 선두 경로 기준 순위·동기화 처리 확정
-
-
-## P03 러닝 측정값 수신
-
-`POST` `/api/v1/running-sessions/{sessionId}/metrics`
-
-| 항목 | 값 |
-|---|---|
-| 단계 | 1차 MVP |
-| 인증 | 회원 |
-| 관련 요구사항 | PAC-001~007 / BPM-001~003 / REC-005 |
-| 미정 사항 | 있음 |
-| 비고 | API 요청/응답 필드와 값 제한은 검토용 제안 |
-
-### 설명
-
-GPS·심박·페이스·케이던스 측정 시각과 품질 포함. 전송 방식 미정.
-
-### 인증 및 권한
-
-- 로그인 사용자 본인 또는 서비스 리소스 접근 권한 검사.
-- 건강정보·실시간 위치·타인 기록 조회 시 동의 상태 및 공개 범위가 우선한다.
-
-### Path Parameters
-
-| 필드 | 타입 | 필수 | 설명 |
-|---|---|:---:|---|
-| `sessionId` | string (UUID) | O | 러닝 세션 UUID |
+| `sessionId` | string (UUID) | O | 본인의 준비 중 또는 진행 중 러닝 세션 |
 
 ### Query Parameters
 
@@ -201,22 +41,11 @@ GPS·심박·페이스·케이던스 측정 시각과 품질 포함. 전송 방�
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `deviceId` | string (UUID) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `samples` | array | O | 심박수·페이스·케이던스 등 측정 데이터 배열 |
-| `routePoints` | array | X | 시각과 GPS 좌표를 포함한 경로 포인트 배열, 상세 아이템 필드 검토 |
+| `targetBpm` | number | O | 조절 후 적용할 리듬 BPM(분당 비트 수). 증감 단위·허용 범위 미정 |
 
 ```json
 {
-  "samples": [
-    {
-      "id": "00000000-0000-4000-8000-000000000001",
-      "metricType": "HEART_RATE",
-      "measuredAt": "2026-10-20T01:00:00Z",
-      "value": 142,
-      "unit": "BPM",
-      "qualityStatus": "VALID"
-    }
-  ]
+  "targetBpm": 165
 }
 ```
 
@@ -232,371 +61,62 @@ GPS·심박·페이스·케이던스 측정 시각과 품질 포함. 전송 방�
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `acceptedCount` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `rejectedCount` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `receivedAt` | string (ISO 8601) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-
-### 오류 응답
-
-- `403 SESSION_FORBIDDEN`
-- `409 SESSION_NOT_RUNNING`
-- `422 BAD_MEASUREMENT`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
-
-### 처리 규칙
-
-- GPS·심박·페이스·케이던스 측정 시각과 품질 포함. 전송 방식 미정.
-- 사용자 소유권·그룹 참가 권한·상태 전이·재요청 여부를 검증한다(적용 범위는 API별로 결정).
-- 예시는 **명세 구조를 보여주는 가상 값**이며, 확정되지 않은 제한·동기화 주기·AI 호출 주기를 의미하지 않는다.
-
-### 상태값
-
-- PUBLIC / PRIVATE 또는 기능별 ERD CHECK 값, 해당 없으면 별도 상태 없음.
-
-### 미정 사항
-
-- [ ] 요청·응답의 세부 필드 타입, 허용 범위, nullable 규칙 및 실제 JSON 구조 검토
-- [ ] HTTP 성공 코드 및 각 예외의 오류 코드 최종 확정
-- [ ] 실시간 전달 채널, 선두 경로 기준 순위·동기화 처리 확정
-
-
-## P04 실시간 운동·코칭 상태
-
-`GET` `/api/v1/running-sessions/{sessionId}/live`
-
-| 항목 | 값 |
-|---|---|
-| 단계 | 1차 MVP |
-| 인증 | 회원 |
-| 관련 요구사항 | PAC-001~007 / BPM-001~003 / REC-005 |
-| 미정 사항 | 있음 |
-| 비고 | API 요청/응답 필드와 값 제한은 검토용 제안 |
-
-### 설명
-
-러닝 중 현재 센서 상태, AI 페이스 조정과 BPM 통합 조회.
-
-### 인증 및 권한
-
-- 로그인 사용자 본인 또는 서비스 리소스 접근 권한 검사.
-- 건강정보·실시간 위치·타인 기록 조회 시 동의 상태 및 공개 범위가 우선한다.
-
-### Path Parameters
-
-| 필드 | 타입 | 필수 | 설명 |
-|---|---|:---:|---|
-| `sessionId` | string (UUID) | O | 러닝 세션 UUID |
-
-### Query Parameters
-
-없음
-
-### Request Body
-
-없음
-
-
-### Response
-
-`200 OK (제안)`
-
-```json
-{
-  "sessionId": "00000000-0000-4000-8000-000000000001",
-  "status": "RUNNING",
-  "distanceM": 2300,
-  "elapsedDurationSec": 820,
-  "paceSecPerKm": 365,
-  "heartRateBpm": 142,
-  "cadenceSpm": 164,
-  "currentGuidePaceSecPerKm": 360,
-  "targetBpm": 165,
-  "coachingEvent": null
-}
-```
-
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
-
-| 필드 | 타입 | 필수 | 설명 |
-|---|---|:---:|---|
-| `sessionId` | string (UUID) | X | 러닝 세션 UUID |
-| `status` | string (제안) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `measuredAt` | string (ISO 8601) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `dataQuality` | string / object (확인 필요) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `distanceM` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `elapsedDurationSec` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `paceSecPerKm` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `heartRateBpm` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `cadenceSpm` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `currentGuidePaceSecPerKm` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `targetTimeGapSec` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `predictedFinishDurationSec` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `loadLevel` | string / object (확인 필요) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `overpaceDetected` | boolean | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `paceDropDetected` | boolean | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `targetBpm` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `coachingEvent` | string / object (확인 필요) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-
-### 오류 응답
-
-- `403 SESSION_FORBIDDEN`
-- `404 SESSION_NOT_FOUND`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
-
-### 처리 규칙
-
-- 러닝 중 현재 센서 상태, AI 페이스 조정과 BPM 통합 조회.
-- 사용자 소유권·그룹 참가 권한·상태 전이·재요청 여부를 검증한다(적용 범위는 API별로 결정).
-- 예시는 **명세 구조를 보여주는 가상 값**이며, 확정되지 않은 제한·동기화 주기·AI 호출 주기를 의미하지 않는다.
-
-### 상태값
-
-- PUBLIC / PRIVATE 또는 기능별 ERD CHECK 값, 해당 없으면 별도 상태 없음.
-
-### 미정 사항
-
-- [ ] 요청·응답의 세부 필드 타입, 허용 범위, nullable 규칙 및 실제 JSON 구조 검토
-- [ ] HTTP 성공 코드 및 각 예외의 오류 코드 최종 확정
-- [ ] 실시간 전달 채널, 선두 경로 기준 순위·동기화 처리 확정
-
-
-## P05 과거 동일 코스 기록 비교
-
-`GET` `/api/v1/running-sessions/{sessionId}/past-record-comparison`
-
-| 항목 | 값 |
-|---|---|
-| 단계 | 1차 MVP |
-| 인증 | 회원 |
-| 관련 요구사항 | PAC-001~007 / BPM-001~003 / REC-005 |
-| 미정 사항 | 있음 |
-| 비고 | API 요청/응답 필드와 값 제한은 검토용 제안 |
-
-### 설명
-
-같은 코스를 과거에 달린 기록과 현재 거리 도달시간 비교. 복수 과거 기록 기본 선택 규칙 미정.
-
-### 인증 및 권한
-
-- 로그인 사용자 본인 또는 서비스 리소스 접근 권한 검사.
-- 건강정보·실시간 위치·타인 기록 조회 시 동의 상태 및 공개 범위가 우선한다.
-
-### Path Parameters
-
-| 필드 | 타입 | 필수 | 설명 |
-|---|---|:---:|---|
-| `sessionId` | string (UUID) | O | 러닝 세션 UUID |
-
-### Query Parameters
-
-| 필드 | 타입 | 필수 | 설명 |
-|---|---|:---:|---|
-| `referenceSessionId` | string (UUID) | X | 같은 코스를 과거에 완주한 비교 기준 세션 UUID |
-
-### Request Body
-
-없음
-
-
-### Response
-
-`200 OK (제안)`
-
-```json
-{
-  "comparisonStatus": "AVAILABLE",
-  "referenceSessionId": "00000000-0000-4000-8000-000000000001",
-  "currentDistanceM": 2300,
-  "currentElapsedDurationSec": 820,
-  "referenceElapsedAtDistanceSec": 835,
-  "deltaSec": -15
-}
-```
-
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
-
-| 필드 | 타입 | 필수 | 설명 |
-|---|---|:---:|---|
-| `referenceSessionId` | string (UUID) | X | 같은 코스를 과거에 완주한 비교 기준 세션 UUID |
-| `courseId` | string (UUID) | X | 선택한 코스 식별자. 개인·그룹 자유러닝은 null/생략 가능 |
-| `currentDistanceM` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `currentElapsedDurationSec` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `referenceElapsedAtDistanceSec` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `deltaSec` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `comparisonStatus` | string (제안) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-
-### 오류 응답
-
-- `404 SESSION_NOT_FOUND`
-- `422 DIFFERENT_COURSE`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
-
-### 처리 규칙
-
-- 같은 코스를 과거에 달린 기록과 현재 거리 도달시간 비교. 복수 과거 기록 기본 선택 규칙 미정.
-- 사용자 소유권·그룹 참가 권한·상태 전이·재요청 여부를 검증한다(적용 범위는 API별로 결정).
-- 예시는 **명세 구조를 보여주는 가상 값**이며, 확정되지 않은 제한·동기화 주기·AI 호출 주기를 의미하지 않는다.
-
-### 상태값
-
-- PUBLIC / PRIVATE 또는 기능별 ERD CHECK 값, 해당 없으면 별도 상태 없음.
-
-### 미정 사항
-
-- [ ] 요청·응답의 세부 필드 타입, 허용 범위, nullable 규칙 및 실제 JSON 구조 검토
-- [ ] HTTP 성공 코드 및 각 예외의 오류 코드 최종 확정
-- [ ] 실시간 전달 채널, 선두 경로 기준 순위·동기화 처리 확정
-
-
-## P06 BPM 프로필 조회
-
-`GET` `/api/v1/users/me/bpm-profile`
-
-| 항목 | 값 |
-|---|---|
-| 단계 | 1차 MVP |
-| 인증 | 회원 |
-| 관련 요구사항 | PAC-001~007 / BPM-001~003 / REC-005 |
-| 미정 사항 | 있음 |
-| 비고 | API 요청/응답 필드와 값 제한은 검토용 제안 |
-
-### 설명
-
-개인 특성 및 보정 상태 조회.
-
-### 인증 및 권한
-
-- 로그인 사용자 본인 또는 서비스 리소스 접근 권한 검사.
-- 건강정보·실시간 위치·타인 기록 조회 시 동의 상태 및 공개 범위가 우선한다.
-
-### Path Parameters
-
-없음
-
-### Query Parameters
-
-없음
-
-### Request Body
-
-없음
-
-
-### Response
-
-`200 OK (제안)`
-
-```json
-{}
-```
-
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
-
-| 필드 | 타입 | 필수 | 설명 |
-|---|---|:---:|---|
-| `initialBpm` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `stepLengthM` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `preferredCadenceSpm` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `calibrationState` | string (제안) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `confidence` | string / object (확인 필요) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `calibratedAt` | string (ISO 8601) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-
-### 오류 응답
-
-- `404 BPM_PROFILE_NOT_FOUND`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
-
-### 처리 규칙
-
-- 개인 특성 및 보정 상태 조회.
-- 사용자 소유권·그룹 참가 권한·상태 전이·재요청 여부를 검증한다(적용 범위는 API별로 결정).
-- 예시는 **명세 구조를 보여주는 가상 값**이며, 확정되지 않은 제한·동기화 주기·AI 호출 주기를 의미하지 않는다.
-
-### 상태값
-
-- PUBLIC / PRIVATE 또는 기능별 ERD CHECK 값, 해당 없으면 별도 상태 없음.
-
-### 미정 사항
-
-- [ ] 요청·응답의 세부 필드 타입, 허용 범위, nullable 규칙 및 실제 JSON 구조 검토
-- [ ] HTTP 성공 코드 및 각 예외의 오류 코드 최종 확정
-- [ ] 실시간 전달 채널, 선두 경로 기준 순위·동기화 처리 확정
-
-
-## P07 BPM 초기값 설정
-
-`PUT` `/api/v1/users/me/bpm-profile`
-
-| 항목 | 값 |
-|---|---|
-| 단계 | 1차 MVP |
-| 인증 | 회원 |
-| 관련 요구사항 | PAC-001~007 / BPM-001~003 / REC-005 |
-| 미정 사항 | 있음 |
-| 비고 | API 요청/응답 필드와 값 제한은 검토용 제안 |
-
-### 설명
-
-사용자 입력 초기 BPM 설정. 자동 특성 보정은 시스템 담당.
-
-### 인증 및 권한
-
-- 로그인 사용자 본인 또는 서비스 리소스 접근 권한 검사.
-- 건강정보·실시간 위치·타인 기록 조회 시 동의 상태 및 공개 범위가 우선한다.
-
-### Path Parameters
-
-없음
-
-### Query Parameters
-
-없음
-
-### Request Body
-
-| 필드 | 타입 | 필수 | 설명 |
-|---|---|:---:|---|
-| `initialBpm` | number | O | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-
-```json
-{
-  "initialBpm": 165
-}
-```
-
-### Response
-
-`200 OK (제안)`
-
-```json
-{}
-```
-
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
-
-| 필드 | 타입 | 필수 | 설명 |
-|---|---|:---:|---|
-| `initialBpm` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `calibrationState` | string (제안) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `targetBpm` | number | X | 현재 세션에 적용한 리듬 BPM |
 | `updatedAt` | string (ISO 8601) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
 
 ### 오류 응답
 
+- `403 SESSION_FORBIDDEN`
+- `409 INVALID_STATE`
 - `422 INVALID_BPM`
 - 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
 
 ### 처리 규칙
 
-- 사용자 입력 초기 BPM 설정. 자동 특성 보정은 시스템 담당.
+- 수동 변경보다 앞선 입력으로 계산한 코칭 결과가 늦게 도착해 사용자의 새 BPM을 덮어쓰지 않도록 적용 순서를 검증한다. 다음 코칭은 해당 변경값을 반영한 입력을 기준으로 한다. 버전·명령 ID·적용 시각 계약은 별도 확정한다.
+
+- 절대 BPM 값을 설정하는 PUT 계약을 제안한다. 같은 요청 재전송이 증감량을 중복 적용하지 않도록 한다.
+- 사용자 변경 BPM을 예측·코칭 모델 입력에 반영하고 다음 코칭에서 새 BPM을 제공한다. 고정 잠금이나 별도 보정량 누적은 하지 않는다.
+- 본인 세션 소유권과 상태를 검사한다. READY/RUNNING에서 조절하며 PAUSED 허용 여부는 미정이다.
+- 서버 반영 결과를 앱·워치에 전달한다. 오프라인 수동 조절·복구 충돌 처리와 다음 운동까지 유지 여부는 미정이다.
+
+- 운동 전 또는 운동 중 사용자가 올리거나 내린 BPM을 해당 개인 세션에 적용한다. 그룹런에서도 개인 BPM만 조절하며 공동 안내 페이스는 변경하지 않는다.
 - 사용자 소유권·그룹 참가 권한·상태 전이·재요청 여부를 검증한다(적용 범위는 API별로 결정).
 - 예시는 **명세 구조를 보여주는 가상 값**이며, 확정되지 않은 제한·동기화 주기·AI 호출 주기를 의미하지 않는다.
 
 ### 상태값
 
-- PUBLIC / PRIVATE 또는 기능별 ERD CHECK 값, 해당 없으면 별도 상태 없음.
+- READY / RUNNING. PAUSED에서 조절 허용 여부는 미정이며 종료된 세션의 조절은 허용하지 않는다.
 
 ### 미정 사항
 
 - [ ] 요청·응답의 세부 필드 타입, 허용 범위, nullable 규칙 및 실제 JSON 구조 검토
 - [ ] HTTP 성공 코드 및 각 예외의 오류 코드 최종 확정
-- [ ] 실시간 전달 채널, 선두 경로 기준 순위·동기화 처리 확정
+- [ ] 조절 단위·허용 범위, PAUSED·오프라인 조절 허용, 재연결 충돌 및 다음 운동 유지 정책
+- [ ] 수동 변경과 코칭 결과의 적용 순서·시각 계약
+
+## 러닝 모드별 분석 정책
+
+[확정된 모드별 AI 동작](../requirements.md#러닝-모드별-ai-동작)을 따른다. 코스 지정은 실제 미래 경사로 전체 코스를 시뮬레이션하고, 목표 있는 자유러닝은 미래 경사 0%로 사전 계획을 생성한다. 두 모드는 30/60/120초 뒤 HR 예측을 활용해 MPC가 목표와 HR 부담을 고려한 페이스를 선택하고 BPM·음성 Cue를 제공한다. 무목표 자유러닝은 사전 계획 없이 미래 경사 0%에서 후보 페이스별 HR을 예측하며, HR 부담·페이스 급변 최소화와 현재 페이스 유지를 기준으로 실시간 코칭한다.
+
+목표 대비 차이·예상 완주 시간은 산출 기준이 있는 경우에만 제공한다. 무목표 모드의 사전 계획 부재와 실제 분석 실패를 구분한다. 상세 메시지 구조와 모델 계산 주기는 별도 확정한다.
+
+## 자동 수집·분석과 지속 전달 — 내부 필수 처리
+
+사용자 버튼과 무관하게 아래 흐름을 실행한다. 분석 실행용 REST 요청이나 화면의 반복 조회를 요구하지 않는다.
+
+| 작업 | 통신·실행 방식 | 전달할 정보 |
+|---|---|---|
+| 초기 전략 표시 | S01/S08에서 코스·목표가 있는 모드만 자동 생성, 준비 결과와 후속 갱신 전달. 무목표 자유러닝은 사전 계획 없음 | 전략 생성 상태, 전략 버전, 구간별 안내 페이스, 목표·예상 시간, 목표 BPM |
+| 운동 측정값 수집 | 기기가 센서 콜백으로 계속 수집하고 W07로 자동 전송 | 측정 ID, 세션·기기·출처, 측정 시각, 종류·값·단위·품질, 경로 포인트 |
+| 분석·코칭 갱신 | 유효한 측정값 수신에 따라 자동 계산·전달 | 생성·적용 시각, 안내 페이스, 예상 완주 시간, 목표 대비 차이, BPM, 코칭 내용 |
+| 과거 기록 비교 | 지정된 비교 기록과 자동 비교해 전달 | 비교 가용성, 기준 기록 ID, 현재 거리·시간, 과거 동일 거리 도달 시간, 시간 차이 |
+| BPM 수동 조절 반영 | P07 변경값을 적용하고 모델 입력에 반영 | 세션 ID, 적용 BPM과 시각. 다음 코칭에서 새 BPM 전달 |
+
+- P01·P02·P03·P04·P05·P06은 별도 공개 REST API 목록에서 제외했다. 기능 삭제가 아니며 ID를 재사용하지 않는다.
+- P03의 측정값 전송은 W07 계약으로 통합한다. 기기→서버 통신은 계속 필요하며 W07을 앱의 서비스가 자동 호출한다.
+- 계획 대상 모드에서 S01 응답 시 준비가 끝났으면 초기 전략을 함께 제공한다. 무목표 자유러닝은 계획 비대상이며 생성 대기·실패로 표시하지 않는다. 처리 중이면 준비 상태를 제공하고 완료·변경 결과를 후속 전달한다. 별도 전략 조회를 요구하지 않는다.
+- S02는 세션 재진입·재연결 복구에 필요한 최신 전략·코칭·BPM·비교 상태를 제공한다. 지속 갱신을 반복 조회로 대체하지 않는다.
+- 연결이 끊겨도 기기 측정·기록과 마지막 페이스·BPM 안내를 유지하고 새 서버 코칭은 재연결 후 재개한다.
+- 전송 기술·연결 경로·인증·구독·메시지 구조·순서·중복 제거·만료 정책은 미정이다. 수집·자동 분석·지속 전달 자체는 필수 구현 범위다.
+- [자동 처리 요구사항](../requirements.md)를 따른다.
