@@ -15,7 +15,8 @@
 - `master` : 배포·시연 가능한 안정 버전
 - `dev` : 팀 개발 내용이 지속적으로 합쳐지는 통합 브랜치이자 Default Branch
 - 작업 브랜치 : Jira Task/Story 단위의 실제 개발 브랜치
-  - Task와 Story는 **각각 하나의 브랜치와 하나의 MR**을 가진다. (Jira 이슈 1개 = 브랜치 1개 = MR 1개)
+  - Task와 Story는 **각각 별도 worktree 하나, 브랜치 하나, MR 하나**를 가진다. (Jira 이슈 1개 = worktree 1개 = 브랜치 1개 = MR 1개)
+  - 다른 Jira 업무는 같은 worktree에서 개발하지 않는다. 같은 업무를 재개할 때만 해당 worktree와 브랜치를 재사용한다. 기본 체크아웃에서 브랜치만 바꾸어 작업하지 않는다. 세부 확인·분리 절차는 루트 `AGENTS.md`를 따른다.
 - `master`, `dev` 직접 Push 금지 → Merge Request를 통해서만 병합
 - FE/BE/AI 등 영역별 `dev-fe`, `dev-be` 같은 장기 브랜치는 만들지 않는다.
 
@@ -230,7 +231,7 @@ DB migration / Schema
       ↓
 ② dev 최신화
       ↓
-③ Jira Key 포함 작업 브랜치 생성
+③ Jira 업무 전용 worktree와 Jira Key 포함 작업 브랜치 생성
       ↓
 ④ 개발 및 Commit
       ↓

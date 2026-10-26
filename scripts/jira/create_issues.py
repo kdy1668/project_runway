@@ -178,7 +178,7 @@ def load_draft(path: Path) -> dict:
 
 
 def validate_draft(draft: dict) -> dict:
-    allowed = {"issue_type", "summary", "description", "acceptance_criteria", "story_points", "assignee", "epic", "sprint_id", "labels", "epic_name"}
+    allowed = {"issue_type", "summary", "description", "acceptance_criteria", "story_points", "assignee", "epic", "sprint_id", "labels", "epic_name", "priority", "priority_reason"}
     if not isinstance(draft, dict) or set(draft) - allowed:
         raise JiraError("지원하지 않는 초안 항목입니다. docs/development/jira-automation.md를 확인하세요.")
     for key in ("issue_type", "summary", "description"):
@@ -215,6 +215,15 @@ def validate_draft(draft: dict) -> dict:
     labels = draft.get("labels", [])
     if not isinstance(labels, list) or any(not isinstance(x, str) or not x or re.search(r"\s", x) for x in labels):
         raise JiraError("labels에는 공백 없는 문자열 목록이 필요합니다.")
+    priority, reason = draft.get("priority"), draft.get("priority_reason")
+    if priority is not None:
+        if (not isinstance(priority, str) or not priority.strip() or priority != priority.strip()
+                or any(ord(c) < 32 for c in priority)):
+            raise JiraError("priority에는 조회한 우선순위 ID 또는 이름 문자열을 입력하세요.")
+        if not isinstance(reason, str) or not reason.strip():
+            raise JiraError("우선순위를 지정하면 priority_reason에 선정 이유가 필요합니다.")
+    elif reason is not None:
+        raise JiraError("priority_reason은 priority와 함께 지정하세요.")
     return {**draft, "story_points": points, "assignee": draft.get("assignee"), "epic": draft.get("epic"),
             "sprint_id": sprint, "labels": sorted(set(labels))}
 
@@ -235,12 +244,25 @@ def adf_description(draft: dict) -> dict:
     return {"type": "doc", "version": 1, "content": content}
 
 
+def priority_options(metadata: dict) -> list[dict]:
+    values = metadata.get("priority", {}).get("allowedValues", [])
+    if not isinstance(values, list) or any(
+            not isinstance(x, dict) or not isinstance(x.get("id"), str) or not x["id"].strip()
+            or not isinstance(x.get("name"), str) or not x["name"].strip() for x in values):
+        raise JiraError("생성 화면의 우선순위 목록 형식을 확인하세요.")
+    return [{"id": x["id"], "name": x["name"]} for x in values]
+
+
 class Workflow:
     def __init__(self, client: Client):
         self.client, self.config = client, client.config
 
     def types(self):
         return self.client.pages(f"/rest/api/3/issue/createmeta/{self.config.project}/issuetypes", "issueTypes")
+
+    def create_metadata(self, issue_type: str) -> dict:
+        rows = self.client.pages(f"/rest/api/3/issue/createmeta/{self.config.project}/issuetypes/{issue_type}", "fields")
+        return {x.get("fieldId", x.get("key")): x for x in rows}
 
     def check(self) -> dict:
         user = self.client.request("GET", "/rest/api/3/myself")
@@ -288,10 +310,19 @@ class Workflow:
         if current_user["assignable"] is not True:
             current_user["question"] = "누구를 담당자로 설정할까요?"
         types = self.types()
+        priorities = []
+        for issue_type in types:
+            if issue_type.get("subtask") or issue_type.get("name") not in ("Task", "작업", "Story", "스토리", "Epic", "에픽"):
+                continue
+            meta = self.create_metadata(str(issue_type["id"]))
+            options = priority_options(meta)
+            default_id = (meta.get("priority", {}).get("defaultValue") or {}).get("id")
+            priorities.append({"issue_type_id": str(issue_type["id"]), "issue_type": issue_type["name"],
+                               "values": options, "default": next((x for x in options if x["id"] == default_id), None)})
         epic_types = [x for x in types if x.get("name") in ("Epic", "에픽") or x.get("hierarchyLevel") == 1]
         epics = self.client.search(f"project = {jql_string(self.config.project)} AND issuetype = {jql_string(str(epic_types[0]['id']))}") if len(epic_types) == 1 else []
         sprints = self.client.pages(f"/rest/agile/1.0/board/{self.config.board}/sprint", "values", {"state": "active,future"})
-        return {"current_user": current_user, "issue_types": types, "epics": epics, "sprints": sprints,
+        return {"current_user": current_user, "issue_types": types, "priorities": priorities, "epics": epics, "sprints": sprints,
                 "assignable_users": self.users(user_query) if user_query else [],
                 "hint": "담당자 검색은 --user-query 이름 또는 이메일을 사용하세요."}
 
@@ -305,13 +336,20 @@ class Workflow:
         if len(matches) != 1:
             raise JiraError("프로젝트에서 요청한 Task/Story/Epic 유형을 유일하게 확인할 수 없습니다.")
         issue_type = str(matches[0]["id"])
-        metadata = self.client.pages(f"/rest/api/3/issue/createmeta/{self.config.project}/issuetypes/{issue_type}", "fields")
-        meta = {x.get("fieldId", x.get("key")): x for x in metadata}
+        meta = self.create_metadata(issue_type)
         points = [key for key, item in meta.items() if (
             key == self.config.points_field if self.config.points_field else
             item.get("name", "").casefold() in ("story points", "story point estimate", "스토리 포인트"))]
         fields = {"project": {"key": self.config.project}, "issuetype": {"id": issue_type},
                   "summary": draft["summary"], "description": adf_description(draft)}
+        priority = None
+        if draft.get("priority") is not None:
+            options = priority_options(meta)
+            matches = [x for x in options if draft["priority"] in (x["id"], x["name"])]
+            if len(matches) != 1:
+                raise JiraError("선택한 우선순위를 사용할 수 없거나 유일하지 않습니다. --catalog에서 대상 업무 유형의 값을 확인하세요.")
+            fields["priority"] = {"id": matches[0]["id"]}
+            priority = {**matches[0], "reason": draft["priority_reason"]}
         if not is_epic:
             if len(points) != 1:
                 raise JiraError("생성 가능한 Story Points 필드를 확인하세요. 필요하면 JIRA_STORY_POINTS_FIELD를 설정하세요.")
@@ -375,7 +413,7 @@ class Workflow:
         # Korean word stems and scope are reviewed by the AI using the full candidate list.
         return {"fields": fields, "exact_duplicates": exact, "project_issues": issues,
                 "sprint_id": draft["sprint_id"], "approval_sha256": draft_hash(self.config, draft),
-                "draft": draft, "jira_changed": False}
+                "draft": draft, "priority": priority, "jira_changed": False}
 
     def verify(self, key: str, fields: dict, sprint_id: int | None) -> dict:
         if not re.fullmatch(re.escape(self.config.project) + r"-\d+", key):
@@ -387,7 +425,7 @@ class Workflow:
             if name in ("project", "parent"):
                 got = (got or {}).get("key")
                 expected = expected["key"]
-            elif name == "issuetype":
+            elif name in ("issuetype", "priority"):
                 got = (got or {}).get("id")
                 expected = expected["id"]
             elif name in ("assignee", "reporter"):
