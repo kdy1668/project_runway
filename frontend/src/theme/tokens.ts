@@ -22,6 +22,12 @@ export const palette = {
   coralSoft: '#FFD3C8',
   lavender: '#C9B8FF',
   periwinkle: '#C3C6F4',
+  // 1.7 워치 연결: the drawn watch's metal bezel and its face glow (connected / not).
+  metalLight: '#A8ADB8',
+  metal: '#4A4E58',
+  metalDark: '#16181D',
+  faceGlow: '#123230',
+  faceOff: '#24262C',
 } as const;
 
 export const fontFamily = {

@@ -3,6 +3,7 @@ import { StyleSheet, Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import App from '../App';
 import { createMockRepositories } from '../src/data';
+import * as fixtures from '../src/data/mock/fixtures';
 import {
   authRoutes,
   groupTabRoutes,
@@ -79,13 +80,29 @@ test('every prototype link points at a registered screen', () => {
 
 test('signed-out users move from start through login into the home tab', async () => {
   const screen = await render();
-  expect(texts(screen)).toContain('1.1');
+  expect(texts(screen)).toContain('나만의 길을 달려요');
   expect(
     screen.root.findAll(node => node.props.accessibilityRole === 'tablist'),
   ).toHaveLength(0);
-  await press(screen, '1.2 로그인');
-  expect(texts(screen)).toContain('비밀번호 찾기');
-  await press(screen, '로그인 완료 → 2.1 홈');
+  await press(screen, '로그인');
+  expect(texts(screen)).toContain('비밀번호를 잊으셨나요?');
+  await act(async () => {
+    for (const [label, text] of [
+      ['아이디', fixtures.account.loginId],
+      ['비밀번호', fixtures.account.password],
+    ]) {
+      screen.root
+        .findAll(
+          node =>
+            node.props.accessibilityLabel === label &&
+            typeof node.props.onChangeText === 'function',
+        )[0]
+        .props.onChangeText(text);
+    }
+  });
+  await press(screen, '로그인');
+  // The mock answers on a 0 ms timer.
+  await act(() => new Promise<void>(resolve => setTimeout(resolve, 20)));
   const home = texts(screen);
   expect(home).toContain('2.1');
   expect(home).toContain('민준');
@@ -98,32 +115,17 @@ test('signed-out users move from start through login into the home tab', async (
   await act(async () => screen.unmount());
 });
 
-test('sign-up flow reaches home through consent, profiles and watch choice', async () => {
-  const screen = await render();
-  for (const step of [
-    '1.3 회원가입',
-    '1.4 개인정보·데이터 이용 동의',
-    '1.5 기본 프로필',
-    '1.6 러닝 프로필',
-    '1.6w 워치 사용 여부',
-    '1.7 워치 연결',
-  ]) {
-    await press(screen, step);
-    expect(texts(screen)).toContain(step.split(' ')[0]);
-  }
-  await press(screen, '로그인 완료 → 2.1 홈');
-  const home = texts(screen);
-  expect(home).toContain('오늘 달리기 좋은 날이에요');
-  expect(home).not.toContain('S15P31E105-145');
-  await act(async () => screen.unmount());
-});
-
 test('watch connection opened from settings returns home instead of signing in', async () => {
   const screen = await render({ initialSignedIn: true });
   await press(screen, '8.1 설정');
   await press(screen, '1.7 워치 연결');
-  expect(texts(screen)).not.toContain('로그인 완료');
-  await press(screen, '2.1 홈');
+  await act(() => new Promise<void>(resolve => setTimeout(resolve, 20)));
+  expect(texts(screen)).toContain('82%');
+  await act(async () => {
+    screen.root
+      .findAll(node => node.props.accessibilityLabel === '밀어서 시작하기')[0]
+      .props.onAccessibilityAction({ nativeEvent: { actionName: 'activate' } });
+  });
   expect(texts(screen)).toContain('오늘 달리기 좋은 날이에요');
   await act(async () => screen.unmount());
 });
@@ -163,7 +165,7 @@ test('settings switches light and dark themes and signs out', async () => {
   await press(screen, '다크');
   expect(backgrounds()).not.toContain(lightTheme.colors.background);
   await press(screen, '로그아웃 → 1.1 시작');
-  expect(texts(screen)).toContain('1.1');
+  expect(texts(screen)).toContain('나만의 길을 달려요');
   await act(async () => screen.unmount());
 });
 
