@@ -9,6 +9,8 @@ export type UserProfile = {
   id: string;
   nickname: string;
   runningLevel: 'beginner' | 'intermediate' | 'advanced';
+  // 2.1 홈 uses the profile photo as its background; null shows the default backdrop.
+  profileImageUrl: string | null;
 };
 
 export type TodayCondition = {
@@ -19,6 +21,128 @@ export type TodayCondition = {
   condition: string | null;
   sleepMinutes: number | null;
   restingHeartRate: number | null;
+  // Labels under each 2.1 metric, plus the AI line. All null until a score exists.
+  readinessSummary: string | null;
+  sleepLabel: string | null;
+  restingHeartRateLabel: string | null;
+  weeklyLoad: string | null;
+  weeklyLoadLabel: string | null;
+  aiAdvice: string | null;
+  // 2.P′ 오래된 데이터: when the last score was made.
+  lastAssessedDate: string | null;
+};
+
+// 2.1 홈 배경. The real API returns the profile photo for both; the mock follows the prototype,
+// which pairs the light mode (2.1La) with a brighter photo.
+export type HomeBackdrop = { dark: string | null; light: string | null };
+
+// 2.1 러닝 분석 card.
+export type MonthlyRunSummary = {
+  month: string;
+  runCount: number;
+  totalDistanceM: number;
+  averagePaceSecPerKm: number | null;
+  // Monday-first share of the busiest weekday, 0–1.
+  weekdayRatios: number[];
+  // Positive when this month is faster than last month.
+  paceImprovementSec: number | null;
+};
+
+export type RecordSort = 'recent' | 'distance' | 'pace';
+
+export type RunRecordSummary = {
+  id: string;
+  title: string;
+  startedAt: string;
+  distanceM: number;
+  durationSec: number;
+  averagePaceSecPerKm: number;
+  // Shape of the run for the small thumbnail, as [x, y] points in a 0–1 box.
+  shape: [number, number][];
+};
+
+export type SavedCourse = {
+  id: string;
+  name: string;
+  distanceM: number;
+  expectedMinutes: number;
+  shape: [number, number][];
+};
+
+export type NotificationKind =
+  | 'GROUP_RUN_STARTING'
+  | 'CREW_JOIN_APPROVED'
+  | 'CREW_JOIN_REJECTED'
+  | 'POST_COMMENT'
+  | 'GROUP_RUN_CANCELED'
+  | 'FOLLOW_REQUEST';
+
+export type AppNotification = {
+  id: string;
+  kind: NotificationKind;
+  message: string;
+  createdAt: string;
+  read: boolean;
+};
+
+export type GpsQuality = 'good' | 'weak' | 'none';
+
+export type CurrentPlace = {
+  name: string;
+  gps: GpsQuality;
+  // [longitude, latitude] as in GeoJSON.
+  position: [number, number];
+};
+
+// 2.0 코스 러닝: the course split into 1km segments with a recommended pace each.
+export type CoursePlan = {
+  courseId: string;
+  name: string;
+  distanceM: number;
+  route: [number, number][];
+  segmentPacesSecPerKm: number[];
+  strategy: string;
+  targetPaceSecPerKm: number;
+  expectedDurationSec: number;
+  caution: string | null;
+};
+
+export type MusicService = 'MELON' | 'SPOTIFY';
+export type MusicSource = MusicService | 'NONE';
+export type MusicServiceStatus =
+  | 'CONNECTED'
+  | 'LOGIN_REQUIRED'
+  | 'PERMISSION_REQUIRED'
+  | 'INSTALL_REQUIRED';
+
+export type Track = {
+  id: string;
+  title: string;
+  subtitle: string;
+  durationSec: number;
+};
+
+export type Playlist = { id: string; title: string };
+
+export type MusicLibrary = {
+  likedCount: number;
+  liked: Track[];
+  recent: Playlist[];
+  playlists: Playlist[];
+  top100UpdatedAt: string | null;
+  top100: Track[];
+};
+
+export type MusicState = {
+  // null until the user picks a source in 2.8 (2.7a 미연결).
+  source: MusicSource | null;
+  services: Record<MusicService, MusicServiceStatus>;
+  // 2.7b: the link between RunWay and the music app dropped.
+  linked: boolean;
+  nowPlaying: (Track & { positionSec: number; playing: boolean }) | null;
+  library: MusicLibrary | null;
+  // Spotify plays chosen tracks only with Premium (2.7S).
+  premium: boolean;
 };
 
 // U01 로그인 · U15 회원가입 response.
@@ -110,6 +234,33 @@ export type Repositories = {
   };
   home: {
     getTodayCondition: () => Promise<TodayCondition>;
+    getMonthlySummary: () => Promise<MonthlyRunSummary>;
+    getBackdrop: () => Promise<HomeBackdrop>;
+  };
+  records: {
+    getRecent: (sort: RecordSort, limit: number) => Promise<RunRecordSummary[]>;
+  };
+  courses: {
+    getSaved: () => Promise<SavedCourse[]>;
+    getTodayPlan: () => Promise<CoursePlan>;
+  };
+  notifications: {
+    list: () => Promise<AppNotification[]>;
+    markAllRead: () => Promise<void>;
+  };
+  run: {
+    getCurrentPlace: () => Promise<CurrentPlace>;
+  };
+  music: {
+    getState: () => Promise<MusicState>;
+    selectSource: (source: MusicSource) => Promise<MusicState>;
+    // Opens login, permission or install for a service (2.8 오른쪽 버튼).
+    resolveService: (service: MusicService) => Promise<MusicState>;
+    reconnect: () => Promise<MusicState>;
+  };
+  // The current time; mock data pins it to the prototype's 12:45 so relative times and day/night match.
+  clock: {
+    now: () => Date;
   };
   watch: {
     getConnection: () => Promise<WatchConnection>;

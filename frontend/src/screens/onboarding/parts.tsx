@@ -1,20 +1,12 @@
 import React, { useState } from 'react';
 import {
   FlatList,
-  Image,
   Pressable,
   StyleSheet,
   View,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import Svg, {
-  Defs,
-  LinearGradient,
-  RadialGradient,
-  Rect,
-  Stop,
-} from 'react-native-svg';
 import {
   AppText,
   BottomSheet,
@@ -24,42 +16,9 @@ import {
 } from '../../components';
 import { radius, size, spacing, typography, useTheme } from '../../theme';
 
-const logo = require('../../../assets/images/runway-logo-white.png');
-
-// 1.1·1.2 sit on a blurred runner photo in the prototype. Until the design draft (S15P31E105-89)
-// settles the photo, a dark gradient with a mint glow stands in for it.
-export function HeroBackground() {
-  const { colors } = useTheme();
-  return (
-    <Svg width="100%" height="100%">
-      <Defs>
-        <LinearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor={colors.surfaceRaised} />
-          <Stop offset="0.55" stopColor={colors.background} />
-          <Stop offset="1" stopColor={colors.background} />
-        </LinearGradient>
-        <RadialGradient id="glow" cx="0.7" cy="0.25" r="0.6">
-          <Stop offset="0" stopColor={colors.accent} stopOpacity={0.16} />
-          <Stop offset="1" stopColor={colors.accent} stopOpacity={0} />
-        </RadialGradient>
-      </Defs>
-      <Rect width="100%" height="100%" fill="url(#fade)" />
-      <Rect width="100%" height="100%" fill="url(#glow)" />
-    </Svg>
-  );
-}
-
-export function Logo({ width }: { width: number }) {
-  return (
-    <Image
-      source={logo}
-      accessibilityLabel="RUNWAY"
-      resizeMode="contain"
-      // logo2_white.png is 1915×374.
-      style={{ width, height: (width * 374) / 1915 }}
-    />
-  );
-}
+// 1.1·1.2 sit on a blurred runner photo in the prototype; the shared backdrop stands in for it
+// until the design draft (S15P31E105-89) settles the photo.
+export { Backdrop as HeroBackground, Logo, Segmented } from '../../components';
 
 // Back button with the 1/2 progress bar of 1.5·1.6, or a title as on 1.2q.
 export function OnboardingHeader({
@@ -359,58 +318,6 @@ export function SelectionCard({
   );
 }
 
-// Two-way switch: 1.5 성별, 1.6 완주 시간 · 페이스.
-export function Segmented<T extends string>({
-  options,
-  value,
-  onChange,
-  compact = false,
-}: {
-  options: { value: T; label: string }[];
-  value: T | null;
-  onChange: (value: T) => void;
-  compact?: boolean;
-}) {
-  const { colors } = useTheme();
-  return (
-    <View
-      accessibilityRole="radiogroup"
-      style={[
-        styles.segmented,
-        compact && styles.segmentedCompact,
-        { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
-      ]}
-    >
-      {options.map(option => {
-        const selected = option.value === value;
-        return (
-          <Pressable
-            key={option.value}
-            accessibilityRole="radio"
-            accessibilityLabel={option.label}
-            accessibilityState={{ selected }}
-            onPress={() => onChange(option.value)}
-            style={[
-              styles.segment,
-              compact && styles.segmentCompact,
-              selected && { backgroundColor: colors.accent },
-            ]}
-          >
-            <AppText
-              variant={compact ? 'captionStrong' : 'bodyStrong'}
-              style={{
-                color: selected ? colors.onAccent : colors.textSecondary,
-              }}
-            >
-              {option.label}
-            </AppText>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
 // React Native has no <select>, so 1.5 생년월일 opens a sheet of options instead.
 export function SelectField<T extends number>({
   label,
@@ -435,7 +342,9 @@ export function SelectField<T extends number>({
     <>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${label} ${value === null ? placeholder : format(value)}`}
+        accessibilityLabel={`${label} ${
+          value === null ? placeholder : format(value)
+        }`}
         onPress={() => setOpen(true)}
         style={[
           styles.select,
@@ -456,11 +365,7 @@ export function SelectField<T extends number>({
         </AppText>
         <Icon name="chevronDown" color={colors.textSecondary} size={16} />
       </Pressable>
-      <BottomSheet
-        visible={open}
-        onClose={() => setOpen(false)}
-        title={label}
-      >
+      <BottomSheet visible={open} onClose={() => setOpen(false)} title={label}>
         <FlatList
           data={options}
           keyExtractor={item => String(item)}
@@ -596,21 +501,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     padding: spacing.xl,
   },
-  segmented: {
-    flexDirection: 'row',
-    padding: spacing.xs,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-  },
-  segmentedCompact: { padding: spacing.xxs },
-  segment: {
-    flex: 1,
-    height: 44,
-    borderRadius: radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  segmentCompact: { flex: 0, height: 28, paddingHorizontal: spacing.lg },
   select: {
     height: size.input,
     borderRadius: radius.pill,

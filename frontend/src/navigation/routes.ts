@@ -172,7 +172,7 @@ export const routes: Record<RouteName, RouteInfo> = {
     code: '2.9',
     title: '알림',
     task: HOME,
-    links: ['GroupRunDetail', 'CrewDetail', 'PostDetail'],
+    links: ['GroupRunDetail', 'CrewDetail', 'PostDetail', 'RunnerProfile'],
   },
   RunMode: {
     code: '2.0M',
