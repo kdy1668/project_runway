@@ -14,7 +14,7 @@ const tabs: Record<keyof MainTabParamList, { label: string; icon: IconName }> =
     CommunityTab: { label: '커뮤니티', icon: 'community' },
   };
 
-// 2.1 홈 하단: a floating pill with four tabs. The 2.P arc drag comes with S15P31E105-146.
+// 2.1 홈 하단: a floating pill with four tabs. The 2.P arc drag is not built; 2.P was out of scope for S15P31E105-146.
 export function PillTabBar({ state, navigation }: BottomTabBarProps) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();

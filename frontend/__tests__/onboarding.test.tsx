@@ -272,7 +272,7 @@ test('five wrong codes require a new code', async () => {
 
 test('a disconnected watch shows the 1.8 state and can be skipped from settings', async () => {
   const screen = await render({ initialSignedIn: true }, 'watchDisconnected');
-  await press(screen, '8.1 설정');
+  await press(screen, '설정');
   await press(screen, '1.7 워치 연결');
   const text = texts(screen);
   expect(text).toContain('연결 끊김');
@@ -281,6 +281,6 @@ test('a disconnected watch shows the 1.8 state and can be skipped from settings'
   await slide(screen, '밀어서 다시 연결');
   expect(texts(screen)).toContain('연결 끊김');
   await press(screen, '나중에 연결하기');
-  expect(texts(screen)).toContain('2.1');
+  expect(texts(screen)).toContain('오늘 달리기 좋은 날이에요');
   await act(async () => screen.unmount());
 });

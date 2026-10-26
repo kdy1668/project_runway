@@ -132,11 +132,91 @@ const icons = {
       <Path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
     </>
   ),
+  compass: (
+    <>
+      <Path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z" />
+      <Circle cx="12" cy="12" r="10" />
+    </>
+  ),
+  music: (
+    <>
+      <Path d="M9 18V5l12-2v13" />
+      <Circle cx="6" cy="18" r="3" />
+      <Circle cx="18" cy="16" r="3" />
+    </>
+  ),
+  musicOff: (
+    <>
+      <Path d="M9 18V9" />
+      <Path d="M9 5.5V5l12-2v11" />
+      <Circle cx="6" cy="18" r="3" />
+      <Path d="m2 2 20 20" />
+    </>
+  ),
+  skipBack: (
+    <>
+      <Polygon points="19 20 9 12 19 4 19 20" />
+      <Rect x="4" y="5" width="2.4" height="14" rx="1.2" />
+    </>
+  ),
+  skipForward: (
+    <>
+      <Polygon points="5 4 15 12 5 20 5 4" />
+      <Rect x="17.6" y="5" width="2.4" height="14" rx="1.2" />
+    </>
+  ),
+  pause: (
+    <>
+      <Rect x="14" y="4" width="4" height="16" rx="1" />
+      <Rect x="6" y="4" width="4" height="16" rx="1" />
+    </>
+  ),
+  clock: (
+    <>
+      <Circle cx="12" cy="12" r="10" />
+      <Polyline points="12 6 12 12 16 14" />
+    </>
+  ),
+  userCheck: (
+    <>
+      <Path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <Circle cx="9" cy="7" r="4" />
+      <Polyline points="16 11 18 13 22 9" />
+    </>
+  ),
+  userX: (
+    <>
+      <Path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <Circle cx="9" cy="7" r="4" />
+      <Path d="m17 8 5 5" />
+      <Path d="m22 8-5 5" />
+    </>
+  ),
+  userPlus: (
+    <>
+      <Path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <Circle cx="9" cy="7" r="4" />
+      <Path d="M19 8v6" />
+      <Path d="M22 11h-6" />
+    </>
+  ),
+  circleX: (
+    <>
+      <Circle cx="12" cy="12" r="10" />
+      <Path d="m15 9-6 6" />
+      <Path d="m9 9 6 6" />
+    </>
+  ),
 } as const;
 
 export type IconName = keyof typeof icons;
 
-const filled: ReadonlySet<IconName> = new Set<IconName>(['play']);
+const filled: ReadonlySet<IconName> = new Set<IconName>([
+  'play',
+  'skipBack',
+  'skipForward',
+  'pause',
+]);
 
 export function Icon({
   name,

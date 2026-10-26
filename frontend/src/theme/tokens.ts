@@ -28,6 +28,9 @@ export const palette = {
   metalDark: '#16181D',
   faceGlow: '#123230',
   faceOff: '#24262C',
+  // 2.0·2.8 music service marks.
+  melon: '#00CD3C',
+  spotify: '#1ED760',
 } as const;
 
 export const fontFamily = {

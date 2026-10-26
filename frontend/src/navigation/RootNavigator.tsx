@@ -9,9 +9,11 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { appConfig } from '../config';
 import { ComponentGalleryScreen } from '../screens/ComponentGalleryScreen';
+import { homeScreens } from '../screens/home';
 import { onboardingScreens, SignUpDraftProvider } from '../screens/onboarding';
 import { PlaceholderScreen } from '../screens/PlaceholderScreen';
-import { HomePreview, SettingsPreview } from '../screens/previews';
+import { SettingsPreview } from '../screens/previews';
+import { runScreens } from '../screens/run';
 import { useSession } from '../session/SessionProvider';
 import { fontFamily, useTheme } from '../theme';
 import { PillTabBar } from './PillTabBar';
@@ -35,7 +37,6 @@ const RunStack = createNativeStackNavigator<RunStackParamList>();
 const GroupStack = createNativeStackNavigator<GroupStackParamList>();
 
 const previews: Partial<Record<RouteName, React.ComponentType>> = {
-  Home: HomePreview,
   Settings: SettingsPreview,
 };
 
@@ -68,7 +69,15 @@ const placeholders = Object.fromEntries(
 const screens: Record<RouteName, React.ComponentType> = {
   ...placeholders,
   ...onboardingScreens,
+  ...homeScreens,
+  ...runScreens,
 };
+
+// 2.7·2.8 float over the run screen, which stays visible behind the dimmed backdrop.
+const musicSheet = {
+  presentation: 'transparentModal',
+  animation: 'fade',
+} as const;
 
 const modalRoutes: ReadonlySet<RouteName> = new Set<RouteName>([
   'MusicCard',
@@ -86,11 +95,7 @@ function RunTab() {
   return (
     <RunStack.Navigator screenOptions={noHeader}>
       {runTabRoutes.map(name => (
-        <RunStack.Screen
-          key={name}
-          name={name}
-          component={screens[name]}
-        />
+        <RunStack.Screen key={name} name={name} component={screens[name]} />
       ))}
     </RunStack.Navigator>
   );
@@ -100,11 +105,7 @@ function GroupTab() {
   return (
     <GroupStack.Navigator screenOptions={noHeader}>
       {groupTabRoutes.map(name => (
-        <GroupStack.Screen
-          key={name}
-          name={name}
-          component={screens[name]}
-        />
+        <GroupStack.Screen key={name} name={name} component={screens[name]} />
       ))}
     </GroupStack.Navigator>
   );
@@ -150,43 +151,41 @@ export function RootNavigator() {
   return (
     <NavigationContainer theme={navigationTheme}>
       <SignUpDraftProvider>
-      <Root.Navigator screenOptions={noHeader}>
-        {/* 1.7 워치 연결 exists in both groups; the key makes sign-in/out start a fresh stack instead of staying on it. */}
-        {signedIn ? (
-          <Root.Group navigationKey="signed-in">
-            <Root.Screen name="MainTabs" component={MainTabs} />
-            {mainRoutes.map(route => (
-              <Root.Screen
-                key={route}
-                name={route}
-                component={screens[route]}
-                options={
-                  modalRoutes.has(route) ? { presentation: 'modal' } : undefined
-                }
-              />
-            ))}
-            {appConfig.developerMenu ? (
-              <>
+        <Root.Navigator screenOptions={noHeader}>
+          {/* 1.7 워치 연결 exists in both groups; the key makes sign-in/out start a fresh stack instead of staying on it. */}
+          {signedIn ? (
+            <Root.Group navigationKey="signed-in">
+              <Root.Screen name="MainTabs" component={MainTabs} />
+              {mainRoutes.map(route => (
                 <Root.Screen
-                  name="ComponentGallery"
-                  component={ComponentGalleryScreen}
+                  key={route}
+                  name={route}
+                  component={screens[route]}
+                  options={modalRoutes.has(route) ? musicSheet : undefined}
                 />
-                <Root.Screen name="HealthPoc" getComponent={loadHealthPoc} />
-              </>
-            ) : null}
-          </Root.Group>
-        ) : (
-          <Root.Group navigationKey="signed-out">
-            {authRoutes.map(route => (
-              <Root.Screen
-                key={route}
-                name={route}
-                component={screens[route]}
-              />
-            ))}
-          </Root.Group>
-        )}
-      </Root.Navigator>
+              ))}
+              {appConfig.developerMenu ? (
+                <>
+                  <Root.Screen
+                    name="ComponentGallery"
+                    component={ComponentGalleryScreen}
+                  />
+                  <Root.Screen name="HealthPoc" getComponent={loadHealthPoc} />
+                </>
+              ) : null}
+            </Root.Group>
+          ) : (
+            <Root.Group navigationKey="signed-out">
+              {authRoutes.map(route => (
+                <Root.Screen
+                  key={route}
+                  name={route}
+                  component={screens[route]}
+                />
+              ))}
+            </Root.Group>
+          )}
+        </Root.Navigator>
       </SignUpDraftProvider>
     </NavigationContainer>
   );

@@ -104,7 +104,6 @@ test('signed-out users move from start through login into the home tab', async (
   // The mock answers on a 0 ms timer.
   await act(() => new Promise<void>(resolve => setTimeout(resolve, 20)));
   const home = texts(screen);
-  expect(home).toContain('2.1');
   expect(home).toContain('민준');
   expect(home).toContain('오늘 달리기 좋은 날이에요');
   expect(home).toContain('82');
@@ -117,7 +116,7 @@ test('signed-out users move from start through login into the home tab', async (
 
 test('watch connection opened from settings returns home instead of signing in', async () => {
   const screen = await render({ initialSignedIn: true });
-  await press(screen, '8.1 설정');
+  await press(screen, '설정');
   await press(screen, '1.7 워치 연결');
   await act(() => new Promise<void>(resolve => setTimeout(resolve, 20)));
   expect(texts(screen)).toContain('82%');
@@ -133,14 +132,9 @@ test('watch connection opened from settings returns home instead of signing in',
 test('tabs and their inner screens follow the prototype flow', async () => {
   const screen = await render({ initialSignedIn: true });
   await press(screen, '러닝');
-  expect(texts(screen)).toContain('러닝 방식 선택');
-  await press(screen, '2.0F 자유 러닝');
-  expect(texts(screen)).toContain('2.0F');
-  await press(screen, '4.2 러닝 진행');
-  await press(screen, '4.3 일시정지·종료');
-  await press(screen, '4.5 러닝 결과');
-  expect(texts(screen)).toContain('S15P31E105-148');
-  await press(screen, '2.1 홈');
+  expect(texts(screen)).toContain('달릴까요?');
+  await press(screen, '자유 러닝');
+  expect(texts(screen)).toContain('코스 없이 기록만 남겨요');
   await press(screen, '그룹');
   expect(texts(screen)).toContain('그룹 · 내 크루');
   await press(screen, '6.1 크루 모집');
@@ -157,8 +151,8 @@ test('settings switches light and dark themes and signs out', async () => {
     screen.root
       .findAll(node => node.props.edges !== undefined)
       .map(node => StyleSheet.flatten(node.props.style)?.backgroundColor);
+  await press(screen, '설정');
   expect(backgrounds()).toContain(darkTheme.colors.background);
-  await press(screen, '8.1 설정');
   await press(screen, '라이트');
   expect(backgrounds()).toContain(lightTheme.colors.background);
   expect(backgrounds()).not.toContain(darkTheme.colors.background);
@@ -171,7 +165,7 @@ test('settings switches light and dark themes and signs out', async () => {
 
 test('developer menu opens the component gallery with sheet and toast', async () => {
   const screen = await render({ initialSignedIn: true });
-  await press(screen, '8.1 설정');
+  await press(screen, '설정');
   await press(screen, '공통 컴포넌트 미리보기');
   const gallery = texts(screen);
   for (const text of [

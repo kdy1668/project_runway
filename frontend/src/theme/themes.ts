@@ -17,6 +17,8 @@ export type ThemeColors = {
   accentPressed: string;
   onAccent: string;
   accentText: string;
+  // Lighter mint for secondary bars (2.1 러닝 분석).
+  accentSoft: string;
   danger: string;
   dangerSurface: string;
   dangerBorder: string;
@@ -53,6 +55,7 @@ export const darkTheme: Theme = {
     accentPressed: palette.mintPressed,
     onAccent: palette.ink,
     accentText: palette.mint,
+    accentSoft: 'rgba(167,246,236,0.45)',
     danger: palette.coral,
     dangerSurface: 'rgba(255,158,138,0.12)',
     dangerBorder: 'rgba(255,158,138,0.5)',
@@ -87,6 +90,7 @@ export const lightTheme: Theme = {
     accentPressed: palette.mintPressed,
     onAccent: palette.ink,
     accentText: palette.mintText,
+    accentSoft: 'rgba(79,208,191,0.35)',
     danger: palette.coralStrong,
     dangerSurface: 'rgba(255,138,115,0.12)',
     dangerBorder: 'rgba(255,138,115,0.5)',

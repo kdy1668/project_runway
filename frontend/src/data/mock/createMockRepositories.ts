@@ -1,17 +1,35 @@
 import { DataError } from '../errors';
 import type {
   AuthSession,
+  MusicSource,
+  MusicState,
   PhoneCodeRequest,
+  RecordSort,
   Repositories,
+  RunRecordSummary,
+  TodayCondition,
 } from '../types';
 import * as fixtures from './fixtures';
 
 export type MockScenario =
   | 'default'
+  // 2.P′ 신규 사용자: readiness still collecting.
   | 'newUser'
   | 'error'
-  // 1.8 워치 연결 문제: the watch stays disconnected even after reconnecting.
-  | 'watchDisconnected';
+  // 1.8 워치 연결 문제 and the 2.1 워치 미연결 state.
+  | 'watchDisconnected'
+  // The other 2.1 health data states.
+  | 'staleHealth'
+  | 'healthDenied'
+  // 2.9b 알림 없음.
+  | 'noNotifications'
+  // 2.7S Spotify, 2.7a 미연결, 2.7b 연결 끊김, 2.8b 설치·권한 필요.
+  | 'musicSpotify'
+  | 'musicNotConnected'
+  | 'musicDisconnected'
+  | 'musicNeedsSetup'
+  // 2.0N: after sunset.
+  | 'night';
 
 export type MockOptions = {
   scenario?: MockScenario;
@@ -42,6 +60,84 @@ function fail(error: DataError, { latencyMs = 300 }: MockOptions) {
   });
 }
 
+function conditionFor(scenario: MockScenario = 'default'): TodayCondition {
+  switch (scenario) {
+    case 'newUser':
+      return fixtures.collectingCondition;
+    case 'staleHealth':
+      return {
+        ...fixtures.collectingCondition,
+        readinessState: 'stale',
+        lastAssessedDate: '2026-10-15',
+      };
+    case 'healthDenied':
+      return {
+        ...fixtures.collectingCondition,
+        readinessState: 'permissionDenied',
+      };
+    case 'watchDisconnected':
+      return {
+        ...fixtures.collectingCondition,
+        readinessState: 'watchDisconnected',
+      };
+    default:
+      return fixtures.todayCondition;
+  }
+}
+
+const recordOrder: Record<
+  RecordSort,
+  (a: RunRecordSummary, b: RunRecordSummary) => number
+> = {
+  recent: (a, b) => b.startedAt.localeCompare(a.startedAt),
+  distance: (a, b) => b.distanceM - a.distanceM,
+  pace: (a, b) => a.averagePaceSecPerKm - b.averagePaceSecPerKm,
+};
+
+// Picking a source swaps in that service's library; 음악 없음 clears the player.
+function withSource(state: MusicState, source: MusicSource): MusicState {
+  if (source === 'NONE') {
+    return { ...state, source, nowPlaying: null, library: null };
+  }
+  const library = fixtures.musicLibraries[source];
+  const first = library.liked[0] ?? null;
+  return {
+    ...state,
+    source,
+    library,
+    nowPlaying: first ? { ...first, positionSec: 84, playing: true } : null,
+  };
+}
+
+function musicFor(scenario: MockScenario = 'default'): MusicState {
+  switch (scenario) {
+    case 'musicSpotify':
+      return {
+        ...fixtures.musicState,
+        source: 'SPOTIFY',
+        services: { MELON: 'CONNECTED', SPOTIFY: 'CONNECTED' },
+        library: fixtures.musicLibraries.SPOTIFY,
+      };
+    case 'musicNotConnected':
+      return {
+        ...fixtures.musicState,
+        source: null,
+        services: { MELON: 'LOGIN_REQUIRED', SPOTIFY: 'LOGIN_REQUIRED' },
+        nowPlaying: null,
+        library: null,
+      };
+    case 'musicDisconnected':
+      return { ...fixtures.musicState, linked: false };
+    case 'musicNeedsSetup':
+      return {
+        ...fixtures.musicState,
+        services: { MELON: 'PERMISSION_REQUIRED', SPOTIFY: 'INSTALL_REQUIRED' },
+      };
+    default:
+      return fixtures.musicState;
+  }
+}
+
 type Account = {
   password: string;
   phoneNumber: string;
@@ -67,7 +163,12 @@ export function createMockRepositories(
       },
     ]),
   );
-  const loginFailures = new Map<string, { count: number; lockedUntil: number }>();
+  let notifications = fixtures.notifications;
+  let music = musicFor(options.scenario);
+  const loginFailures = new Map<
+    string,
+    { count: number; lockedUntil: number }
+  >();
   const pendingCodes = new Map<string, PendingCode>();
   const verifiedPhones = new Map<string, string>();
   let nextUserId = 101;
@@ -219,12 +320,57 @@ export function createMockRepositories(
       setRunningBaseline: () => respond(undefined, options),
     },
     home: {
-      getTodayCondition: () =>
+      getTodayCondition: () => respond(conditionFor(options.scenario), options),
+      getMonthlySummary: () => respond(fixtures.monthlySummary, options),
+      getBackdrop: () => respond(fixtures.homeBackdrop, options),
+    },
+    records: {
+      getRecent: (sort, limit) =>
         respond(
-          options.scenario === 'newUser'
-            ? fixtures.collectingCondition
-            : fixtures.todayCondition,
+          [...fixtures.recentRecords].sort(recordOrder[sort]).slice(0, limit),
           options,
+        ),
+    },
+    courses: {
+      getSaved: () => respond(fixtures.savedCourses, options),
+      getTodayPlan: () => respond(fixtures.todayPlan, options),
+    },
+    notifications: {
+      list: () =>
+        respond(
+          options.scenario === 'noNotifications' ? [] : notifications,
+          options,
+        ),
+      markAllRead: () => {
+        notifications = notifications.map(item => ({ ...item, read: true }));
+        return respond(undefined, options);
+      },
+    },
+    run: {
+      getCurrentPlace: () => respond(fixtures.currentPlace, options),
+    },
+    music: {
+      getState: () => respond(music, options),
+      selectSource: source => {
+        music = withSource(music, source);
+        return respond(music, options);
+      },
+      resolveService: service => {
+        music = {
+          ...music,
+          services: { ...music.services, [service]: 'CONNECTED' },
+        };
+        return respond(music, options);
+      },
+      reconnect: () => {
+        music = { ...music, linked: true };
+        return respond(music, options);
+      },
+    },
+    clock: {
+      now: () =>
+        new Date(
+          options.scenario === 'night' ? fixtures.nightNow : fixtures.now,
         ),
     },
     watch: {
