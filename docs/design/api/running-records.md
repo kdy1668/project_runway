@@ -10,6 +10,14 @@
 | [H06](#h06-러닝-통계-요약) | 러닝 통계 요약 | GET | `/running-records/statistics` | 1차 MVP | 회원 |
 | [H07](#h07-평균-페이스-추이) | 평균 페이스 추이 | GET | `/running-records/statistics/pace-trend` | 1차 MVP | 회원 |
 
+## ERD 응답 대응 기준
+
+**응답 해석:** 각 Response의 JSON은 기존 동작과 기능상 필요한 출력을 설명하는 검토용 예시다. 저장·전송 정책이 미정인 보완 필드는 구현 완료 계약을 뜻하지 않는다. 확인 필요 필드의 생략은 기능 삭제나 최종 선택 필드 확정을 뜻하지 않는다. `O`는 해당 응답 객체가 존재할 때 키를 포함함을 뜻하며, 값의 NULL 허용은 타입의 ` / null`로 구분한다. 조회 결과 자체가 없는 경우와 복구 행동은 해당 오류 응답 절을 따른다.
+
+기록의 저장 근거는 running_sessions다. running_metric_samples·running_route_points는 측정/경로 근거이며 원본 GPS 응답을 추가하지 않는다. 구간 분석·기간 통계는 파생 결과다. NULL 결과를 0으로 채우지 않고 개인 원본 기록의 본인 조회 정책을 유지한다.
+
+자료형·NULL의 정본은 [schema.sql](../db/schema.sql), 표시·관계 설명은 [ERD](../db/erd.md)를 따른다. ERD 정합성 단계에서는 API 종류·개수·역할·오류 응답을 유지했다. 후속 오류 검토 내용은 각 오류 응답 절을 따른다.
+
 ## H01 러닝 기록 목록
 
 `GET` `/api/v1/running-records`
@@ -44,7 +52,7 @@
 | `limit` | number | X | 조회 결과 최대 개수(최대값 미정) |
 | `from` | string / object (확인 필요) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
 | `to` | string / object (확인 필요) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `courseId` | string (UUID) | X | 선택한 코스 식별자. 개인·그룹 자유러닝은 null/생략 가능 |
+| `courseId` | integer (int64) | X | 선택한 코스 식별자. 개인·그룹 자유러닝은 null/생략 가능 |
 | `runType` | string | X | ALL/SOLO/GROUP(5.1 전체·개인·그룹런 탭) |
 | `sort` | string | X | LATEST/DISTANCE/PACE(2.1 최신순·거리순·페이스순) |
 
@@ -58,20 +66,58 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "items": [
+    {
+      "id": 101,
+      "courseId": null,
+      "startedAt": null,
+      "totalDistance": null,
+      "movingDuration": null,
+      "averagePace": null,
+      "goalAchieved": null
+    }
+  ]
+}
 ```
 
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
+응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
 | `items` | array | X | 본인 러닝 기록 요약 목록. 세부 객체 계약 미정 |
-| `page` | string / object (확인 필요) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `page` | string / object (확인 필요) | X | 페이지 메타데이터는 저장 엔티티가 아니다. cursor/limit 등 공통 페이지 형식 확정 필요. |
+
+중첩 객체의 저장 필드 대응(추가 표시·집계 값은 기존 후보를 유지하며 별도 확인):
+
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|:---:|---|
+| `items[].id` | integer (int64) | O | `running_sessions.id` (BIGINT). 저장 값은 NULL 불가. |
+| `items[].courseId` | integer (int64) / null | O | `running_sessions.course_id` (BIGINT). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `items[].startedAt` | string (ISO 8601 UTC) / null | O | `running_sessions.started_at` (TIMESTAMPTZ). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `items[].totalDistance` | number / null | O | `running_sessions.total_distance` (NUMERIC(12,2)). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `items[].movingDuration` | integer / null | O | `running_sessions.moving_duration` (INTEGER). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `items[].averagePace` | number / null | O | `running_sessions.average_pace` (NUMERIC(10,2)). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `items[].goalAchieved` | boolean / null | O | `running_sessions.goal_achieved` (BOOLEAN). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+
+
+**사용 흐름과 응답 판단**
+
+기록 목록은 기록 ID·운동시각·거리·이동시간·평균페이스로 상세 진입을 지원한다. 개인/그룹 구분과 정렬 기준의 표시값도 확인한다.
 
 ### 오류 응답
 
-- `400 INVALID_FILTER`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `400 INVALID_FILTER` | 검색 조건 | 정렬·필터·페이지 조건이 명세의 허용값/형식에 맞지 않음 |
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+- 검색/조회 결과가 0건인 경우 자체는 오류가 아니다. 유효한 빈 목록과 잘못된 조회 조건을 구분한다.
 
 ### 처리 규칙
 
@@ -119,7 +165,7 @@
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `sessionId` | string (UUID) | O | 러닝 세션 UUID |
+| `sessionId` | integer (int64) | O | 러닝 세션 BIGINT 식별자 |
 
 ### Query Parameters
 
@@ -135,31 +181,68 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "sessionId": 101,
+  "targetDistanceM": null,
+  "targetDurationSec": null,
+  "actualDistanceM": null,
+  "movingDurationSec": null,
+  "elapsedDurationSec": null,
+  "averagePaceSecPerKm": null,
+  "averageHeartRate": null,
+  "averageCadence": null,
+  "goalAchieved": null,
+  "courseId": null,
+  "targetPaceSecPerKm": null,
+  "comparisonSessionId": null
+}
 ```
 
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
+응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `sessionId` | string (UUID) | X | 러닝 세션 UUID |
-| `targetDistanceM` | number | X | 목표 거리, 미터, 양수 |
-| `targetDurationSec` | number | X | 목표 완주 시간, 초, 양수 |
-| `actualDistanceM` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `movingDurationSec` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `elapsedDurationSec` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `averagePaceSecPerKm` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `averageHeartRate` | string / object (확인 필요) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `averageCadence` | string / object (확인 필요) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `goalAchieved` | boolean | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `routePreviewImageUrl` | string / null (제안) | X | 화면 표시용 경로 이미지 참조. 원본 GPS 좌표 배열은 미제공 |
-| `courseId` | string (UUID) | X | 선택한 코스 식별자. 개인·그룹 자유러닝은 null/생략 가능 |
+| `sessionId` | integer (int64) | O | `running_sessions.id` (BIGINT). 저장 값은 NULL 불가. |
+| `targetDistanceM` | integer / null | O | `running_sessions.goal_distance` (INTEGER). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `targetDurationSec` | integer / null | O | `running_sessions.goal_duration` (INTEGER). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `actualDistanceM` | number / null | O | `running_sessions.total_distance` (NUMERIC(12,2)). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `movingDurationSec` | integer / null | O | `running_sessions.moving_duration` (INTEGER). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `elapsedDurationSec` | integer / null | O | `running_sessions.elapsed_duration` (INTEGER). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `averagePaceSecPerKm` | number / null | O | `running_sessions.average_pace` (NUMERIC(10,2)). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `averageHeartRate` | number / null | O | `running_sessions.average_heart_rate` (NUMERIC(7,2)). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `averageCadence` | number / null | O | `running_sessions.average_cadence` (NUMERIC(8,2)). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `goalAchieved` | boolean / null | O | `running_sessions.goal_achieved` (BOOLEAN). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `routePreviewImageUrl` | string / null (제안) | X | 원본 경로에서 생성한 표시용 이미지 참조. 해당 저장 컬럼·준비 상태는 미정. 원본 GPS 응답으로 대체하지 않는다. |
+| `courseId` | integer (int64) / null | O | `running_sessions.course_id` (BIGINT). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+
+
+**사용 흐름과 응답 판단**
+
+초기 거리/시간뿐 아니라 목표 페이스·비교기록과 실제 결과를 보여야 목표달성을 해석할 수 있다. 개인 경로 그림의 준비 여부는 원본 GPS와 분리한다.
+
+기능상 필요한 응답 필드 보완안:
+
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|:---:|---|
+| `targetPaceSecPerKm` | number / null | O | 최초 goal_pace. 미설정은null. |
+| `comparisonSessionId` | integer (int64) / null | O | 비교를 선택한 과거 세션. 미선택은 null. |
 
 ### 오류 응답
 
-- `403 NOT_OWNER`
-- `404 RECORD_NOT_FOUND`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `403 NOT_OWNER` | 소유권 | 본인 전용 세션·기록이 다른 회원 소유임 |
+| `404 RECORD_NOT_FOUND` | 대상 없음 | 요청한 러닝 기록이 없거나 삭제됨 |
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- **대상 없음·접근 차단 점검:** 경로 대상의 부재/삭제, 본인 소유·역할·참가 자격 불충족을 구분한다. 위 표에 없는 경우 `404` 자원 없음 또는 `403` 접근 거부의 추가 매핑을 확인한다. 존재 은닉을 위한 403/404 선택·검사 순서는 미정이며 새 코드로 단정하지 않는다.
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+- 종료 성공·원본 저장 완료와 분석 준비/실패를 구분한다. 아직 없는 결과나 미측정 값을 0/false로 채우거나 원 요청 전체를 재실행하도록 요구하지 않는다.
 
 ### 처리 규칙
 
@@ -212,7 +295,7 @@
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `sessionId` | string (UUID) | O | 러닝 세션 UUID |
+| `sessionId` | integer (int64) | O | 러닝 세션 BIGINT 식별자 |
 
 ### Query Parameters
 
@@ -228,19 +311,63 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "splits": [
+    {
+      "startDistanceM": 0,
+      "endDistanceM": 1000,
+      "paceSecPerKm": 360,
+      "averageHeartRate": null,
+      "averageCadence": null
+    }
+  ]
+}
 ```
 
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
+응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `splits` | array | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `splits` | array | O | 저장 컬럼과 직접 대응하지 않는 응답 값. 산출·표시 구조 확인 필요 (ERD만으로 응답 형식을 확정하지 않음.) |
+
+
+**사용 흐름과 응답 판단**
+
+각 구간의 범위와 페이스·심박·케이던스로 차트를 그린다. 빈 구간과 분석 준비 중/실패는 구분한다.
+
+기존 목록/결과의 기능상 필요한 하위 필드 보완안:
+
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|:---:|---|
+| `splits[].startDistanceM` | number | O | 해당 구간 시작 거리. |
+| `splits[].endDistanceM` | number | O | 해당 구간 종료 거리. |
+| `splits[].paceSecPerKm` | number / null | O | 구간 페이스. 구간 분할·미완주 구간 처리 계약 확인 필요. |
+| `splits[].averageHeartRate` | number / null | O | 구간 심박. 미측정은 null. |
+| `splits[].averageCadence` | number / null | O | 구간 케이던스. 미측정은 null. |
 
 ### 오류 응답
 
-- `404 RECORD_NOT_FOUND`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `404 RECORD_NOT_FOUND` | 대상 없음 | 요청한 러닝 기록이 없거나 삭제됨 |
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+**추가 오류 후보 — HTTP·코드·판정 정책 확인 필요**
+
+| 후보 | 발생 가능 상황 |
+|---|---|
+| `403 NOT_OWNER` | 타인 원본 기록의 구간 분석 조회 |
+| `409 ANALYSIS_NOT_READY` | 분석이 아직 준비되지 않음. 정상 준비 상태/오류 구분 미정 |
+
+- **대상 없음·접근 차단 점검:** 경로 대상의 부재/삭제, 본인 소유·역할·참가 자격 불충족을 구분한다. 위 표에 없는 경우 `404` 자원 없음 또는 `403` 접근 거부의 추가 매핑을 확인한다. 존재 은닉을 위한 403/404 선택·검사 순서는 미정이며 새 코드로 단정하지 않는다.
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+
+**응답·복구 행동과의 연결:** 분석 준비 중/실패 계약은 미정이다. 원본 세션 존재와 본인 소유권을 먼저 확인하고 H03 조회를 재시도하며 종료를 다시 요청하지 않는다.
 
 ### 처리 규칙
 
@@ -307,25 +434,46 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "runCount": 0,
+  "totalDistanceM": 0,
+  "totalDurationSec": 0,
+  "averagePaceSecPerKm": null,
+  "breakdown": [],
+  "heartRateZones": [],
+  "previousPeriod": null
+}
 ```
 
-응답 필드 후보(화면 표시 항목 기준, **ERD 확정 후 갱신**):
+응답 필드 정의(ERD ver.3 대조):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `runCount` | number | X | 러닝 횟수 |
-| `totalDistanceM` | number | X | 누적 거리 |
-| `totalDurationSec` | number | X | 총 시간 |
-| `averagePaceSecPerKm` | number | X | 평균 페이스 |
-| `breakdown` | array | X | 요일별(홈 차트)·주별(5.3 주별 거리) 거리 |
-| `heartRateZones` | array | X | 심박 구간 1~5 비율 |
-| `previousPeriod` | object | X | 직전 기간 횟수·거리·평균 페이스와 차이 |
+| `runCount` | number | O | 러닝 횟수 (ERD만으로 응답 형식을 확정하지 않음.) |
+| `totalDistanceM` | number | O | 누적 거리 (ERD만으로 응답 형식을 확정하지 않음.) |
+| `totalDurationSec` | number | O | 총 시간 (ERD만으로 응답 형식을 확정하지 않음.) |
+| `averagePaceSecPerKm` | number / null | O | 평균 페이스 (ERD만으로 응답 형식을 확정하지 않음.) |
+| `breakdown` | array | O | 요일별(홈 차트)·주별(5.3 주별 거리) 거리 (ERD만으로 응답 형식을 확정하지 않음.) |
+| `heartRateZones` | array | O | 심박 구간 1~5 비율 (ERD만으로 응답 형식을 확정하지 않음.) |
+| `previousPeriod` | object / null | O | 직전 기간 횟수·거리·평균 페이스와 차이 (ERD만으로 응답 형식을 확정하지 않음.) |
+
+
+**사용 흐름과 응답 판단**
+
+통계에는 요청기간·실제 집계기간·측정수 또는 결측 표시가 필요하다. 운동 없음의 횟수0과 계산 불가 평균페이스 null을 구분한다.
 
 ### 오류 응답
 
-- `400 INVALID_PERIOD`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `400 INVALID_PERIOD` | 조회 기간 | 실제 요청 period의 허용값·baseDate 날짜 형식이 잘못됨. runType은 INVALID_FILTER/VALIDATION_ERROR와 매핑 확인. 최대 기간은 별도 확정 |
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
 
 ### 처리 규칙
 
@@ -391,19 +539,50 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "items": [
+    {
+      "month": "2026-10",
+      "averagePaceSecPerKm": 360,
+      "runCount": 3
+    }
+  ],
+  "changeSecPerKm": null
+}
 ```
 
-응답 필드 후보(화면 표시 항목 기준, **ERD 확정 후 갱신**):
+응답 필드 정의(ERD ver.3 대조):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `items` | array | X | 월(YYYY-MM)별 평균 페이스·러닝 횟수 |
-| `changeSecPerKm` | number | X | 첫 달 대비 마지막 달 페이스 변화 |
+| `items` | array | O | 월(YYYY-MM)별 평균 페이스·러닝 횟수 |
+| `changeSecPerKm` | number / null | O | 첫 달 대비 마지막 달 페이스 변화 (ERD만으로 응답 형식을 확정하지 않음.) |
+
+
+**사용 흐름과 응답 판단**
+
+기간별 추이를 그릴 때 누락 월·기록 없는 월과 실제 페이스를 구분한다.
+
+기존 목록/결과의 기능상 필요한 하위 필드 보완안:
+
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|:---:|---|
+| `items[].month` | string (YYYY-MM) | O | 차트의 기준 월. |
+| `items[].averagePaceSecPerKm` | number / null | O | 해당 월 계산 가능 평균페이스. 집계 산식 확인 필요. |
+| `items[].runCount` | integer | O | 해당 월 집계 러닝 수. |
 
 ### 오류 응답
 
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+- 검색/조회 결과가 0건인 경우 자체는 오류가 아니다. 유효한 빈 목록과 잘못된 조회 조건을 구분한다.
 
 ### 처리 규칙
 

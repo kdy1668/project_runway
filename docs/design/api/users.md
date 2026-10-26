@@ -30,6 +30,14 @@
 | [U24](#u24-받은-팔로우-요청-목록) | 받은 팔로우 요청 목록 | GET | `/users/me/follow-requests` | 1차 MVP | 회원 |
 | [U25](#u25-팔로우-요청-승인거절) | 팔로우 요청 승인·거절 | PATCH | `/users/me/follow-requests/{requesterId}` | 1차 MVP | 회원 |
 
+## ERD 응답 대응 기준
+
+**응답 해석:** 각 Response의 JSON은 기존 동작과 기능상 필요한 출력을 설명하는 검토용 예시다. 저장·전송 정책이 미정인 보완 필드는 구현 완료 계약을 뜻하지 않는다. 확인 필요 필드의 생략은 기능 삭제나 최종 선택 필드 확정을 뜻하지 않는다. `O`는 해당 응답 객체가 존재할 때 키를 포함함을 뜻하며, 값의 NULL 허용은 타입의 ` / null`로 구분한다. 조회 결과 자체가 없는 경우와 복구 행동은 해당 오류 응답 절을 따른다.
+
+회원 응답은 users, 러닝 기준값은 user_profiles, 앱 설정은 user_settings를 사용한다. 비밀번호·전화번호·건강 동의 등 DB 컬럼을 공개 프로필에 자동 노출하지 않는다. user_follows는 follower_id → followee_id 방향이며 is_approved로 요청/성립을 구분한다.
+
+자료형·NULL의 정본은 [schema.sql](../db/schema.sql), 표시·관계 설명은 [ERD](../db/erd.md)를 따른다. ERD 정합성 단계에서는 API 종류·개수·역할·오류 응답을 유지했다. 후속 오류 검토 내용은 각 오류 응답 절을 따른다.
+
 ## U01 로그인
 
 `POST` `/api/v1/auth/login`
@@ -79,23 +87,51 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "user": {
+    "id": 101,
+    "loginId": "runner01"
+  },
+  "accessToken": "access-token-placeholder",
+  "onboardingCompleted": false
+}
 ```
 
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
+응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `user` | object | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `accessToken` | string / object (확인 필요) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `refreshToken` | string / object (확인 필요) | X | 갱신 토큰(저장/쿠키 정책 미정) |
-| `onboardingCompleted` | boolean | X | 초기 설정(1.4~1.6) 완료 여부. 미완료면 초기 설정 화면으로 이동 |
+| `user` | object | X | 저장 컬럼과 직접 대응하지 않는 응답 값. 산출·표시 구조 확인 필요 (ERD만으로 응답 형식을 확정하지 않음.) |
+| `accessToken` | string | 조건부 | 본문 토큰 방식이면 필수. 쿠키 방식이면 안전한 쿠키로 동등한 인증수단 전달. DB 컬럼 유무와 무관. |
+| `refreshToken` | string / object (확인 필요) | X | 갱신 토큰(저장/쿠키 정책 미정) (ERD만으로 응답 형식을 확정하지 않음.) |
+| `onboardingCompleted` | boolean | O | 기존 초기 설정 완료 여부. 완료 판정 기준은 미정으로 남기되 클라이언트가 임의 추측하지 않게 전달. |
+
+중첩 객체의 저장 필드 대응(추가 표시·집계 값은 기존 후보를 유지하며 별도 확인):
+
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|:---:|---|
+| `user.id` | integer (int64) | O | `users.id` (BIGINT). 저장 값은 NULL 불가. |
+| `user.loginId` | string | O | `users.login_id` (VARCHAR(16)). 저장 값은 NULL 불가. |
+
+
+**사용 흐름과 응답 판단**
+
+성공 후 동의·초기 설정 또는 홈으로 이동하고 회원 API를 호출할 수 있어야 한다. 인증수단 전달은 필수이며 JSON 토큰/쿠키의 위치는 별도 결정이다.
+
+위 보완 필드는 호출 목적상 필요한 출력이다. 저장 컬럼 부재는 출력 불필요의 근거가 아니다. 저장·전송 정책 미정 항목은 위 설명의 계약을 확정한 후 구현한다.
 
 ### 오류 응답
 
-- `401 INVALID_CREDENTIALS` — 아이디 또는 비밀번호 불일치. 남은 시도 횟수(`remainingAttempts`)를 `details`에 포함(제안)
-- `429 LOGIN_LOCKED` — 5회 연속 실패 시 10분간 로그인 제한. 해제 시각(`lockedUntil`)을 `details`에 포함(제안)
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `401 INVALID_CREDENTIALS` | 인증 | 아이디·비밀번호 불일치. 계정 존재 여부를 구분해 노출하지 않음 |
+| `429 LOGIN_LOCKED` | 요청 제한 | 기존 정책의 로그인 연속 실패 제한에 도달함. 5회 실패 시 10분 제한 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
 
 ### 처리 규칙
 
@@ -161,21 +197,38 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "accessToken": "new-access-token-placeholder",
+  "expiresInSec": 3600
+}
 ```
 
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
+응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `accessToken` | string / object (확인 필요) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `refreshToken` | string / object (확인 필요) | X | 갱신 토큰(저장/쿠키 정책 미정) |
-| `expiresInSec` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `accessToken` | string | 조건부 | 본문 토큰 방식의 새 접근 토큰. 쿠키 방식은 동등한 갱신 결과 전달. |
+| `refreshToken` | string / object (확인 필요) | X | 갱신 토큰(저장/쿠키 정책 미정) (ERD만으로 응답 형식을 확정하지 않음.) |
+| `expiresInSec` | integer | 조건부 | 본문 토큰 방식을 채택하면 접근 토큰 만료까지 남은 초. 회전/전달 정책은 별도 확정. |
+
+
+**사용 흐름과 응답 판단**
+
+갱신 성공 후 새 인증수단으로 원래 회원 요청을 재개할 수 있어야 한다.
+
+위 보완 필드는 호출 목적상 필요한 출력이다. 저장 컬럼 부재는 출력 불필요의 근거가 아니다. 저장·전송 정책 미정 항목은 위 설명의 계약을 확정한 후 구현한다.
 
 ### 오류 응답
 
-- `401 INVALID_REFRESH_TOKEN`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `401 INVALID_REFRESH_TOKEN` | 인증 | 갱신 토큰이 없거나 만료·변조·폐기됨. 회전 후 재사용 판정은 토큰 정책 확정 필요 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
 
 ### 처리 규칙
 
@@ -238,19 +291,38 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "success": true
+}
 ```
 
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
+응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `success` | boolean | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `success` | boolean | X | 로그아웃 처리 성공 여부. |
+
+
+**사용 흐름과 응답 판단**
+
+로그아웃 성공을 확인하고 로컬 인증정보를 정리한다. 폐기 정책은 별도 확정.
+
+위 보완 필드는 호출 목적상 필요한 출력이다. 저장 컬럼 부재는 출력 불필요의 근거가 아니다. 저장·전송 정책 미정 항목은 위 설명의 계약을 확정한 후 구현한다.
+
+로그아웃 완료는 HTTP 성공으로 확인할 수도 있다. success 키는 기존 선택 필드이며 새 필수 래퍼를 도입하지 않는다.
 
 ### 오류 응답
 
-- `401 UNAUTHORIZED`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
 
 ### 처리 규칙
 
@@ -309,26 +381,45 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "id": 101,
+  "nickname": "러너",
+  "gender": "MALE",
+  "birthDate": "2000-01-01",
+  "loginId": "runner01",
+  "status": "ACTIVE"
+}
 ```
 
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
+응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `id` | string (UUID) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `nickname` | string / object (확인 필요) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `gender` | string / object (확인 필요) | X | 사용자 성별(허용값 미정) |
-| `birthDate` | string (YYYY-MM-DD) | X | 생년월일. 연령대·나이 표시는 이 값으로 계산 |
-| `profileImageUrl` | string | X | 프로필 사진 URL. 홈·프로필 배경으로 사용 |
-| `loginId` | string | X | 로그인 아이디 |
-| `status` | string (제안) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `onboarding` | object | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `id` | integer (int64) | O | `users.id` (BIGINT). 저장 값은 NULL 불가. |
+| `nickname` | string | O | `users.nickname` (VARCHAR(10)). 저장 값은 NULL 불가. |
+| `gender` | string | O | `users.gender` (ENUM('MALE', 'FEMALE')). 저장 값은 NULL 불가. 허용값: MALE, FEMALE. |
+| `birthDate` | string (YYYY-MM-DD) | O | `users.birth_date` (DATE). 저장 값은 NULL 불가. |
+| `profileImageUrl` | string / null | X | users.profile_image_key에서 파생하는 조회 URL. 키가 NULL이면 null. URL 생성 방식은 확인 필요. |
+| `loginId` | string | O | `users.login_id` (VARCHAR(16)). 저장 값은 NULL 불가. |
+| `status` | string | O | `users.account_status` (ENUM('ACTIVE', 'WITHDRAWN')). 저장 값은 NULL 불가. 허용값: ACTIVE, WITHDRAWN. |
+| `onboarding` | object | X | 저장 컬럼과 직접 대응하지 않는 응답 값. 산출·표시 구조 확인 필요 (ERD만으로 응답 형식을 확정하지 않음.) |
+
+
+**사용 흐름과 응답 판단**
+
+초기 설정 분기에는 onboarding의 완료 판정과 단계 정보가 필요하다. 스키마만으로 정의되지 않는 값을 빈 객체로 완료 처리하지 않는다.
 
 ### 오류 응답
 
-- `401 UNAUTHORIZED`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
 
 ### 처리 규칙
 
@@ -395,23 +486,46 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "id": 101,
+  "nickname": "러너",
+  "gender": "MALE",
+  "birthDate": "2000-01-01",
+  "updatedAt": "2026-10-24T09:00:00Z",
+  "profileImageUrl": null
+}
 ```
 
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
+응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `id` | string (UUID) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `nickname` | string / object (확인 필요) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `gender` | string / object (확인 필요) | X | 사용자 성별(허용값 미정) |
-| `birthDate` | string (YYYY-MM-DD) | X | 생년월일. 심박 구간·권장 페이스 계산에 사용 |
-| `updatedAt` | string (ISO 8601) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `id` | integer (int64) | O | `users.id` (BIGINT). 저장 값은 NULL 불가. |
+| `nickname` | string | O | `users.nickname` (VARCHAR(10)). 저장 값은 NULL 불가. |
+| `gender` | string | O | `users.gender` (ENUM('MALE', 'FEMALE')). 저장 값은 NULL 불가. 허용값: MALE, FEMALE. |
+| `birthDate` | string (YYYY-MM-DD) | O | `users.birth_date` (DATE). 저장 값은 NULL 불가. |
+| `updatedAt` | string (ISO 8601 UTC) | O | `users.updated_at` (TIMESTAMPTZ). 저장 값은 NULL 불가. |
+| `profileImageUrl` | string / null | O | 적용된 프로필 사진 조회 참조. 미등록은 null. URL 생성 정책 확인 필요. |
+
+**사용 흐름과 응답 판단**
+
+수정된 프로필과 사진을 바로 다시 그릴 수 있어야 한다.
+
+위 보완 필드는 호출 목적상 필요한 출력이다. 저장 컬럼 부재는 출력 불필요의 근거가 아니다. 저장·전송 정책 미정 항목은 위 설명의 계약을 확정한 후 구현한다.
 
 ### 오류 응답
 
-- `400 INVALID_PROFILE`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `400 INVALID_PROFILE` | 입력 값 | 닉네임·생년월일·성별 등 수정 값이 명세/ERD의 형식·허용 코드·길이와 맞지 않음 |
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
 
 ### 처리 규칙
 
@@ -472,21 +586,38 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "selfReportedLevel": "BEGINNER"
+}
 ```
 
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
+응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `selfReportedLevel` | string (제안) | X | BEGINNER/INTERMEDIATE/ADVANCED |
-| `assessedLevel` | string / object (확인 필요) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `assessedAt` | string (ISO 8601) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `selfReportedLevel` | string | O | 기존 자기보고 수준 BEGINNER/INTERMEDIATE/ADVANCED. 기능상 필수이나 별도 추정 수준과의 저장 매핑 결정 필요. |
+| `assessedLevel` | string / object (확인 필요) | X | 별도 추정 수준 컬럼 없음. user_profiles.running_level을 자기보고/추정 두 값으로 복제하지 않는다. |
+| `assessedAt` | string (ISO 8601) | X | 독립 평가 시각 컬럼 없음. created_at/updated_at을 평가 시각으로 치환할 근거 확인 필요. |
+
+
+**사용 흐름과 응답 판단**
+
+수준 화면을 표시하거나 저장 후 선택값을 확인해야 한다. 단일 ERD 수준과 자기보고/추정 수준 구분은 해결할 계약이다.
+
+위 보완 필드는 호출 목적상 필요한 출력이다. 저장 컬럼 부재는 출력 불필요의 근거가 아니다. 저장·전송 정책 미정 항목은 위 설명의 계약을 확정한 후 구현한다.
 
 ### 오류 응답
 
-- `404 PROFILE_NOT_SET`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `404 PROFILE_NOT_SET` | 데이터 없음 | 본인 user_profiles 행이 아직 없어 러닝 수준을 조회할 수 없음 |
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
 
 ### 처리 규칙
 
@@ -551,21 +682,40 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "updatedAt": "2026-10-24T09:00:00Z",
+  "selfReportedLevel": "BEGINNER"
+}
 ```
 
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
+응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `selfReportedLevel` | string (제안) | X | BEGINNER/INTERMEDIATE/ADVANCED |
-| `assessedLevel` | string / object (확인 필요) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `updatedAt` | string (ISO 8601) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `selfReportedLevel` | string | O | 기존 자기보고 수준 BEGINNER/INTERMEDIATE/ADVANCED. 기능상 필수이나 별도 추정 수준과의 저장 매핑 결정 필요. |
+| `assessedLevel` | string / object (확인 필요) | X | 별도 추정 수준 컬럼 없음. user_profiles.running_level을 자기보고/추정 두 값으로 복제하지 않는다. |
+| `updatedAt` | string (ISO 8601 UTC) | O | `user_profiles.updated_at` (TIMESTAMPTZ). 저장 값은 NULL 불가. |
+
+
+**사용 흐름과 응답 판단**
+
+수준 화면을 표시하거나 저장 후 선택값을 확인해야 한다. 단일 ERD 수준과 자기보고/추정 수준 구분은 해결할 계약이다.
+
+위 보완 필드는 호출 목적상 필요한 출력이다. 저장 컬럼 부재는 출력 불필요의 근거가 아니다. 저장·전송 정책 미정 항목은 위 설명의 계약을 확정한 후 구현한다.
 
 ### 오류 응답
 
-- `422 INVALID_LEVEL`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `422 INVALID_LEVEL` | 입력 값 | 수준 코드가 BEGINNER/INTERMEDIATE/ADVANCED에 해당하지 않음 |
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
 
 ### 처리 규칙
 
@@ -623,22 +773,39 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "baselineDistanceM": null,
+  "baselineDurationSec": null,
+  "usualPaceSecPerKm": 360
+}
 ```
 
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
+응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `baselineDistanceM` | number | X | DISTANCE_TIME 입력 시 평소 러닝 기준 거리, 미터, 양수 |
-| `baselineDurationSec` | number | X | DISTANCE_TIME 입력 시 기준 거리의 평소 완주 시간, 초, 양수 |
-| `usualPaceSecPerKm` | number | O | 입력하거나 기준 거리·시간으로 계산한 평소 페이스, 초/km, 양수 |
-| `inputType` | string | O | PACE/DISTANCE_TIME 중 사용자가 입력한 방식 |
+| `baselineDistanceM` | integer / null | O | `user_profiles.distance` (INTEGER). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `baselineDurationSec` | integer / null | O | `user_profiles.duraction` (INTEGER). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `usualPaceSecPerKm` | number | O | `user_profiles.average_pace` (NUMERIC(10,2)). 저장 값은 NULL 불가. |
+| `inputType` | string | 확인 필요 | user_profiles에 입력 방식 컬럼 없음. distance/duraction의 NULL만으로 기존 입력 방식을 복원할지는 확인 필요. |
+
+
+**사용 흐름과 응답 판단**
+
+거리·시간 또는 페이스 입력을 복원하고 서버가 계산해 저장한 페이스를 보여준다.
 
 ### 오류 응답
 
-- `404 RUNNING_BASELINE_NOT_SET`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `404 RUNNING_BASELINE_NOT_SET` | 데이터 없음 | 평소 러닝 정보가 아직 등록되지 않음. NULL인 선택 거리·시간과 프로필 전체 부재는 구분 |
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
 
 ### 처리 규칙
 
@@ -708,22 +875,41 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "baselineDistanceM": 5000,
+  "baselineDurationSec": 1800,
+  "usualPaceSecPerKm": 360,
+  "inputType": "DISTANCE_TIME"
+}
 ```
 
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
+응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `baselineDistanceM` | number | X | DISTANCE_TIME 입력 시 평소 러닝 기준 거리, 미터, 양수 |
-| `baselineDurationSec` | number | X | DISTANCE_TIME 입력 시 기준 거리의 평소 완주 시간, 초, 양수 |
-| `usualPaceSecPerKm` | number | O | 입력하거나 계산한 평소 페이스, 초/km, 양수 |
-| `inputType` | string | O | PACE/DISTANCE_TIME 중 사용자가 입력한 방식 |
+| `baselineDistanceM` | integer / null | O | `user_profiles.distance` (INTEGER). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `baselineDurationSec` | integer / null | O | `user_profiles.duraction` (INTEGER). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `usualPaceSecPerKm` | number | O | `user_profiles.average_pace` (NUMERIC(10,2)). 저장 값은 NULL 불가. |
+| `inputType` | string | 확인 필요 | user_profiles에 입력 방식 컬럼 없음. distance/duraction의 NULL만으로 기존 입력 방식을 복원할지는 확인 필요. |
+
+
+**사용 흐름과 응답 판단**
+
+거리·시간 또는 페이스 입력을 복원하고 서버가 계산해 저장한 페이스를 보여준다.
 
 ### 오류 응답
 
-- `422 INVALID_RUNNING_BASELINE`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `422 INVALID_RUNNING_BASELINE` | 입력 값 | 평소 페이스·거리·시간이 양수 조건에 맞지 않거나 입력 조합·계산 관계가 맞지 않음 |
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
 
 ### 처리 규칙
 
@@ -784,19 +970,42 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "items": [
+    "PARK",
+    "RIVERSIDE",
+    "URBAN",
+    "BEACH",
+    "TRACK"
+  ]
+}
 ```
 
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
+응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `items` | array | X | 수집된 이벤트/측정 배치 목록. 상세 타입별 구성 미정 |
+| `items` | string[] | O | course_environment_tags.environment_type의 코드 목록: PARK/RIVERSIDE/URBAN/BEACH/TRACK. 태그 행 PK 배열이 아니다. |
+
+
+**사용 흐름과 응답 판단**
+
+환경 선택 화면은 안정된 코드와 표시 이름 대응이 필요하다. 현재 코드 배열로 선택·전달하며 표시 이름은 클라이언트에서 매핑한다.
+
+**환경 전달 기준:** U10의 items 코드를 U12/C01의 environmentTypes에 그대로 전달한다. 코스 태그 행 ID나 별도 UUID를 환경 기준 ID로 사용하지 않는다.
 
 ### 오류 응답
 
-- `400 INVALID_FILTER`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `400 INVALID_FILTER` | 검색 조건 | activeOnly가 boolean 형식이 아님. 현재 ENUM에는 비활성 구분이 없어 true/false 모두 같은 허용 코드 목록을 반환하며 가상 비활성 상태를 만들지 않는다. |
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
 
 ### 처리 규칙
 
@@ -854,19 +1063,35 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "environmentTypes": []
+}
 ```
 
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
+응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `environmentIds` | string[] (UUID) | X | 선호 환경 유형 UUID 배열 |
+| `environmentTypes` | string[] | O | 선택 환경 코드 전체 목록. 미설정 조회는 []. 사용자 선호의 영속 저장 위치는 ERD에 없어 별도 확정 필요. |
+
+
+**사용 흐름과 응답 판단**
+
+선호 환경 선택 상태를 복원한다. 미설정 빈 목록과 저장 실패를 구분한다.
+
+위 보완 필드는 호출 목적상 필요한 출력이다. 저장 컬럼 부재는 출력 불필요의 근거가 아니다. 저장·전송 정책 미정 항목은 위 설명의 계약을 확정한 후 구현한다.
 
 ### 오류 응답
 
-- `401 UNAUTHORIZED`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
 
 ### 처리 규칙
 
@@ -899,7 +1124,7 @@
 
 ### 설명
 
-배열 전체 교체. 존재하지 않는 환경 유형 거부.
+배열 전체 교체. PARK/RIVERSIDE/URBAN/BEACH/TRACK 외 코드는 거부.
 
 ### 인증 및 권한
 
@@ -918,11 +1143,14 @@
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `environmentIds` | string[] (UUID) | O | 선호 환경 유형 UUID 배열 |
+| `environmentTypes` | string[] | O | PARK/RIVERSIDE/URBAN/BEACH/TRACK 코드 배열. 빈 배열은 선택 없음. |
 
 ```json
 {
-  "environmentIds": []
+  "environmentTypes": [
+    "PARK",
+    "RIVERSIDE"
+  ]
 }
 ```
 
@@ -931,24 +1159,47 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "environmentTypes": [
+    "PARK",
+    "RIVERSIDE"
+  ]
+}
 ```
 
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
+응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `environmentIds` | string[] (UUID) | X | 선호 환경 유형 UUID 배열 |
-| `updatedAt` | string (ISO 8601) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `environmentTypes` | string[] | O | 선택 환경 코드 전체 목록. 미설정 조회는 []. 사용자 선호의 영속 저장 위치는 ERD에 없어 별도 확정 필요. |
+| `updatedAt` | string (ISO 8601) | X | 저장 컬럼과 직접 대응하지 않는 응답 값. 산출·표시 구조 확인 필요 (ERD만으로 응답 형식을 확정하지 않음.) |
+
+
+**사용 흐름과 응답 판단**
+
+선호 환경 선택 상태를 복원한다. 미설정 빈 목록과 저장 실패를 구분한다.
+
+위 보완 필드는 호출 목적상 필요한 출력이다. 저장 컬럼 부재는 출력 불필요의 근거가 아니다. 저장·전송 정책 미정 항목은 위 설명의 계약을 확정한 후 구현한다.
+
+**환경 전달 기준:** U10의 items 코드를 U12/C01의 environmentTypes에 그대로 전달한다. 코스 태그 행 ID나 별도 UUID를 환경 기준 ID로 사용하지 않는다.
 
 ### 오류 응답
 
-- `422 INVALID_ENVIRONMENT`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `422 INVALID_ENVIRONMENT` | 입력 값 | environmentTypes가 허용 코드 목록과 다름. 코드 배열 타입 오류와 구분. 사용자 선호 저장 위치는 별도 계약 |
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
 
 ### 처리 규칙
 
-- 배열 전체 교체. 존재하지 않는 환경 유형 거부.
+- 배열 전체 교체. PARK/RIVERSIDE/URBAN/BEACH/TRACK 외 코드는 거부.
 - 사용자 소유권·그룹 참가 권한·상태 전이·재요청 여부를 검증한다(적용 범위는 API별로 결정).
 - 예시는 **명세 구조를 보여주는 가상 값**이며, 확정되지 않은 제한·동기화 주기·AI 호출 주기를 의미하지 않는다.
 
@@ -1002,19 +1253,39 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "isPrivate": true
+}
 ```
 
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
+응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `isPrivate` | boolean | X | true: 승인된 팔로워에게 프로필·게시물 공개, false: 전체 공개 |
+| `isPrivate` | boolean | O | user_settings.account_visibility의 PRIVATE=true, PUBLIC=false 변환. 설정 행 부재를 false로 간주하지 않는다. |
+
+
+**사용 흐름과 응답 판단**
+
+공개 설정 조회는 반드시 isPrivate 값을 제공해야 한다. 설정 행 부재를 PUBLIC으로 추정하지 않는다.
 
 ### 오류 응답
 
-- `401 UNAUTHORIZED`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+**추가 오류 후보 — HTTP·코드·판정 정책 확인 필요**
+
+| 후보 | 발생 가능 상황 |
+|---|---|
+| `404 SETTINGS_NOT_SET` | 설정 행 부재. 임의 PUBLIC 처리 금지. 복구/오류 정책 확인 |
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
 
 ### 처리 규칙
 
@@ -1082,20 +1353,43 @@
 `200 OK (제안)`
 
 ```json
-{"isPrivate": true}
+{
+  "isPrivate": true,
+  "updatedAt": "2026-10-24T09:00:00Z"
+}
 ```
 
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
+응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `isPrivate` | boolean | O | true: 승인된 팔로워에게 프로필·게시물 공개, false: 전체 공개 |
-| `updatedAt` | string (ISO 8601) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `isPrivate` | boolean | O | user_settings.account_visibility의 PRIVATE=true, PUBLIC=false 변환. 설정 행 부재를 false로 간주하지 않는다. |
+| `updatedAt` | string (ISO 8601 UTC) | O | `user_settings.updated_at` (TIMESTAMPTZ). 저장 값은 NULL 불가. |
+
+
+**사용 흐름과 응답 판단**
+
+공개 전환 응답은 변경된 공개 상태를 보여준다. 대기 요청 자동 승인 전체 완료/후속 처리 중의 구분은 미정이며 부분 완료를 전체 실패로 취급해 원 요청을 반복시키지 않는다.
 
 ### 오류 응답
 
-- `422 INVALID_VISIBILITY`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `422 INVALID_VISIBILITY` | 입력 값 | 계정 공개 설정 값의 타입·허용 범위가 맞지 않음. isPrivate와 PUBLIC/PRIVATE 대응 확인 |
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+**추가 오류 후보 — HTTP·코드·판정 정책 확인 필요**
+
+| 후보 | 발생 가능 상황 |
+|---|---|
+| `409 VISIBILITY_STATE_CONFLICT` | 공개 전환과 팔로우 승인·거절·취소가 겹치는 경우. 내부 재처리와 클라이언트 충돌 구분 미정 |
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
 
 ### 처리 규칙
 
@@ -1136,7 +1430,7 @@
 
 ### 설명
 
-아이디·비밀번호로 계정을 만든다. 가입 직후 토큰을 발급해 1.4 동의 → 1.5~1.6 초기 설정을 이어서 진행한다.
+아이디·비밀번호와 닉네임·생년월일·성별·전화번호·건강정보 수집·이용 동의 값을 모두 받은 뒤 계정을 생성한다. 화면에서 단계별로 입력하더라도 U15 호출 전 수집을 완료하며, 필수값이 없는 임시 회원 행을 만들지 않는다. 러닝 수준·평소 러닝 정보 등의 추가 설정은 기존 API로 진행한다.
 
 ### 인증 및 권한
 
@@ -1154,13 +1448,23 @@
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
+| `nickname` | string | O | users.nickname. 2–10자. 중복 허용 여부는 기존 미정 정책 유지. |
+| `birthDate` | string (YYYY-MM-DD) | O | users.birth_date. 유효한 생년월일, 미래 날짜 불가. 나이 제한 정책은 추가하지 않는다. |
+| `gender` | string | O | users.gender. MALE/FEMALE. |
+| `phoneNumber` | string | O | users.phone_number VARCHAR(20). 숫자 타입이 아니며 형식·정규화·인증 여부는 별도 확정. |
+| `healthDataAccess` | string | O | users.health_data_access. ERD 원본 코드 AGREEE/DISAGREE. 값을 반드시 받되 AGREEE를 가입 필수 조건으로 강제하지 않는다. 실제 건강 측정값이 아님. |
 | `loginId` | string | O | 영문·숫자 4–16자 |
 | `password` | string | O | 8자 이상, 영문·숫자 포함 |
 
 ```json
 {
   "loginId": "minjun01",
-  "password": "********"
+  "password": "********",
+  "nickname": "러너",
+  "birthDate": "2000-01-01",
+  "gender": "MALE",
+  "phoneNumber": "01000000000",
+  "healthDataAccess": "AGREEE"
 }
 ```
 
@@ -1169,27 +1473,59 @@
 `201 Created (제안)`
 
 ```json
-{}
+{
+  "user": {
+    "id": 101,
+    "loginId": "minjun01"
+  },
+  "accessToken": "access-token-placeholder",
+  "onboardingCompleted": false
+}
 ```
 
-응답 필드 후보(화면 표시 항목 기준, **ERD 확정 후 갱신**):
+응답 필드 정의(ERD ver.3 대조):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `user` | object | X | 생성된 사용자(id, loginId) |
-| `accessToken` | string | X | 가입 직후 초기 설정 진행용 토큰 |
-| `refreshToken` | string | X | 갱신 토큰(저장·회전 정책 미정) |
+| `user` | object | X | 생성된 사용자(id, loginId) (ERD만으로 응답 형식을 확정하지 않음.) |
+| `accessToken` | string | 조건부 | 본문 토큰 방식이면 필수. 쿠키 방식이면 안전한 쿠키로 동등한 인증수단 전달. DB 컬럼 유무와 무관. |
+| `refreshToken` | string | X | 갱신 토큰(저장·회전 정책 미정) (ERD만으로 응답 형식을 확정하지 않음.) |
+
+중첩 객체의 저장 필드 대응(추가 표시·집계 값은 기존 후보를 유지하며 별도 확인):
+
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|:---:|---|
+| `user.id` | integer (int64) | O | `users.id` (BIGINT). 저장 값은 NULL 불가. |
+| `user.loginId` | string | O | `users.login_id` (VARCHAR(16)). 저장 값은 NULL 불가. |
+| `onboardingCompleted` | boolean | O | 기존 초기 설정 완료 여부. 완료 판정 기준은 미정으로 남기되 클라이언트가 임의 추측하지 않게 전달. |
+
+**사용 흐름과 응답 판단**
+
+성공 후 동의·초기 설정 또는 홈으로 이동하고 회원 API를 호출할 수 있어야 한다. 인증수단 전달은 필수이며 JSON 토큰/쿠키의 위치는 별도 결정이다.
+
+위 보완 필드는 호출 목적상 필요한 출력이다. 저장 컬럼 부재는 출력 불필요의 근거가 아니다. 저장·전송 정책 미정 항목은 위 설명의 계약을 확정한 후 구현한다.
+
+**확정된 가입 순서:** 필수 사용자 정보와 건강정보 동의 값을 모두 검증한 뒤 저장·인증수단 발급을 진행한다. 최초 요청 누락을 기본값이나 NULL로 채우지 않는다. 추가 러닝 설정의 완료 판정은 별도이며 onboardingCompleted를 곧바로 true로 만들지 않는다.
 
 ### 오류 응답
 
-- `409 LOGIN_ID_DUPLICATED`
-- `422 INVALID_PASSWORD_POLICY`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `409 LOGIN_ID_DUPLICATED` | 중복 | 동일 login_id로 가입이 이미 완료됨. 중복 확인 이후 동시 가입도 포함 |
+| `422 INVALID_PASSWORD_POLICY` | 입력 값 | 비밀번호가 확정할 비밀번호 정책에 맞지 않음. 세부 조합·길이를 임의로 정하지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
+
+**응답·복구 행동과의 연결:** 필수값 누락은 400 VALIDATION_ERROR, 값 검증 실패는 400 INVALID_PROFILE(후보)로 필드명을 안내한다. 원문 전화번호·생년월일·비밀번호·동의값은 오류 details에 에코하지 않는다. 응답 유실 시 가입 여부를 확인하고 중복 계정 생성을 반복하지 않는다.
 
 ### 처리 규칙
 
 - 비밀번호 확인 입력값 비교는 클라이언트에서 처리하고 서버로 보내지 않는다.
-- 필수 동의(이용약관·개인정보·위치)는 가입 직후 [W04](devices-health.md#w04-수집-동의철회)로 저장한다.
+- 건강정보 동의 값은 가입 요청에서 받아 users.health_data_access에 저장한다. DISAGREE인 경우 건강정보 수집·이용을 허용하지 않는다. W04는 가입 후 동의 변경·철회에 사용한다. 이용약관·개인정보·위치 동의의 기존 필수 구분은 W04를 따른다. 가입 전 일괄 전송 여부와 정책 버전·이력 저장 계약은 별도 검토하며 이번 지시로 기존 필수 구분을 변경하지 않는다.
 - 사용자 소유권·그룹 참가 권한·상태 전이·재요청 여부를 검증한다(적용 범위는 API별로 결정).
 - 예시는 **명세 구조를 보여주는 가상 값**이며, 확정되지 않은 제한·동기화 주기·AI 호출 주기를 의미하지 않는다.
 
@@ -1199,7 +1535,7 @@
 
 ### 미정 사항
 
-- [ ] 필수 동의를 가입 요청에 함께 받을지(원자적 처리) 여부
+- [ ] 이용약관·개인정보·위치 동의의 가입 전 일괄 전송·버전·이력 계약. W04 기존 필수 구분 유지, 건강정보 동의 값의 가입 시 수집은 확정
 - [ ] 응답 필드는 ERD 확정 후 갱신
 - [ ] HTTP 성공 코드 및 각 예외의 오류 코드 최종 확정
 
@@ -1244,21 +1580,41 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "loginId": "runner01",
+  "available": true,
+  "reason": null
+}
 ```
 
-응답 필드 후보(화면 표시 항목 기준, **ERD 확정 후 갱신**):
+응답 필드 정의(ERD ver.3 대조):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `loginId` | string | X | 요청한 아이디 |
-| `available` | boolean | X | 사용 가능 여부 |
-| `reason` | string | X | DUPLICATED/INVALID_FORMAT (사용 불가 시) |
+| `loginId` | string | O | 검사한 원래 아이디. 늦게 도착한 이전 검색 결과를 현재 입력값에 적용하지 않게 구분. |
+| `available` | boolean | O | 아이디 사용 가능 여부. |
+| `reason` | string / null | O | 가능하면 null. 사용 중이면 DUPLICATED. 형식 오류를 INVALID_FORMAT 정상결과/400 중 어디로 전달할지는 결정 필요. |
+
+
+**사용 흐름과 응답 판단**
+
+입력한 아이디를 사용할 수 있는지 판단한다. 이미 사용 중인 경우는 정상 결과다.
+
+위 보완 필드는 호출 목적상 필요한 출력이다. 저장 컬럼 부재는 출력 불필요의 근거가 아니다. 저장·전송 정책 미정 항목은 위 설명의 계약을 확정한 후 구현한다.
 
 ### 오류 응답
 
-- `429 TOO_MANY_REQUESTS`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `429 TOO_MANY_REQUESTS` | 요청 제한 | 해당 요청의 호출 빈도 제한 초과. 제한 단위·횟수·시간·응답 헤더는 확인 필요 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+- 아이디가 이미 사용 중인 경우는 이 조회의 정상 결과 `available=false`다. 회원가입 U15의 중복 오류와 구분한다.
+
+**응답·복구 행동과의 연결:** DUPLICATED는 available=false 정상 응답. INVALID_FORMAT을 reason으로 표시할지 HTTP400으로 거절할지는 한 방식으로 확정해야 한다.
 
 ### 처리 규칙
 
@@ -1314,22 +1670,41 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "runningRecordCount": 0,
+  "postCount": 0,
+  "bookmarkedCourseCount": 0,
+  "connectedDevices": [],
+  "ownedCrews": []
+}
 ```
 
-응답 필드 후보(화면 표시 항목 기준, **ERD 확정 후 갱신**):
+응답 필드 정의(ERD ver.3 대조):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `runningRecordCount` | number | X | 러닝 기록 수 |
-| `postCount` | number | X | 커뮤니티 게시물 수 |
-| `bookmarkedCourseCount` | number | X | 저장한 코스 수(내가 만든 코스 포함) |
-| `connectedDevices` | array | X | 연결 해제될 기기 목록 |
-| `ownedCrews` | array | X | 크루장인 크루와 위임 대상(가장 오래된 멤버) 정보 |
+| `runningRecordCount` | integer | O | 탈퇴 영향 안내의 러닝 기록 수. 삭제범위는 탈퇴 정책 따름. |
+| `postCount` | integer | O | 삭제 대상 게시물 수. |
+| `bookmarkedCourseCount` | integer | O | 본인 북마크 수. 공용 코스 삭제 의미 아님. |
+| `connectedDevices` | array | O | 해제 대상 본인 기기(id/deviceType). |
+| `ownedCrews` | array | O | 위임 대상 크루와 후보 회원 ID/닉네임. 후보 부재 표현은 결정 필요. |
+
+
+**사용 흐름과 응답 판단**
+
+탈퇴 대상 개수와 크루별 위임 대상 식별자·닉네임이 필요하다. 후보 부재와 조회 실패를 구분하고 사전 조회 이후 실행 시 다시 검증한다.
 
 ### 오류 응답
 
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
 
 ### 처리 규칙
 
@@ -1394,20 +1769,42 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "withdrawnAt": "2026-10-24T09:00:00Z"
+}
 ```
 
-응답 필드 후보(화면 표시 항목 기준, **ERD 확정 후 갱신**):
+응답 필드 정의(ERD ver.3 대조):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `withdrawnAt` | string (ISO 8601) | X | 탈퇴 처리 시각 |
+| `withdrawnAt` | string (ISO 8601 UTC) / null | O | `users.withdrawn_at` (TIMESTAMPTZ). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+
+
+**사용 흐름과 응답 판단**
+
+탈퇴 완료를 확인할 시각과 인증 종료 처리가 필요하다. 후속 삭제/위임 실패를 탈퇴 저장 실패로 혼동하지 않는다.
 
 ### 오류 응답
 
-- `401 INVALID_PASSWORD`
-- `422 AGREEMENT_REQUIRED`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `401 INVALID_PASSWORD` | 본인 확인 | 탈퇴 확인용 비밀번호 불일치 |
+| `422 AGREEMENT_REQUIRED` | 필수 확인 | 탈퇴에 필요한 기존 확인 항목을 수락하지 않음 |
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+**추가 오류 후보 — HTTP·코드·판정 정책 확인 필요**
+
+| 후보 | 발생 가능 상황 |
+|---|---|
+| `409 WITHDRAWAL_CONFLICT` | 탈퇴와 진행 중 러닝·그룹장/크루장 위임이 충돌하는 경우. 차단/정리 정책 미정 |
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
 
 ### 처리 규칙
 
@@ -1466,21 +1863,52 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "voiceCoachingEnabled": true,
+  "bpmGuideEnabled": true,
+  "locationRecordingMode": "RUNNING_ONLY",
+  "notifications": {
+    "groupRun": true,
+    "community": true
+  }
+}
 ```
 
-응답 필드 후보(화면 표시 항목 기준, **ERD 확정 후 갱신**):
+응답 필드 정의(ERD ver.3 대조):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `voiceCoachingEnabled` | boolean | X | 코칭 음성 알림 |
-| `bpmGuideEnabled` | boolean | X | BPM 리듬 가이드 |
-| `locationRecordingMode` | string | X | ALWAYS/WHILE_RUNNING/OFF |
-| `notifications` | object | X | groupRun·coaching·community 알림 여부 |
+| `voiceCoachingEnabled` | boolean | O | 적용된 음성 코칭 설정. |
+| `bpmGuideEnabled` | boolean | O | 적용된 BPM 안내 설정. |
+| `locationRecordingMode` | string | O | ALWAYS/RUNNING_ONLY/OFF 중 적용된 값. |
+| `notifications` | object | O | groupRun/community는 ERD boolean 설정. coaching 알림 분류는 미정. |
+
+
+`notifications.groupRun`은 user_settings.group_notifications_enabled, `notifications.community`는 community_notifications_enabled(모두 boolean NOT NULL)에 대응한다. 기존 `notifications.coaching`에 대응하는 독립 알림 컬럼은 없다. voice_coaching_enabled는 음성 코칭 설정이므로 같은 값으로 간주하지 않는다. 중첩 객체 존재 시 groupRun/community 키를 포함하며 coaching은 확인 필요다.
+
+**사용 흐름과 응답 판단**
+
+설정 화면이 저장된 유효 설정을 표시한다. PATCH는 보낸 값뿐 아니라 적용 후 전체 설정을 반환하는 보완안이다.
+
+위 보완 필드는 호출 목적상 필요한 출력이다. 저장 컬럼 부재는 출력 불필요의 근거가 아니다. 저장·전송 정책 미정 항목은 위 설명의 계약을 확정한 후 구현한다.
 
 ### 오류 응답
 
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+**추가 오류 후보 — HTTP·코드·판정 정책 확인 필요**
+
+| 후보 | 발생 가능 상황 |
+|---|---|
+| `404 SETTINGS_NOT_SET` | 앱 설정 행 부재. 임의 기본값 생성 정책 확인 |
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
 
 ### 처리 규칙
 
@@ -1532,7 +1960,7 @@
 |---|---|:---:|---|
 | `voiceCoachingEnabled` | boolean | X | 코칭 음성 알림(페이스·심박 이탈 시 음성 안내) |
 | `bpmGuideEnabled` | boolean | X | BPM 리듬 가이드(목표 케이던스 비트) |
-| `locationRecordingMode` | string | X | ALWAYS(항상)/WHILE_RUNNING(러닝 중에만)/OFF(끔) |
+| `locationRecordingMode` | string | X | ALWAYS(항상)/RUNNING_ONLY(러닝 중에만)/OFF(끔) |
 | `notifications` | object | X | `{groupRun, coaching, community}` boolean |
 
 ```json
@@ -1549,17 +1977,47 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "voiceCoachingEnabled": true,
+  "bpmGuideEnabled": false,
+  "locationRecordingMode": "RUNNING_ONLY",
+  "notifications": {
+    "community": false,
+    "groupRun": true
+  }
+}
 ```
 
-응답 필드 후보(화면 표시 항목 기준, **ERD 확정 후 갱신**):
+응답 필드 정의(ERD ver.3 대조):
 
-없음
+
+
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|:---:|---|
+| `voiceCoachingEnabled` | boolean | O | 적용된 음성 코칭 설정. |
+| `bpmGuideEnabled` | boolean | O | 적용된 BPM 안내 설정. |
+| `locationRecordingMode` | string | O | ALWAYS/RUNNING_ONLY/OFF 중 적용된 값. |
+| `notifications` | object | O | groupRun/community는 ERD boolean 설정. coaching 알림 분류는 미정. |
+
+**사용 흐름과 응답 판단**
+
+설정 화면이 저장된 유효 설정을 표시한다. PATCH는 보낸 값뿐 아니라 적용 후 전체 설정을 반환하는 보완안이다.
+
+위 보완 필드는 호출 목적상 필요한 출력이다. 저장 컬럼 부재는 출력 불필요의 근거가 아니다. 저장·전송 정책 미정 항목은 위 설명의 계약을 확정한 후 구현한다.
 
 ### 오류 응답
 
-- `422 INVALID_SETTING`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `422 INVALID_SETTING` | 입력 값 | boolean 설정 타입이나 위치 모드(ALWAYS/RUNNING_ONLY/OFF)가 잘못됨. 지원하지 않는 설정 키 포함 |
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
 
 ### 처리 규칙
 
@@ -1603,7 +2061,7 @@
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `userId` | string (UUID) | O | 대상 사용자 ID. 내 프로필은 본인 ID |
+| `userId` | integer (int64) | O | 대상 사용자 ID. 내 프로필은 본인 ID |
 
 ### Query Parameters
 
@@ -1618,29 +2076,59 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "userId": 101,
+  "followerCount": 0,
+  "followingCount": 0,
+  "profileAccessible": true,
+  "followStatus": "NONE",
+  "isFollowing": false
+}
 ```
 
-응답 필드 후보(화면 표시 항목 기준, **ERD 확정 후 갱신**):
+응답 필드 정의(ERD ver.3 대조):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `userId` | string (UUID) | X | 사용자 ID |
-| `nickname` | string | X | 닉네임 |
-| `profileImageUrl` | string | X | 프로필 사진(배경) |
-| `runningLevel` | string | X | BEGINNER/INTERMEDIATE/ADVANCED |
-| `followerCount` | number | X | 팔로워 수 |
-| `followingCount` | number | X | 팔로잉 수 |
-| `isFollowing` | boolean | X | 내가 팔로우 중인지. 본인이면 null |
-| `profileAccessible` | boolean | X | 본인·공개 계정·승인된 팔로워이면 true |
-| `followStatus` | string (제안) | X | NONE/PENDING/FOLLOWING. 본인 표시 규칙 미정 |
-| `monthlySummary` | object | X | 이번 달 러닝 횟수·거리·평균 페이스 |
-| `recentPosts` | array | X | 접근 가능한 최근 기록 공유 게시물. 원본 기록 API를 우회하지 않음 |
+| `userId` | integer (int64) | X | `users.id` 참조. 기존 응답 노출 범위 유지. |
+| `nickname` | string | X | 닉네임 (ERD만으로 응답 형식을 확정하지 않음.) |
+| `profileImageUrl` | string / null | X | users.profile_image_key에서 파생하는 조회 URL. 키가 NULL이면 null. URL 생성 방식은 확인 필요. |
+| `runningLevel` | string | X | BEGINNER/INTERMEDIATE/ADVANCED (ERD만으로 응답 형식을 확정하지 않음.) |
+| `followerCount` | integer | X | user_follows.followee_id=대상 회원, is_approved=true인 관계 수. 미승인 요청 제외. |
+| `followingCount` | integer | X | user_follows.follower_id=대상 회원, is_approved=true인 관계 수. 미승인 요청 제외. |
+| `isFollowing` | boolean / null | O | user_follows.is_approved=true인 관계만 true. 본인 조회 시 null이라는 기존 표현을 유지한다. |
+| `profileAccessible` | boolean | O | 본인·공개 계정·승인된 팔로워이면 true (ERD만으로 응답 형식을 확정하지 않음.) |
+| `followStatus` | string (제안) | O | user_follows 행 없음=NONE, is_approved=false=PENDING, true=FOLLOWING. 본인 표시 방식은 미정. |
+| `monthlySummary` | object | X | 이번 달 러닝 횟수·거리·평균 페이스 (ERD만으로 응답 형식을 확정하지 않음.) |
+| `recentPosts` | array | X | 접근 가능한 최근 기록 공유 게시물. 원본 기록 API를 우회하지 않음 (ERD만으로 응답 형식을 확정하지 않음.) |
+
+
+**사용 흐름과 응답 판단**
+
+비공개 접근 불가 때도 후속 팔로우 행동에 필요한 최소 프로필/관계 상태와 숨길 항목의 분리를 정해야 한다. 403만 반환하는 후보와 profileAccessible=false 성공 응답은 중복 확정하지 않는다.
+
+비공개 접근 제한 성공 표현을 선택하는 경우 profileAccessible=false와 팔로우 버튼용 최소 정보만 제공하고 monthlySummary/recentPosts는 노출하지 않는다. 이 방식과 403 오류 중 선택은 미정이며 무조건 양쪽을 적용하지 않는다.
 
 ### 오류 응답
 
-- `404 USER_NOT_FOUND`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `404 USER_NOT_FOUND` | 대상 없음 | 대상 회원이 없거나 조회 가능한 회원으로 취급할 수 없음. 탈퇴·비공개 은닉 방식은 별도 확인 |
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+**추가 오류 후보 — HTTP·코드·판정 정책 확인 필요**
+
+| 후보 | 발생 가능 상황 |
+|---|---|
+| `403 ACCOUNT_ACCESS_DENIED` | 비공개 프로필 접근 제한. 제한된 정상 프로필 반환과 오류 응답 중 기존 표시 정책 확인 |
+
+- **대상 없음·접근 차단 점검:** 경로 대상의 부재/삭제, 본인 소유·역할·참가 자격 불충족을 구분한다. 위 표에 없는 경우 `404` 자원 없음 또는 `403` 접근 거부의 추가 매핑을 확인한다. 존재 은닉을 위한 403/404 선택·검사 순서는 미정이며 새 코드로 단정하지 않는다.
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
 
 ### 처리 규칙
 
@@ -1685,7 +2173,7 @@
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `userId` | string (UUID) | O | 팔로우할 사용자 ID |
+| `userId` | integer (int64) | O | 팔로우할 사용자 ID |
 
 ### Query Parameters
 
@@ -1700,22 +2188,44 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "followerCount": 0,
+  "followStatus": "PENDING",
+  "following": false
+}
 ```
 
-응답 필드 후보(화면 표시 항목 기준, **ERD 확정 후 갱신**):
+응답 필드 정의(ERD ver.3 대조):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `followStatus` | string (제안) | X | PENDING 또는 FOLLOWING |
-| `following` | boolean | X | 승인된 관계일 때만 true |
-| `followerCount` | number | X | 대상 팔로워 수 |
+| `followStatus` | string | O | 성공 결과 PENDING 또는 FOLLOWING. |
+| `following` | boolean | O | PENDING이면 false, FOLLOWING이면 true. |
+| `followerCount` | integer | X | user_follows.followee_id=대상 회원, is_approved=true인 관계 수. 미승인 요청 제외. |
+
+
+**사용 흐름과 응답 판단**
+
+팔로우 버튼을 요청 대기 또는 팔로우 중으로 갱신한다. 재전송은 기존 멱등 규칙으로 같은 결과를 확인한다.
+
+위 보완 필드는 호출 목적상 필요한 출력이다. 저장 컬럼 부재는 출력 불필요의 근거가 아니다. 저장·전송 정책 미정 항목은 위 설명의 계약을 확정한 후 구현한다.
 
 ### 오류 응답
 
-- `404 USER_NOT_FOUND`
-- `422 CANNOT_FOLLOW_SELF`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `404 USER_NOT_FOUND` | 대상 없음 | 대상 회원이 없거나 조회 가능한 회원으로 취급할 수 없음. 탈퇴·비공개 은닉 방식은 별도 확인 |
+| `422 CANNOT_FOLLOW_SELF` | 자기 참조 | 본인을 팔로우하려고 함 |
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- **대상 없음·접근 차단 점검:** 경로 대상의 부재/삭제, 본인 소유·역할·참가 자격 불충족을 구분한다. 위 표에 없는 경우 `404` 자원 없음 또는 `403` 접근 거부의 추가 매핑을 확인한다. 존재 은닉을 위한 403/404 선택·검사 순서는 미정이며 새 코드로 단정하지 않는다.
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
 
 ### 처리 규칙
 
@@ -1764,7 +2274,7 @@
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `userId` | string (UUID) | O | 팔로우 취소할 사용자 ID |
+| `userId` | integer (int64) | O | 팔로우 취소할 사용자 ID |
 
 ### Query Parameters
 
@@ -1779,21 +2289,43 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "followerCount": 0,
+  "followStatus": "NONE",
+  "following": false
+}
 ```
 
-응답 필드 후보(화면 표시 항목 기준, **ERD 확정 후 갱신**):
+응답 필드 정의(ERD ver.3 대조):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `followStatus` | string (제안) | X | NONE |
-| `following` | boolean | X | false |
-| `followerCount` | number | X | 대상 팔로워 수 |
+| `followStatus` | string | O | 취소 후 NONE. 관계가 원래 없어도 같은 성공 상태. |
+| `following` | boolean | O | 취소 후 false. |
+| `followerCount` | integer | X | user_follows.followee_id=대상 회원, is_approved=true인 관계 수. 미승인 요청 제외. |
+
+
+**사용 흐름과 응답 판단**
+
+팔로우/요청 취소 후 버튼을 미관계 상태로 갱신한다.
+
+위 보완 필드는 호출 목적상 필요한 출력이다. 저장 컬럼 부재는 출력 불필요의 근거가 아니다. 저장·전송 정책 미정 항목은 위 설명의 계약을 확정한 후 구현한다.
 
 ### 오류 응답
 
-- `404 USER_NOT_FOUND`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `404 USER_NOT_FOUND` | 대상 없음 | 대상 회원이 없거나 조회 가능한 회원으로 취급할 수 없음. 탈퇴·비공개 은닉 방식은 별도 확인 |
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- **대상 없음·접근 차단 점검:** 경로 대상의 부재/삭제, 본인 소유·역할·참가 자격 불충족을 구분한다. 위 표에 없는 경우 `404` 자원 없음 또는 `403` 접근 거부의 추가 매핑을 확인한다. 존재 은닉을 위한 403/404 선택·검사 순서는 미정이며 새 코드로 단정하지 않는다.
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
 
 ### 처리 규칙
 
@@ -1853,7 +2385,7 @@
 {
   "items": [
     {
-      "requesterId": "00000000-0000-4000-8000-000000000001",
+      "requesterId": 101,
       "nickname": "러너",
       "requestedAt": "2026-10-23T01:00:00Z",
       "status": "PENDING"
@@ -1863,10 +2395,24 @@
 }
 ```
 
+
+`requesterId`는 user_follows.follower_id → users.id의 BIGINT 식별자다. U24의 requestedAt은 user_follows.created_at이며 PENDING은 is_approved=false의 표시값이다. U25의 FOLLOWING은 승인 후 true의 표시값이며 거절 결과는 기존 NONE 정책을 따른다.
+
+**사용 흐름과 응답 판단**
+
+대기 요청마다 requesterId·닉네임·요청시각이 있어야 승인/거절 버튼을 연결할 수 있다. 이미 처리된 요청은 다음 조회에서 제외한다.
+
 ### 오류 응답
 
-- `401 UNAUTHORIZED`
-- `400 INVALID_FILTER`
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `400 INVALID_FILTER` | 검색 조건 | 정렬·필터·페이지 조건이 명세의 허용값/형식에 맞지 않음 |
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+- 검색/조회 결과가 0건인 경우 자체는 오류가 아니다. 유효한 빈 목록과 잘못된 조회 조건을 구분한다.
 
 ### 처리 규칙
 
@@ -1905,7 +2451,7 @@ PENDING
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `requesterId` | string (UUID) | O | 내 계정에 요청을 보낸 사용자 ID |
+| `requesterId` | integer (int64) | O | 내 계정에 요청을 보낸 사용자 ID |
 
 ### Query Parameters
 
@@ -1925,17 +2471,33 @@ PENDING
 
 ```json
 {
-  "requesterId": "00000000-0000-4000-8000-000000000001",
+  "requesterId": 101,
   "followStatus": "FOLLOWING"
 }
 ```
 
+
+`requesterId`는 user_follows.follower_id → users.id의 BIGINT 식별자다. U24의 requestedAt은 user_follows.created_at이며 PENDING은 is_approved=false의 표시값이다. U25의 FOLLOWING은 승인 후 true의 표시값이며 거절 결과는 기존 NONE 정책을 따른다.
+
+**사용 흐름과 응답 판단**
+
+승인은 FOLLOWING, 거절은 NONE 결과로 화면 요청 행을 제거한다. 동일 요청 재전송 성공과 다른 결정의 충돌은 구분한다.
+
 ### 오류 응답
 
-- `401 UNAUTHORIZED`
-- `404 REQUEST_NOT_FOUND`
-- `409 REQUEST_STATE_CONFLICT`
-- `422 INVALID_DECISION`
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `404 REQUEST_NOT_FOUND` | 대상 없음 | 본인에게 들어온 팔로우 대기 요청이 없음 |
+| `409 REQUEST_STATE_CONFLICT` | 상태 충돌 | 승인·거절 전에 요청이 취소되거나 다른 요청/공개 전환으로 이미 처리됨 |
+| `422 INVALID_DECISION` | 입력 값 | 승인·거절 결정이 해당 API의 허용값이 아님 |
+
+- **대상 없음·접근 차단 점검:** 경로 대상의 부재/삭제, 본인 소유·역할·참가 자격 불충족을 구분한다. 위 표에 없는 경우 `404` 자원 없음 또는 `403` 접근 거부의 추가 매핑을 확인한다. 존재 은닉을 위한 403/404 선택·검사 순서는 미정이며 새 코드로 단정하지 않는다.
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
 
 ### 처리 규칙
 

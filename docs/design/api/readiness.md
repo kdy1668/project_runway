@@ -6,6 +6,14 @@
 |---|---|---|---|---|---|
 | [R02](#r02-최신-준비도-조회) | 최신 준비도 조회 | GET | `/readiness-assessments/latest` | 1차 MVP | 회원 |
 
+## ERD 응답 대응 기준
+
+**응답 해석:** 각 Response의 JSON은 기존 동작과 기능상 필요한 출력을 설명하는 검토용 예시다. 저장·전송 정책이 미정인 보완 필드는 구현 완료 계약을 뜻하지 않는다. 확인 필요 필드의 생략은 기능 삭제나 최종 선택 필드 확정을 뜻하지 않는다. `O`는 해당 응답 객체가 존재할 때 키를 포함함을 뜻하며, 값의 NULL 허용은 타입의 ` / null`로 구분한다. 조회 결과 자체가 없는 경우와 복구 행동은 해당 오류 응답 절을 따른다.
+
+daily_readiness는 readiness_score와 readiness_confidence(LOW/MEDIUM/HIGH, NULL 가능)를 저장한다. readinessLevel은 신뢰도와 다른 표시 값이며 등급 경계는 미정이다. daily_health_metrics는 user_id와 기준 날짜로 대응하며 FK로 일일 건강 행을 직접 참조하지 않는다.
+
+자료형·NULL의 정본은 [schema.sql](../db/schema.sql), 표시·관계 설명은 [ERD](../db/erd.md)를 따른다. ERD 정합성 단계에서는 API 종류·개수·역할·오류 응답을 유지했다. 후속 오류 검토 내용은 각 오류 응답 절을 따른다.
+
 ## 자동 평가 — 내부 필수 처리
 
 - 건강·활동 데이터가 수신·갱신되면 준비도를 자동 평가한다. 별도 공개 평가 요청 API는 두지 않는다.
@@ -42,7 +50,7 @@
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `sessionId` | string (UUID) | X | 러닝 세션 UUID |
+| `sessionId` | integer (int64) | X | 러닝 세션 BIGINT 식별자 |
 
 ### Request Body
 
@@ -54,24 +62,46 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "id": 101,
+  "readinessScore": 75,
+  "readinessDate": "2026-10-24",
+  "readinessConfidence": null
+}
 ```
 
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
+응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `id` | string (UUID) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `readinessScore` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `readinessLevel` | string (제안) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `reasonDetails` | string / object (확인 필요) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `assessedAt` | string (ISO 8601) | X | 자동 평가 시각 |
-| `dataAvailability` | object | X | 사용 가능한 데이터·누락 상태. 세부 구조 미정 |
+| `id` | integer (int64) | O | `daily_readiness.id` (BIGINT). 저장 값은 NULL 불가. |
+| `readinessScore` | number | O | `daily_readiness.readiness_score` (NUMERIC(7,2)). 저장 값은 NULL 불가. |
+| `readinessLevel` | string (제안) | X | daily_readiness에는 준비도 등급 컬럼 없음. readiness_confidence는 신뢰도이므로 대체 불가. 점수별 표시 기준 확인 필요. |
+| `reasonDetails` | string / object (확인 필요) | X | 저장 컬럼과 직접 대응하지 않는 응답 값. 산출·표시 구조 확인 필요 (ERD만으로 응답 형식을 확정하지 않음.) |
+| `assessedAt` | string (ISO 8601) | X | 독립 평가 시각 컬럼 없음. created_at/updated_at을 평가 시각으로 치환할 근거 확인 필요. |
+| `dataAvailability` | object | X | 사용 가능한 데이터·누락 상태. 세부 구조 미정 (ERD만으로 응답 형식을 확정하지 않음.) |
+| `readinessDate` | string (YYYY-MM-DD) | O | daily_readiness.readiness_date. 오늘 결과/과거 최신 결과 구분. |
+| `readinessConfidence` | string / null | O | daily_readiness.readiness_confidence. LOW/MEDIUM/HIGH; 미산출은 null. |
+
+**사용 흐름과 응답 판단**
+
+오늘 결과인지·얼마나 최신인지·근거 데이터가 부족한지 구분해 준비도를 표시한다. 점수만으로 날짜·신뢰도를 추측하지 않는다.
+
+위 보완 필드는 호출 목적상 필요한 출력이다. 저장 컬럼 부재는 출력 불필요의 근거가 아니다. 저장·전송 정책 미정 항목은 위 설명의 계약을 확정한 후 구현한다.
 
 ### 오류 응답
 
-- `404 ASSESSMENT_NOT_FOUND`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `404 ASSESSMENT_NOT_FOUND` | 데이터 없음 | 기준 날짜의 준비도 결과가 없음. 건강 데이터 부족·계산 중·계산 실패를 같은 원인으로 확정하지 않음 |
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+- 종료 성공·원본 저장 완료와 분석 준비/실패를 구분한다. 아직 없는 결과나 미측정 값을 0/false로 채우거나 원 요청 전체를 재실행하도록 요구하지 않는다.
 
 ### 처리 규칙
 
