@@ -14,7 +14,7 @@ RunWay 서비스의 **클라이언트 공개 API 설계 초안**이다. 저장�
 | [워치·건강 데이터](./devices-health.md) | 워치·건강 데이터 | 8 |
 | [운동 준비도](./readiness.md) | 운동 준비도 | 1 |
 | [러닝 코스](./courses.md) | 러닝 코스 | 5 |
-| [러닝 세션](./sessions.md) | 러닝 세션 | 8 |
+| [러닝 세션](./sessions.md) | 러닝 세션 | 9 |
 | [AI 페이스·실시간 분석·BPM](./pace-coaching.md) | AI 페이스·실시간 분석·BPM | 1 |
 | [러닝 기록·분석](./running-records.md) | 러닝 기록·분석 | 5 |
 | [그룹런](./group-runs.md) | 그룹런 | 13 |
@@ -22,7 +22,7 @@ RunWay 서비스의 **클라이언트 공개 API 설계 초안**이다. 저장�
 | [커뮤니티](./community.md) | 커뮤니티 | 13 |
 | [공통 파일](./files.md) | 이미지 업로드 | 1 |
 
-총 **90개 공개 API 후보**. 크루 멤버 내보내기(M09)는 선택 기능이다. 내부 자동 처리와 실시간 이벤트는 이 수에 포함하지 않는다.
+총 **91개 공개 API 후보**. 크루 멤버 내보내기(M09)는 선택 기능이다. 내부 자동 처리와 실시간 이벤트는 이 수에 포함하지 않는다.
 
 Wear OS 앱의 원본 업로드 계약은 [워치 기록 업로드 계약](wear-upload-api.md)에서 별도로 관리한다. 서비스 API 구현 시 `W07`의 배치 동기화 계약과 함께 검토해야 한다.
 
@@ -132,6 +132,7 @@ Wear OS 앱의 원본 업로드 계약은 [워치 기록 업로드 계약](wear-
 | S06 | [개인 러닝 종료](./sessions.md#s06-개인-러닝-종료) | POST | `/running-sessions/{sessionId}/finish` | [sessions.md](./sessions.md) |
 | S07 | [러닝 취소](./sessions.md#s07-러닝-취소) | POST | `/running-sessions/{sessionId}/cancel` | [sessions.md](./sessions.md) |
 | S08 | [출발 전 러닝 설정 수정](./sessions.md#s08-출발-전-러닝-설정-수정) | PATCH | `/running-sessions/{sessionId}` | [sessions.md](./sessions.md) |
+| S09 | [러닝 세션 삭제](./sessions.md#s09-러닝-세션-삭제) | DELETE | `/running-sessions/{sessionId}` | [sessions.md](./sessions.md) |
 | P07 | [세션 BPM 조절](./pace-coaching.md#p07-세션-bpm-조절) | PUT | `/running-sessions/{sessionId}/bpm` | [pace-coaching.md](./pace-coaching.md) |
 | H01 | [러닝 기록 목록](./running-records.md#h01-러닝-기록-목록) | GET | `/running-records` | [running-records.md](./running-records.md) |
 | H02 | [러닝 기록 상세](./running-records.md#h02-러닝-기록-상세) | GET | `/running-records/{sessionId}` | [running-records.md](./running-records.md) |
@@ -251,7 +252,7 @@ P07은 세션 BPM 조절, G12는 그룹장 전용 전체 강제 종료로 변경
 
 ## API·자동 실행 재점검
 
-남은 기술 계약은 아래 구현 전 검토 항목에 정리했다. 현재 90개 API는 구현 완료 명세가 아닌 후보 초안이며 실시간 전달·오프라인 이벤트·결과 준비 상태의 세부 계약이 남아 있다.
+남은 기술 계약은 아래 구현 전 검토 항목에 정리했다. 현재 91개 API는 구현 완료 명세가 아닌 후보 초안이며 실시간 전달·오프라인 이벤트·결과 준비 상태의 세부 계약이 남아 있다.
 
 최신 사용자 결정: 출발 전 목표 수정(S08)·출발 후 고정, 자유러닝 목표는 선택 입력이며 모드별 AI 동작 확정([상세 정책](../requirements.md#러닝-모드별-ai-동작)), 실제 시작 참가자만 그룹 진행 판정, 강제 종료 시각까지 기록 반영, 러닝 경로 자동 코스 등록(C04 제거).
 
