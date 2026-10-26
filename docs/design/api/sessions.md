@@ -14,6 +14,14 @@
 | [S08](#s08-출발-전-러닝-설정-수정) | 출발 전 러닝 설정 수정 | PATCH | `/running-sessions/{sessionId}` | 1차 MVP | 회원 |
 | [S09](#s09-러닝-세션-삭제) | 러닝 세션 삭제 | DELETE | `/running-sessions/{sessionId}` | 1차 MVP | 회원 |
 
+## ERD 응답 대응 기준
+
+**응답 해석:** 각 Response의 JSON은 기존 동작과 기능상 필요한 출력을 설명하는 검토용 예시다. 저장·전송 정책이 미정인 보완 필드는 구현 완료 계약을 뜻하지 않는다. 확인 필요 필드의 생략은 기능 삭제나 최종 선택 필드 확정을 뜻하지 않는다. `O`는 해당 응답 객체가 존재할 때 키를 포함함을 뜻하며, 값의 NULL 허용은 타입의 ` / null`로 구분한다. 조회 결과 자체가 없는 경우와 복구 행동은 해당 오류 응답 절을 따른다.
+
+running_sessions와 courses를 참조한다. groupRunId는 running_sessions의 컬럼이 아니라 group_run_participants.session_id로 역조회하는 관계다. 관계의 유일성·중첩 방식은 별도 확인이 필요하다. pace_plans → pace_plan_segments와 coaching_decisions는 안내의 근거이며 버전·준비 상태 스키마는 ERD에 없다.
+
+자료형·NULL의 정본은 [schema.sql](../db/schema.sql), 표시·관계 설명은 [ERD](../db/erd.md)를 따른다. ERD 정합성 단계에서는 API 종류·개수·역할·오류 응답을 유지했다. 후속 오류 검토 내용은 각 오류 응답 절을 따른다.
+
 ## S01 러닝 세션 생성
 
 `POST` `/api/v1/running-sessions`
@@ -48,12 +56,12 @@
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `courseId` | string (UUID) | X | 선택한 코스 식별자. 개인·그룹 자유러닝은 null/생략 가능 |
-| `groupRunId` | string (UUID) | X | 그룹런 식별자 |
+| `courseId` | integer (int64) / null | X | 선택한 코스 식별자. 개인·그룹 자유러닝은 null/생략 가능 |
+| `groupRunId` | integer (int64) | X | 그룹런 식별자 |
 | `targetDistanceM` | number | 조건부 | 목표 거리, 미터, 양수. 목표를 끈 자유 러닝은 생략 |
 | `targetDurationSec` | number | 조건부 | 목표 완주 시간, 초, 양수. 자유러닝은 선택 입력·단독 입력 가능 |
 | `targetPaceSecPerKm` | number | X | 목표 페이스, 초/km, 양수. 자유러닝은 선택 입력·단독 입력 가능 |
-| `comparisonSessionId` | string (UUID) | X | 경쟁 모드에서 겨룰 같은 코스의 내 과거 기록 ID(3.2) |
+| `comparisonSessionId` | integer (int64) | X | 경쟁 모드에서 겨룰 같은 코스의 내 과거 기록 ID(3.2) |
 
 ```json
 {
@@ -67,27 +75,63 @@
 `201 Created (제안)`
 
 ```json
-{}
+{
+  "id": 101,
+  "status": "READY",
+  "courseId": null,
+  "targetDistanceM": 5000,
+  "targetDurationSec": 1800,
+  "targetPaceSecPerKm": 360,
+  "comparisonSessionId": null,
+  "groupRunId": null
+}
 ```
 
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
+응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `initialGuidance` | object / null (제안) | X | 모드에 따른 초기 안내. 무목표 자유러닝은 사전 Pace Plan 없음. 준비 중인 계획은 후속 전달 |
-| `guidanceStatus` | string (제안) | X | 전략 준비 상태. 무목표의 계획 비대상을 준비 중·실패와 구분. 구체 상태값은 미정 |
-| `id` | string (UUID) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `status` | string (제안) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `courseId` | string (UUID) | X | 선택한 코스 식별자. 개인·그룹 자유러닝은 null/생략 가능 |
-| `targetDistanceM` | number | X | 목표 거리, 미터, 양수 |
-| `targetDurationSec` | number | X | 목표 완주 시간, 초, 양수 |
-| `groupRunId` | string (UUID) | X | 그룹런 식별자 |
+| `initialGuidance` | object / null (제안) | X | 모드에 따른 초기 안내. 무목표 자유러닝은 사전 Pace Plan 없음. 준비 중인 계획은 후속 전달 (ERD만으로 응답 형식을 확정하지 않음.) |
+| `guidanceStatus` | string (제안) | X | 전략 준비 상태. 무목표의 계획 비대상을 준비 중·실패와 구분. 구체 상태값은 미정 (ERD만으로 응답 형식을 확정하지 않음.) |
+| `id` | integer (int64) | O | `running_sessions.id` (BIGINT). 저장 값은 NULL 불가. |
+| `status` | string | O | `running_sessions.status` (ENUM('READY', 'RUNNING', 'PAUSED', 'COMPLETED', 'CANCELLED', 'INTERRUPTED')). 저장 값은 NULL 불가. 허용값: READY, RUNNING, PAUSED, COMPLETED, CANCELLED, INTERRUPTED. |
+| `courseId` | integer (int64) / null | O | `running_sessions.course_id` (BIGINT). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `targetDistanceM` | integer / null | O | `running_sessions.goal_distance` (INTEGER). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `targetDurationSec` | integer / null | O | `running_sessions.goal_duration` (INTEGER). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `groupRunId` | integer (int64) / null | O | group_run_participants를 통한 연결 그룹. 개인런은 null. 연결 유일성 검증 필요. |
+| `targetPaceSecPerKm` | number / null | O | running_sessions.goal_pace. 목표 미설정/계산 불가 시 null. 거리·시간 입력 예시에서는 360초/km. |
+| `comparisonSessionId` | integer (int64) / null | O | running_sessions.comparison_session_id. 비교 미선택은 null. |
+
+**사용 흐름과 응답 판단**
+
+서버에 적용된 코스·모든 목표·비교 기록·그룹 연결로 준비/운동 화면을 복원해야 한다. 입력 당시 값이 아니라 저장·계산 결과를 반환한다.
+
+위 보완 필드는 호출 목적상 필요한 출력이다. 저장 컬럼 부재는 출력 불필요의 근거가 아니다. 저장·전송 정책 미정 항목은 위 설명의 계약을 확정한 후 구현한다.
 
 ### 오류 응답
 
-- `403 COURSE_INACCESSIBLE`
-- `409 ACTIVE_SESSION_EXISTS`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `403 COURSE_INACCESSIBLE` | 자원 상태/접근 | 요청 용도에 사용할 수 없는 코스를 참조함. MERGED/BLOCKED의 상세·저장 목록 상태 안내를 무조건 차단하지 않음 |
+| `409 ACTIVE_SESSION_EXISTS` | 상태 충돌 | 기존 활성 세션과 새 세션 생성이 충돌함. 활성 상태 범위·동시 생성 처리 기준 확인 필요 |
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+**추가 오류 후보 — HTTP·코드·판정 정책 확인 필요**
+
+| 후보 | 발생 가능 상황 |
+|---|---|
+| `422 INVALID_GOAL` | 무목표 허용과 구분하여 음수·0·모순 목표를 거절 |
+| `422 INVALID_COMPARISON_SESSION` | 비교 기록이 본인 소유·동일 코스 조건에 맞지 않음 |
+| `403 NOT_PARTICIPANT` | 참가하지 않은 groupRunId를 세션에 연결하려 함 |
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
+
+**응답·복구 행동과의 연결:** 코스 지정인데 courseId 없음, 무목표 자유러닝, 목표 조합 오류를 구분한다. 성공 후 S02로 저장된 목표와 안내 준비상태를 복구한다.
 
 ### 처리 규칙
 
@@ -137,7 +181,7 @@
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `sessionId` | string (UUID) | O | 러닝 세션 UUID |
+| `sessionId` | integer (int64) | O | 러닝 세션 BIGINT 식별자 |
 
 ### Query Parameters
 
@@ -152,30 +196,63 @@
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "id": 101,
+  "status": "READY",
+  "courseId": null,
+  "targetDistanceM": 5000,
+  "targetDurationSec": 1800,
+  "startedAt": null,
+  "endedAt": null,
+  "movingDurationSec": null,
+  "elapsedDurationSec": null,
+  "totalDistanceM": null,
+  "targetPaceSecPerKm": 360,
+  "comparisonSessionId": null,
+  "groupRunId": null
+}
 ```
 
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
+응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `guidance` | object / null (제안) | X | 최신 전략 버전·구간 페이스·코칭·BPM·기록 비교와 적용 시각. 구조 미정 |
-| `id` | string (UUID) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `status` | string (제안) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `courseId` | string (UUID) | X | 선택한 코스 식별자. 개인·그룹 자유러닝은 null/생략 가능 |
-| `targetDistanceM` | number | X | 목표 거리, 미터, 양수 |
-| `targetDurationSec` | number | X | 목표 완주 시간, 초, 양수 |
-| `startedAt` | string (ISO 8601) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `endedAt` | string (ISO 8601) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `movingDurationSec` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `elapsedDurationSec` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `totalDistanceM` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `guidance` | object / null (제안) | X | 최신 전략 버전·구간 페이스·코칭·BPM·기록 비교와 적용 시각. 구조 미정 (ERD만으로 응답 형식을 확정하지 않음.) |
+| `id` | integer (int64) | O | `running_sessions.id` (BIGINT). 저장 값은 NULL 불가. |
+| `status` | string | O | `running_sessions.status` (ENUM('READY', 'RUNNING', 'PAUSED', 'COMPLETED', 'CANCELLED', 'INTERRUPTED')). 저장 값은 NULL 불가. 허용값: READY, RUNNING, PAUSED, COMPLETED, CANCELLED, INTERRUPTED. |
+| `courseId` | integer (int64) / null | O | `running_sessions.course_id` (BIGINT). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `targetDistanceM` | integer / null | O | `running_sessions.goal_distance` (INTEGER). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `targetDurationSec` | integer / null | O | `running_sessions.goal_duration` (INTEGER). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `startedAt` | string (ISO 8601 UTC) / null | O | `running_sessions.started_at` (TIMESTAMPTZ). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `endedAt` | string (ISO 8601 UTC) / null | O | `running_sessions.ended_at` (TIMESTAMPTZ). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `movingDurationSec` | integer / null | O | `running_sessions.moving_duration` (INTEGER). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `elapsedDurationSec` | integer / null | O | `running_sessions.elapsed_duration` (INTEGER). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `totalDistanceM` | number / null | O | `running_sessions.total_distance` (NUMERIC(12,2)). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `targetPaceSecPerKm` | number / null | O | running_sessions.goal_pace. 목표 미설정/계산 불가 시 null. 거리·시간 입력 예시에서는 360초/km. |
+| `comparisonSessionId` | integer (int64) / null | O | running_sessions.comparison_session_id. 비교 미선택은 null. |
+| `groupRunId` | integer (int64) / null | O | group_run_participants를 통한 연결 그룹. 개인런은 null. 연결 유일성 검증 필요. |
+
+**사용 흐름과 응답 판단**
+
+서버에 적용된 코스·모든 목표·비교 기록·그룹 연결로 준비/운동 화면을 복원해야 한다. 입력 당시 값이 아니라 저장·계산 결과를 반환한다.
+
+위 보완 필드는 호출 목적상 필요한 출력이다. 저장 컬럼 부재는 출력 불필요의 근거가 아니다. 저장·전송 정책 미정 항목은 위 설명의 계약을 확정한 후 구현한다.
 
 ### 오류 응답
 
-- `403 NOT_OWNER`
-- `404 SESSION_NOT_FOUND`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `403 NOT_OWNER` | 소유권 | 본인 전용 세션·기록이 다른 회원 소유임 |
+| `404 SESSION_NOT_FOUND` | 대상 없음 | 요청한 러닝 세션이 존재하지 않거나 삭제됨 |
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- **대상 없음·접근 차단 점검:** 경로 대상의 부재/삭제, 본인 소유·역할·참가 자격 불충족을 구분한다. 위 표에 없는 경우 `404` 자원 없음 또는 `403` 접근 거부의 추가 매핑을 확인한다. 존재 은닉을 위한 403/404 선택·검사 순서는 미정이며 새 코드로 단정하지 않는다.
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
 
 ### 처리 규칙
 
@@ -220,7 +297,7 @@ READY에서 RUNNING 전이. 초기 페이스 계획은 시작 이전 생성.
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `sessionId` | string (UUID) | O | 러닝 세션 UUID |
+| `sessionId` | integer (int64) | O | 러닝 세션 BIGINT 식별자 |
 
 ### Query Parameters
 
@@ -241,22 +318,42 @@ READY에서 RUNNING 전이. 초기 페이스 계획은 시작 이전 생성.
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "id": 101,
+  "status": "RUNNING",
+  "startedAt": "2026-10-24T09:00:00Z"
+}
 ```
 
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
+응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `id` | string (UUID) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `status` | string (제안) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `startedAt` | string (ISO 8601) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `id` | integer (int64) | O | `running_sessions.id` (BIGINT). 저장 값은 NULL 불가. |
+| `status` | string | O | 이 작업의 신규 처리 성공 상태는 RUNNING. 중복 명령 재응답은 별도 멱등 정책을 따른다. |
+| `startedAt` | string (ISO 8601 UTC) / null | O | `running_sessions.started_at` (TIMESTAMPTZ). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+
+
+**사용 흐름과 응답 판단**
+
+시작 성공 RUNNING과 실제 시작시각으로 화면을 전환한다. 전략 준비 중이라는 사실과 운동 시작 실패를 분리한다.
 
 ### 오류 응답
 
-- `409 INVALID_STATE`
-- `403 CONSENT_REQUIRED`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `409 INVALID_STATE` | 상태 충돌 | 현재 세션 상태에서 해당 API의 작업(출발 전 설정 수정·시작·정지·재개·종료·취소·BPM 변경 중 해당 작업)을 수행할 수 없음. 같은 명령 재전송은 중복 여부를 먼저 판별 |
+| `403 CONSENT_REQUIRED` | 동의 | 요청에서 수집·이용하는 건강·위치 정보에 필요한 동의가 없음/철회됨 |
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- **대상 없음·접근 차단 점검:** 경로 대상의 부재/삭제, 본인 소유·역할·참가 자격 불충족을 구분한다. 위 표에 없는 경우 `404` 자원 없음 또는 `403` 접근 거부의 추가 매핑을 확인한다. 존재 은닉을 위한 403/404 선택·검사 순서는 미정이며 새 코드로 단정하지 않는다.
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
 
 ### 처리 규칙
 
@@ -303,7 +400,7 @@ RUNNING에서 PAUSED 전이. 정지 기간은 페이스 저하 판단에서 제�
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `sessionId` | string (UUID) | O | 러닝 세션 UUID |
+| `sessionId` | integer (int64) | O | 러닝 세션 BIGINT 식별자 |
 
 ### Query Parameters
 
@@ -324,21 +421,40 @@ RUNNING에서 PAUSED 전이. 정지 기간은 페이스 저하 판단에서 제�
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "id": 101,
+  "status": "PAUSED"
+}
 ```
 
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
+응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `id` | string (UUID) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `status` | string (제안) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `pausedAt` | string (ISO 8601) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `id` | integer (int64) | O | `running_sessions.id` (BIGINT). 저장 값은 NULL 불가. |
+| `status` | string | O | 이 작업의 신규 처리 성공 상태는 PAUSED. 중복 명령 재응답은 별도 멱등 정책을 따른다. |
+| `pausedAt` | string (ISO 8601) | X | running_sessions에 일시정지 발생 시각 컬럼 없음. updated_at을 발생 시각으로 치환하지 않는다. |
+
+
+**사용 흐름과 응답 판단**
+
+일시정지 성공 PAUSED를 즉시 반영한다. pausedAt의 저장/이벤트 근거는 별도 필요하며 DB updated_at으로 치환하지 않는다.
 
 ### 오류 응답
 
-- `409 INVALID_STATE`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `409 INVALID_STATE` | 상태 충돌 | 현재 세션 상태에서 해당 API의 작업(출발 전 설정 수정·시작·정지·재개·종료·취소·BPM 변경 중 해당 작업)을 수행할 수 없음. 같은 명령 재전송은 중복 여부를 먼저 판별 |
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- **대상 없음·접근 차단 점검:** 경로 대상의 부재/삭제, 본인 소유·역할·참가 자격 불충족을 구분한다. 위 표에 없는 경우 `404` 자원 없음 또는 `403` 접근 거부의 추가 매핑을 확인한다. 존재 은닉을 위한 403/404 선택·검사 순서는 미정이며 새 코드로 단정하지 않는다.
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
 
 ### 처리 규칙
 
@@ -381,7 +497,7 @@ PAUSED에서 RUNNING 전이.
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `sessionId` | string (UUID) | O | 러닝 세션 UUID |
+| `sessionId` | integer (int64) | O | 러닝 세션 BIGINT 식별자 |
 
 ### Query Parameters
 
@@ -402,21 +518,40 @@ PAUSED에서 RUNNING 전이.
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "id": 101,
+  "status": "RUNNING"
+}
 ```
 
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
+응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `id` | string (UUID) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `status` | string (제안) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `resumedAt` | string (ISO 8601) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `id` | integer (int64) | O | `running_sessions.id` (BIGINT). 저장 값은 NULL 불가. |
+| `status` | string | O | 이 작업의 신규 처리 성공 상태는 RUNNING. 중복 명령 재응답은 별도 멱등 정책을 따른다. |
+| `resumedAt` | string (ISO 8601) | X | running_sessions에 재개 발생 시각 컬럼 없음. updated_at을 발생 시각으로 치환하지 않는다. |
+
+
+**사용 흐름과 응답 판단**
+
+재개 성공 RUNNING을 반영한다. resumedAt 발생시각은 처리 완료시각과 다를 수 있다.
 
 ### 오류 응답
 
-- `409 INVALID_STATE`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `409 INVALID_STATE` | 상태 충돌 | 현재 세션 상태에서 해당 API의 작업(출발 전 설정 수정·시작·정지·재개·종료·취소·BPM 변경 중 해당 작업)을 수행할 수 없음. 같은 명령 재전송은 중복 여부를 먼저 판별 |
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- **대상 없음·접근 차단 점검:** 경로 대상의 부재/삭제, 본인 소유·역할·참가 자격 불충족을 구분한다. 위 표에 없는 경우 `404` 자원 없음 또는 `403` 접근 거부의 추가 매핑을 확인한다. 존재 은닉을 위한 403/404 선택·검사 순서는 미정이며 새 코드로 단정하지 않는다.
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
 
 ### 처리 규칙
 
@@ -459,7 +594,7 @@ PAUSED에서 RUNNING 전이.
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `sessionId` | string (UUID) | O | 러닝 세션 UUID |
+| `sessionId` | integer (int64) | O | 러닝 세션 BIGINT 식별자 |
 
 ### Query Parameters
 
@@ -480,25 +615,50 @@ PAUSED에서 RUNNING 전이.
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "id": 101,
+  "status": "COMPLETED",
+  "endedAt": "2026-10-24T09:00:00Z",
+  "totalDistanceM": null,
+  "movingDurationSec": null,
+  "elapsedDurationSec": null,
+  "goalAchieved": null
+}
 ```
 
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
+응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `id` | string (UUID) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `status` | string (제안) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `endedAt` | string (ISO 8601) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `totalDistanceM` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `movingDurationSec` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `elapsedDurationSec` | number | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `goalAchieved` | boolean | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `id` | integer (int64) | O | `running_sessions.id` (BIGINT). 저장 값은 NULL 불가. |
+| `status` | string | O | 이 작업의 신규 처리 성공 상태는 COMPLETED. 중복 명령 재응답은 별도 멱등 정책을 따른다. |
+| `endedAt` | string (ISO 8601 UTC) / null | O | `running_sessions.ended_at` (TIMESTAMPTZ). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `totalDistanceM` | number / null | O | `running_sessions.total_distance` (NUMERIC(12,2)). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `movingDurationSec` | integer / null | O | `running_sessions.moving_duration` (INTEGER). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `elapsedDurationSec` | integer / null | O | `running_sessions.elapsed_duration` (INTEGER). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `goalAchieved` | boolean / null | O | `running_sessions.goal_achieved` (BOOLEAN). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+
+
+**사용 흐름과 응답 판단**
+
+개인 종료와 최종 분석 완료를 구분한다. 원본 저장 성공 뒤 분석이 지연되더라도 종료 요청을 다시 시키지 않는다.
 
 ### 오류 응답
 
-- `409 INVALID_STATE`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `409 INVALID_STATE` | 상태 충돌 | 현재 세션 상태에서 해당 API의 작업(출발 전 설정 수정·시작·정지·재개·종료·취소·BPM 변경 중 해당 작업)을 수행할 수 없음. 같은 명령 재전송은 중복 여부를 먼저 판별 |
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- **대상 없음·접근 차단 점검:** 경로 대상의 부재/삭제, 본인 소유·역할·참가 자격 불충족을 구분한다. 위 표에 없는 경우 `404` 자원 없음 또는 `403` 접근 거부의 추가 매핑을 확인한다. 존재 은닉을 위한 403/404 선택·검사 순서는 미정이며 새 코드로 단정하지 않는다.
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
+- 종료 성공·원본 저장 완료와 분석 준비/실패를 구분한다. 아직 없는 결과나 미측정 값을 0/false로 채우거나 원 요청 전체를 재실행하도록 요구하지 않는다.
 
 ### 처리 규칙
 
@@ -547,7 +707,7 @@ READY에서 CANCELLED. 달리기 시작 후 취소와 구분.
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `sessionId` | string (UUID) | O | 러닝 세션 UUID |
+| `sessionId` | integer (int64) | O | 러닝 세션 BIGINT 식별자 |
 
 ### Query Parameters
 
@@ -568,20 +728,39 @@ READY에서 CANCELLED. 달리기 시작 후 취소와 구분.
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "id": 101,
+  "status": "CANCELLED"
+}
 ```
 
-응답 필드 정의(상세 객체는 미정 정책 확정 후 보완):
+응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `id` | string (UUID) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `status` | string (제안) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `id` | integer (int64) | O | `running_sessions.id` (BIGINT). 저장 값은 NULL 불가. |
+| `status` | string | O | 이 작업의 신규 처리 성공 상태는 CANCELLED. 중복 명령 재응답은 별도 멱등 정책을 따른다. |
+
+
+**사용 흐름과 응답 판단**
+
+준비 취소는 CANCELLED이며 진행 중 운동 종료를 대신하지 않는다.
 
 ### 오류 응답
 
-- `409 INVALID_STATE`
-- 공통 인증 오류 `401 UNAUTHORIZED`, 권한 오류 `403 FORBIDDEN`, 요청 형식 오류 `400 VALIDATION_ERROR` (해당 시).
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `409 INVALID_STATE` | 상태 충돌 | 현재 세션 상태에서 해당 API의 작업(출발 전 설정 수정·시작·정지·재개·종료·취소·BPM 변경 중 해당 작업)을 수행할 수 없음. 같은 명령 재전송은 중복 여부를 먼저 판별 |
+| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
+| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+
+- **대상 없음·접근 차단 점검:** 경로 대상의 부재/삭제, 본인 소유·역할·참가 자격 불충족을 구분한다. 위 표에 없는 경우 `404` 자원 없음 또는 `403` 접근 거부의 추가 매핑을 확인한다. 존재 은닉을 위한 403/404 선택·검사 순서는 미정이며 새 코드로 단정하지 않는다.
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
 
 ### 처리 규칙
 
@@ -622,7 +801,7 @@ READY에서 CANCELLED. 달리기 시작 후 취소와 구분.
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `sessionId` | string (UUID) | O | 준비 중인 본인 세션 |
+| `sessionId` | integer (int64) | O | 준비 중인 본인 세션 |
 
 ### Query Parameters
 
@@ -632,11 +811,11 @@ READY에서 CANCELLED. 달리기 시작 후 취소와 구분.
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `courseId` | string (UUID) / null | X | 코스 변경. null은 자유러닝 선택 |
+| `courseId` | integer (int64) / null | X | 코스 변경. null은 자유러닝 선택 |
 | `targetDistanceM` | number / null | X | 목표 거리. 자유러닝은 선택 입력. 기존 목표 제거의 null 처리 계약은 별도 확정 |
 | `targetDurationSec` | number / null | X | 목표 시간. 입력 조합은 S01과 동일 |
 | `targetPaceSecPerKm` | number / null | X | 목표 페이스. 자유러닝은 단독 입력 가능. 환산·상충 검증 계약은 별도 확정 |
-| `comparisonSessionId` | string (UUID) / null | X | 비교 기록. null은 비교 해제 |
+| `comparisonSessionId` | integer (int64) / null | X | 비교 기록. null은 비교 해제 |
 
 ```json
 {"targetDistanceM": 5000, "targetDurationSec": 1800}
@@ -647,17 +826,56 @@ READY에서 CANCELLED. 달리기 시작 후 취소와 구분.
 `200 OK (제안)`
 
 ```json
-{}
+{
+  "id": 101,
+  "status": "READY",
+  "courseId": null,
+  "targetDistanceM": 5000,
+  "targetDurationSec": 1800,
+  "targetPaceSecPerKm": 360,
+  "comparisonSessionId": null,
+  "groupRunId": null
+}
 ```
 
 - 세션 ID·변경된 설정·모드에 따른 계획 제공 여부와 준비 상태를 제공한다. 계획 대상 모드는 준비 완료 시 전략·BPM을 제공하고 무목표 자유러닝은 사전 계획 비대상으로 표시한다. 상세 구조는 S01/S02 계약 확정 시 통일한다.
 
+
+
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|:---:|---|
+| `id` | integer (int64) | O | 수정한 running_sessions.id. |
+| `status` | string | O | 수정 성공 시 READY. |
+| `courseId` | integer (int64) / null | O | 실제로 적용한 코스. 자유러닝은 null. |
+| `targetDistanceM` | integer / null | O | 실제 적용된 goal_distance. |
+| `targetDurationSec` | integer / null | O | 실제 적용된 goal_duration. |
+| `targetPaceSecPerKm` | number / null | O | 실제 저장·계산된 goal_pace. |
+| `comparisonSessionId` | integer (int64) / null | O | 적용한 비교 기록. 미선택은 null. |
+| `groupRunId` | integer (int64) / null | O | 기존 연결 그룹. 개인런은 null. |
+
+**사용 흐름과 응답 판단**
+
+출발 전 수정 후 서버가 적용한 설정으로 화면을 갱신한다. S01/S02와 같은 필드를 사용한다.
+
+위 보완 필드는 호출 목적상 필요한 출력이다. 저장 컬럼 부재는 출력 불필요의 근거가 아니다. 저장·전송 정책 미정 항목은 위 설명의 계약을 확정한 후 구현한다.
+
 ### 오류 응답
 
-- `403 NOT_OWNER`
-- `409 SESSION_ALREADY_STARTED`
-- `409 INVALID_STATE`
-- `422 INVALID_GOAL`
+**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+
+| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
+|---|---|---|
+| `403 NOT_OWNER` | 소유권 | 본인 전용 세션·기록이 다른 회원 소유임 |
+| `409 SESSION_ALREADY_STARTED` | 상태 충돌 | 운동이 시작되어 고정된 목표를 출발 전 수정 API로 바꾸려 함 |
+| `409 INVALID_STATE` | 상태 충돌 | 현재 세션 상태에서 해당 API의 작업(출발 전 설정 수정·시작·정지·재개·종료·취소·BPM 변경 중 해당 작업)을 수행할 수 없음. 같은 명령 재전송은 중복 여부를 먼저 판별 |
+| `422 INVALID_GOAL` | 목표 값 | 거리·시간·페이스가 양수/입력 조합 조건을 위반함. 무목표 자유러닝 자체는 오류가 아님 |
+
+- **대상 없음·접근 차단 점검:** 경로 대상의 부재/삭제, 본인 소유·역할·참가 자격 불충족을 구분한다. 위 표에 없는 경우 `404` 자원 없음 또는 `403` 접근 거부의 추가 매핑을 확인한다. 존재 은닉을 위한 403/404 선택·검사 순서는 미정이며 새 코드로 단정하지 않는다.
+
+- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
+- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
+
+**응답·복구 행동과의 연결:** SESSION_ALREADY_STARTED면 S02로 실제 현재 상태를 조회하고 저장된 최초 목표를 사용한다. 시작 이후 목표를 재전송해 강제 변경하지 않는다.
 
 ### 처리 규칙
 
