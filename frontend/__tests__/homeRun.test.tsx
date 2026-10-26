@@ -220,7 +220,7 @@ test('run mode leads to course recommendations and a free run with a countdown',
   await press(screen, '러닝 시작');
   expect(texts(screen)).toContain('달릴까요?');
   await press(screen, '코스 러닝');
-  expect(texts(screen)).toContain('3.1');
+  expect(texts(screen)).toContain('어디서, 얼마나 달릴까요?');
   await act(async () => screen.unmount());
 
   const free = await render();
@@ -242,11 +242,11 @@ test('run mode leads to course recommendations and a free run with a countdown',
 
 test('course run shows the pace plan by day and the night layout after sunset', async () => {
   const day = await render();
-  await press(day, '민락수변공원 출발, 5.0km · 30분');
+  await press(day, '광안대교 루프, 5.0km · 30분');
   const plan = texts(day);
   for (const text of [
     '오늘의 러닝 전략',
-    '민락수변공원 출발 5.0km',
+    '광안대교 루프 5.0km',
     '빠름',
     '초반 안정 → 오르막 절제 → 후반 가속',
     '2km 오르막 주의',
@@ -257,10 +257,10 @@ test('course run shows the pace plan by day and the night layout after sunset', 
   await act(async () => day.unmount());
 
   const night = await render('night');
-  await press(night, '민락수변공원 출발, 5.0km · 30분');
+  await press(night, '광안대교 루프, 5.0km · 30분');
   const dark = texts(night);
   expect(dark).toContain('코스 러닝');
-  expect(dark).toContain('민락수변공원 출발 · 5.0km');
+  expect(dark).toContain('광안대교 루프 · 5.0km');
   expect(dark).toContain('GPS 양호');
   expect(dark).not.toContain('오늘의 러닝 전략');
   await act(async () => night.unmount());

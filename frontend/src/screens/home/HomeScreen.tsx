@@ -23,7 +23,12 @@ import {
   Logo,
   Segmented,
 } from '../../components';
-import { useResource, type RecordSort, type Repositories } from '../../data';
+import {
+  useRepositories,
+  useResource,
+  type RecordSort,
+  type Repositories,
+} from '../../data';
 import {
   formatDotDate,
   formatDuration,
@@ -190,6 +195,7 @@ function RecordsCard() {
 export function HomeScreen() {
   const navigation = useNavigation();
   const { colors, name } = useTheme();
+  const repositories = useRepositories();
   const home = useResource(useCallback(loadHome, []));
   const scrollY = useRef(new Animated.Value(0)).current;
   const insets = useSafeAreaInsets();
@@ -340,12 +346,15 @@ export function HomeScreen() {
               {courses.slice(0, 3).map(course => (
                 <ListRow
                   key={course.id}
-                  title={course.name}
+                  title={course.myAlias ?? course.name}
                   detail={`${formatKm(course.distanceM, 1)}km · ${
                     course.expectedMinutes
                   }분`}
                   shape={course.shape}
-                  onPress={() => navigateTo(navigation, 'CourseRun')}
+                  onPress={async () => {
+                    await repositories.courses.choose(course.id);
+                    navigateTo(navigation, 'CourseRun');
+                  }}
                   trailing={
                     <Icon name="bookmark" color={colors.accentText} size={16} />
                   }
