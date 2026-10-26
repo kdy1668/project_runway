@@ -10,6 +10,7 @@
 - [API 명세](design/api/README.md)
 - [기술 결정 기록](adr/README.md)
 - [일상 심박·IBI 기술 검증 결과](design/watch-passive-health-feasibility.md)
+- [워치·휴대폰·서버 연동 구조와 데이터 흐름](design/watch-mobile-server-integration.md) — Galaxy Watch+갤럭시 MVP, 명령 순서·목표 고정·백그라운드·재전송 설계
 
 설계 문서는 `design/`, 기술 결정 기록은 `adr/`에 둔다. 기능 구현 시 현재 Jira와 관련된 문서만 확인한다. 요구사항이 충돌하면 임의로 정하지 않고 제품 결정을 확인하며, 데이터 모델 내부가 충돌하면 `schema.sql`을 우선한다. API 문서는 문서에 표시된 상태를 확인한다.
 
