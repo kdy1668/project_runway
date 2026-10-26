@@ -8,6 +8,9 @@ import { FreeRunScreen } from './FreeRunScreen';
 import { MusicCardScreen } from './MusicCardScreen';
 import { MusicSourceScreen } from './MusicSourceScreen';
 import { RunModeScreen } from './RunModeScreen';
+import { RunPauseScreen } from './RunPauseScreen';
+import { RunProgressScreen } from './RunProgressScreen';
+import { RunResultScreen } from './RunResultScreen';
 
 function themed(
   Screen: React.ComponentType,
@@ -29,7 +32,7 @@ function themed(
 // The map screens are light by day (2.0·2.0F) and dark after sunset (2.0N), whatever the screen mode.
 const dayNight = (night: boolean): ThemePreference =>
   night ? 'dark' : 'light';
-// The music card is dark in every prototype screen.
+// The music card, 4.3 일시정지 and 4.5 결과 are dark in every prototype screen.
 const dark = (): ThemePreference => 'dark';
 
 export const runScreens: Partial<Record<RouteName, React.ComponentType>> = {
@@ -38,4 +41,7 @@ export const runScreens: Partial<Record<RouteName, React.ComponentType>> = {
   CourseRun: themed(CourseRunScreen, 'CourseRunScreen', dayNight),
   MusicCard: themed(MusicCardScreen, 'MusicCardScreen', dark),
   MusicSource: themed(MusicSourceScreen, 'MusicSourceScreen', dark),
+  RunProgress: themed(RunProgressScreen, 'RunProgressScreen', dayNight),
+  RunPause: themed(RunPauseScreen, 'RunPauseScreen', dark),
+  RunResult: themed(RunResultScreen, 'RunResultScreen', dark),
 };

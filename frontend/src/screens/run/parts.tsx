@@ -10,6 +10,7 @@ import {
   type MusicService,
 } from '../../data';
 import { navigateTo } from '../../navigation/navigateTo';
+import { useRunActions, type RunConfig } from './RunSession';
 import {
   palette,
   radius,
@@ -117,10 +118,21 @@ const countdownSeconds = 3;
 
 // 2.0·2.0F 하단: settings, 러닝 시작 (3초 카운트다운 후 4.2), music.
 // Day screens use a dark start button on the light card; night uses mint (2.0N).
-export function RunStartBar({ night }: { night: boolean }) {
+export function RunStartBar({
+  night,
+  config,
+}: {
+  night: boolean;
+  // What the run starts with; the button stays disabled until it is known.
+  config: RunConfig | null;
+}) {
   const navigation = useNavigation();
   const { colors } = useTheme();
   const source = useMusicSource();
+  const { start: startRun } = useRunActions();
+  // The countdown effect reads these through a ref so a re-render never restarts its timer.
+  const latest = useRef({ config, navigation, start: startRun });
+  latest.current = { config, navigation, start: startRun };
   const [count, setCount] = useState<number | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -129,7 +141,11 @@ export function RunStartBar({ night }: { night: boolean }) {
     }
     if (count === 0) {
       setCount(null);
-      navigateTo(navigation, 'RunProgress');
+      const { config: chosen, navigation: nav, start } = latest.current;
+      if (chosen) {
+        start(chosen);
+      }
+      navigateTo(nav, 'RunProgress');
       return;
     }
     timer.current = setTimeout(() => setCount(count - 1), 1000);
@@ -138,7 +154,7 @@ export function RunStartBar({ night }: { night: boolean }) {
         clearTimeout(timer.current);
       }
     };
-  }, [count, navigation]);
+  }, [count]);
   return (
     <View style={styles.bar}>
       <RoundButton
@@ -150,11 +166,13 @@ export function RunStartBar({ night }: { night: boolean }) {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="러닝 시작"
+        accessibilityState={{ disabled: !config }}
+        disabled={!config}
         onPress={() => setCount(countdownSeconds)}
         style={({ pressed }) => [
           styles.start,
           { backgroundColor: night ? colors.accent : palette.ink },
-          pressed && styles.pressed,
+          (pressed || !config) && styles.pressed,
         ]}
       >
         <Icon

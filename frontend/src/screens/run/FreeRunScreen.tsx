@@ -155,7 +155,15 @@ export function FreeRunScreen() {
               </AppText>
             ) : null}
           </View>
-          <RunStartBar night={night} />
+          <RunStartBar
+            night={night}
+            config={{
+              mode: 'FREE',
+              plan: null,
+              goalDistanceM: km ? Math.round(km * 1000) : null,
+              goalPaceSecPerKm: paceSec,
+            }}
+          />
         </>
       }
     />

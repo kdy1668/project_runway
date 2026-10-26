@@ -144,6 +144,34 @@ export type CoursePlan = {
   targetPaceSecPerKm: number;
   expectedDurationSec: number;
   caution: string | null;
+  // 경쟁 모드: the earlier run on this course to race against (4.2 기록 차이, 4.5 비교 결과).
+  rival: { startedAt: string; durationSec: number } | null;
+};
+
+// One reading during a run, once a second (4.2 러닝 진행).
+export type RunSample = {
+  elapsedSec: number;
+  distanceM: number;
+  paceSecPerKm: number | null;
+  // null without a watch (4.5F 워치가 없으면 ‘– –’).
+  heartRate: number | null;
+  cadence: number | null;
+  // GPS position as [longitude, latitude]; null while the signal is lost.
+  position: [number, number] | null;
+};
+
+// 4.2 길 안내 줄.
+export type RunGuidance = { instruction: string; detail: string };
+
+export type RunRecordDraft = {
+  mode: 'FREE' | 'COURSE';
+  courseId: string | null;
+  startedAt: string;
+  durationSec: number;
+  distanceM: number;
+  averagePaceSecPerKm: number | null;
+  averageHeartRate: number | null;
+  averageCadence: number | null;
 };
 
 export type MusicService = 'MELON' | 'SPOTIFY';
@@ -288,6 +316,13 @@ export type Repositories = {
     save: (courseId: string) => Promise<void>;
     unsave: (courseId: string) => Promise<void>;
     choose: (courseId: string) => Promise<void>;
+    // 4.5F 내 코스에 저장: turns a free run's path into a saved course.
+    saveFromRun: (run: {
+      recordId: string;
+      route: [number, number][];
+      distanceM: number;
+      durationSec: number;
+    }) => Promise<{ courseId: string }>;
   };
   notifications: {
     list: () => Promise<AppNotification[]>;
@@ -295,6 +330,15 @@ export type Repositories = {
   };
   run: {
     getCurrentPlace: () => Promise<CurrentPlace>;
+    // Starts reading GPS and the watch from where the run left off; returns a function that stops it.
+    startTracking: (
+      from: RunSample,
+      // The course being run, so the mock can follow it; the real tracker ignores it and reads GPS.
+      route: [number, number][] | null,
+      onSample: (sample: RunSample, guidance: RunGuidance | null) => void,
+    ) => () => void;
+    // Saves the finished run (4.5 기록 저장 중 → 기록 저장됨 · 동기화 완료).
+    saveRecord: (record: RunRecordDraft) => Promise<{ recordId: string }>;
   };
   music: {
     getState: () => Promise<MusicState>;

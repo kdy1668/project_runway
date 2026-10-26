@@ -235,8 +235,11 @@ test('run mode leads to course recommendations and a free run with a countdown',
   expect(texts(free)).toContain('예상 완주 시간 30:00');
   await press(free, '러닝 시작');
   expect(texts(free)).toContain('3');
-  await settle(3200);
-  expect(texts(free)).toContain('4.2');
+  // Each count renders before the next second starts, so wait a second at a time.
+  for (let second = 0; second < 3; second += 1) {
+    await settle(1050);
+  }
+  expect(texts(free)).toContain('내 페이스');
   await act(async () => free.unmount());
 });
 

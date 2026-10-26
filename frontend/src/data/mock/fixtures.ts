@@ -461,7 +461,45 @@ export const todayPlan: CoursePlan = {
   targetPaceSecPerKm: 360,
   expectedDurationSec: 1800,
   caution: '2km 오르막 주의',
+  rival: { startedAt: '2026-10-13T06:40:00+09:00', durationSec: 1788 },
 };
+
+// 4.5F 자유 러닝: the path drawn for a free run, since it has no planned course.
+export const freeRunTrack: [number, number][] = [
+  [129.1318, 35.1543],
+  [129.1295, 35.1571],
+  [129.1279, 35.1606],
+  [129.1301, 35.1638],
+  [129.1343, 35.1652],
+  [129.1381, 35.1631],
+  [129.1392, 35.1597],
+  [129.1365, 35.1566],
+  [129.1318, 35.1543],
+];
+
+// 4.2 길 안내, by distance run.
+export const guidance = [
+  {
+    untilM: 1200,
+    instruction: '300m 앞 횡단보도에서 직진',
+    detail: '민락수변공원 방향 · 경로를 벗어나면 진동으로 알려요',
+  },
+  {
+    untilM: 2600,
+    instruction: '120m 앞 갈림길에서 왼쪽',
+    detail: '민락수변공원 방향 · 경로를 벗어나면 진동으로 알려요',
+  },
+  {
+    untilM: 4200,
+    instruction: '200m 앞 다리 진입 후 오른쪽',
+    detail: '수변 산책로 방향 · 경로를 벗어나면 진동으로 알려요',
+  },
+  {
+    untilM: Infinity,
+    instruction: '도착까지 직진',
+    detail: '출발점으로 돌아가요 · 경로를 벗어나면 진동으로 알려요',
+  },
+];
 
 const melonLibrary: MusicLibrary = {
   likedCount: 128,

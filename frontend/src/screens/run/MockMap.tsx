@@ -1,13 +1,12 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, { Circle, G, Path, Polyline, Rect, Text } from 'react-native-svg';
+import { distanceM, type LngLat } from '../../geo';
 import { palette } from '../../theme';
 
 // Stand-in for the real map until the map SDK is chosen (S15P31E105-180). It draws a fixed street
 // pattern and projects GeoJSON [longitude, latitude] points onto it, so screens already pass the
 // same course and position data a real map will need.
-
-type LngLat = [number, number];
 
 const viewWidth = 360;
 const viewHeight = 760;
@@ -65,18 +64,6 @@ function paceColor(pace: number, fastest: number, slowest: number) {
 }
 
 const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
-
-function distanceM([lng1, lat1]: LngLat, [lng2, lat2]: LngLat) {
-  const earth = 6371000;
-  const dLat = toRadians(lat2 - lat1);
-  const dLng = toRadians(lng2 - lng1);
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRadians(lat1)) *
-      Math.cos(toRadians(lat2)) *
-      Math.sin(dLng / 2) ** 2;
-  return 2 * earth * Math.asin(Math.sqrt(h));
-}
 
 // Splits a route into equal-length parts (one per km) and returns each part's points.
 export function splitRoute(route: LngLat[], parts: number) {
@@ -141,6 +128,7 @@ export function MockMap({
   routeArea = { top: 140, bottom: 420 },
   positionY = 300,
   formatLabel,
+  trail,
 }: {
   night?: boolean;
   position?: LngLat;
@@ -152,18 +140,32 @@ export function MockMap({
   // Height in the 360×760 frame where a lone position dot sits.
   positionY?: number;
   formatLabel?: (km: number, pace: number) => string;
+  // 4.2: the path run so far. It is drawn solid with the runner at its end, and the course left to run is dashed.
+  trail?: LngLat[];
 }) {
   const look = looks[night ? 'night' : 'day'];
   const project = projector(
-    [...(route ?? []), ...(position ? [position] : [])],
-    route ? routeArea : { top: positionY, bottom: positionY },
+    [...(route ?? []), ...(trail ?? []), ...(position ? [position] : [])],
+    route || (trail && trail.length > 1)
+      ? routeArea
+      : { top: positionY, bottom: positionY },
   );
-  const parts =
-    route && segmentPaces && segmentPaces.length > 0
-      ? splitRoute(route, segmentPaces.length)
-      : route
-      ? [route]
-      : [];
+  const toPoints = (line: LngLat[]) =>
+    line
+      .map(point => {
+        const { x, y } = project(point);
+        return `${x},${y}`;
+      })
+      .join(' ');
+  const runner =
+    trail && trail.length > 0 ? project(trail[trail.length - 1]) : null;
+  const parts = trail
+    ? []
+    : route && segmentPaces && segmentPaces.length > 0
+    ? splitRoute(route, segmentPaces.length)
+    : route
+    ? [route]
+    : [];
   const fastest = segmentPaces ? Math.min(...segmentPaces) : 0;
   const slowest = segmentPaces ? Math.max(...segmentPaces) : 0;
   const start = route ? project(route[0]) : null;
@@ -221,7 +223,59 @@ export function MockMap({
             </G>
           );
         })}
-        {showPaceLabels && segmentPaces && !night
+        {trail && route ? (
+          <Polyline
+            points={toPoints(route)}
+            stroke={night ? palette.mint : paceColors[1]}
+            strokeOpacity={night ? 0.45 : 0.7}
+            strokeWidth={5}
+            strokeDasharray="2 9"
+            fill="none"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+        ) : null}
+        {trail && trail.length > 1 ? (
+          <G>
+            <Polyline
+              points={toPoints(trail)}
+              stroke={palette.mint}
+              strokeOpacity={0.3}
+              strokeWidth={16}
+              fill="none"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+            <Polyline
+              points={toPoints(trail)}
+              stroke={night ? palette.mint : paceColors[0]}
+              strokeWidth={6}
+              fill="none"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          </G>
+        ) : null}
+        {runner ? (
+          <G>
+            <Circle
+              cx={runner.x}
+              cy={runner.y}
+              r={18}
+              fill={palette.mint}
+              opacity={0.3}
+            />
+            <Circle
+              cx={runner.x}
+              cy={runner.y}
+              r={8}
+              fill={palette.mintDeep}
+              stroke={palette.white}
+              strokeWidth={3}
+            />
+          </G>
+        ) : null}
+        {showPaceLabels && segmentPaces && !night && !trail
           ? parts.map((part, index) => {
               const middle = project(part[Math.floor(part.length / 2)]);
               const label = formatLabel
@@ -289,7 +343,7 @@ export function MockMap({
             </Text>
           </G>
         ) : null}
-        {here && !route ? (
+        {here && !route && !trail ? (
           <G>
             <Circle
               cx={here.x}

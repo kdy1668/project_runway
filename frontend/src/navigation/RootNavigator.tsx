@@ -15,6 +15,7 @@ import { onboardingScreens, SignUpDraftProvider } from '../screens/onboarding';
 import { PlaceholderScreen } from '../screens/PlaceholderScreen';
 import { SettingsPreview } from '../screens/previews';
 import { runScreens } from '../screens/run';
+import { RunSessionProvider } from '../screens/run/RunSession';
 import { useSession } from '../session/SessionProvider';
 import { fontFamily, useTheme } from '../theme';
 import { PillTabBar } from './PillTabBar';
@@ -86,6 +87,15 @@ const modalRoutes: ReadonlySet<RouteName> = new Set<RouteName>([
   'MusicSource',
 ]);
 
+// A swipe must not leave a run midway; 4.2 sends the back key to 4.3 and 4.5 to 홈.
+const runScreen = { gestureEnabled: false, animation: 'fade' } as const;
+
+const runRoutes: ReadonlySet<RouteName> = new Set<RouteName>([
+  'RunProgress',
+  'RunPause',
+  'RunResult',
+]);
+
 const noHeader = { headerShown: false } as const;
 
 // The PoC pulls in native health modules, so load it only when the developer opens it.
@@ -154,44 +164,52 @@ export function RootNavigator() {
     <NavigationContainer theme={navigationTheme}>
       <SignUpDraftProvider>
         <CourseSearchProvider>
-          <Root.Navigator screenOptions={noHeader}>
-            {/* 1.7 워치 연결 exists in both groups; the key makes sign-in/out start a fresh stack instead of staying on it. */}
-            {signedIn ? (
-              <Root.Group navigationKey="signed-in">
-                <Root.Screen name="MainTabs" component={MainTabs} />
-                {mainRoutes.map(route => (
-                  <Root.Screen
-                    key={route}
-                    name={route}
-                    component={screens[route]}
-                    options={modalRoutes.has(route) ? musicSheet : undefined}
-                  />
-                ))}
-                {appConfig.developerMenu ? (
-                  <>
+          <RunSessionProvider>
+            <Root.Navigator screenOptions={noHeader}>
+              {/* 1.7 워치 연결 exists in both groups; the key makes sign-in/out start a fresh stack instead of staying on it. */}
+              {signedIn ? (
+                <Root.Group navigationKey="signed-in">
+                  <Root.Screen name="MainTabs" component={MainTabs} />
+                  {mainRoutes.map(route => (
                     <Root.Screen
-                      name="ComponentGallery"
-                      component={ComponentGalleryScreen}
+                      key={route}
+                      name={route}
+                      component={screens[route]}
+                      options={
+                        modalRoutes.has(route)
+                          ? musicSheet
+                          : runRoutes.has(route)
+                          ? runScreen
+                          : undefined
+                      }
                     />
+                  ))}
+                  {appConfig.developerMenu ? (
+                    <>
+                      <Root.Screen
+                        name="ComponentGallery"
+                        component={ComponentGalleryScreen}
+                      />
+                      <Root.Screen
+                        name="HealthPoc"
+                        getComponent={loadHealthPoc}
+                      />
+                    </>
+                  ) : null}
+                </Root.Group>
+              ) : (
+                <Root.Group navigationKey="signed-out">
+                  {authRoutes.map(route => (
                     <Root.Screen
-                      name="HealthPoc"
-                      getComponent={loadHealthPoc}
+                      key={route}
+                      name={route}
+                      component={screens[route]}
                     />
-                  </>
-                ) : null}
-              </Root.Group>
-            ) : (
-              <Root.Group navigationKey="signed-out">
-                {authRoutes.map(route => (
-                  <Root.Screen
-                    key={route}
-                    name={route}
-                    component={screens[route]}
-                  />
-                ))}
-              </Root.Group>
-            )}
-          </Root.Navigator>
+                  ))}
+                </Root.Group>
+              )}
+            </Root.Navigator>
+          </RunSessionProvider>
         </CourseSearchProvider>
       </SignUpDraftProvider>
     </NavigationContainer>
