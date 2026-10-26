@@ -1,6 +1,6 @@
 # RunWay ERD 설명서
 
-기준: 2026-10-23 · ERD ver.3 · **26개 테이블 / 230개 컬럼 / 45개 FK**
+기준: 2026-10-23 · ERD ver.3 · **26개 테이블 / 230개 컬럼 / 45개 FK** · 2026-10-26 무결성 제약 보완(S15P31E105-170)
 
 회원이 러닝을 준비하고 기록한 결과를 코스·크루·게시글로 연결하는 데이터 구조다. 이 문서는 팀원이 구조와 정책을 빠르게 파악하기 위한 요약이다. 전체 컬럼·타입·NULL 정의는 SQL을 기준으로 확인한다.
 
@@ -11,7 +11,7 @@
 | [schema.sql](schema.sql) | 전체 테이블·컬럼·PK·FK 정의 |
 | [erd.png](erd.png) | 전체 테이블과 관계 이미지 |
 
-[온라인 ERD](https://www.erdcloud.com/d/PMb4s6pJDYReQLMMd)에서 내보낸 같은 시점의 자료다. 코스 지역 FK는 테이블 생성 순서를 고려해 SQL의 후행 ALTER 제약으로 정리했다. PNG에서는 해당 참조를 코스 지역 컬럼의 REFERENCES 정의로 표시한다. SQL은 설계 내보내기 자료이며 실행용 초기화/Flyway 마이그레이션은 아니다. 실제 운영 DB 적용은 수행하지 않았다. 과거 API 명세의 계약은 이번 작업에서 수정하지 않는다.
+전체 테이블과 관계는 [온라인 ERD](https://www.erdcloud.com/d/PMb4s6pJDYReQLMMd)에서도 확인할 수 있다. ID 자동 생성·UNIQUE·CHECK·복합 FK·트리거의 정확한 정의는 SQL과 본문을 따른다. 코스 지역 FK는 후행 ALTER 제약으로 정의한다. SQL은 PostgreSQL 17·PostGIS 3.6의 빈 격리 DB에서 검증하는 기준 스키마다. 서비스용 Flyway 마이그레이션과 구분하며 기존·공유·운영 DB에 직접 적용하지 않는다. 과거 API 명세의 UUID 계약은 이번 작업에서 수정하지 않는다.
 
 ## 2. 테이블별 역할
 
@@ -69,7 +69,7 @@
 - **기록 공유:** 회원 → 게시글 → 연결 러닝 세션. 댓글·좋아요가 게시글에 연결된다. 현재 posts에는 독립 post_type·title·course_id 컬럼이 없다.
 - **지역:** 코스·크루·게시글의 region_code는 regions.region_code를 FK로 참조한다. regions.region_code는 UNIQUE이며, 존재하지 않는 지역 코드 저장을 막는다. 코스 지역 미판정 상태의 NULL은 허용한다.
 
-모든 테이블의 PK는 BIGINT다. FK만으로 회원당 프로필 1개, 하루 건강 기록 1개, 회원별 북마크 1개 같은 유일성이 보장되지는 않는다.
+모든 테이블의 PK는 `BIGINT GENERATED ALWAYS AS IDENTITY`다. DB가 값을 생성하며 PK 직접 지정은 기본 거부한다. FK 타입은 BIGINT를 유지한다. ID의 빈 번호는 정상이며 시각·원본 순서를 ID만으로 판단하지 않는다. 아래 UNIQUE로 회원별 단일 행과 관계 중복을 방지한다.
 
 ## 4. 확정된 표시·접근 정책
 
@@ -94,7 +94,7 @@ account_visibility와 location_collection_mode는 **NOT NULL**이다. 설정 행
 
 ### 크루 정원
 
-**크루 최대 정원은 현재 200명으로 예정되어 있다.** 각 크루의 capacity는 상한 내에서 설정하는 방향이며 모든 크루의 정원을 자동 200명으로 한다는 뜻은 아니다. 현재 SQL에는 상한 CHECK가 없다. 승인 시 정원 초과 방지와 동시성 처리가 필요하다. 그룹런 참가 정원과는 별개이며 현재 group_runs에는 capacity가 없다.
+**크루 최대 정원은 200명이다.** 각 크루의 `capacity`는 1~200명 범위에서 명시하며, DB의 `CHECK (capacity BETWEEN 1 AND 200)`과 기존 NOT NULL로 보장한다. 모든 크루의 정원을 자동 200명으로 설정하거나 기본값을 추가하지 않는다. 실제 승인 인원이 해당 크루 정원을 넘지 않도록 하는 검증과 동시성 처리는 서비스 책임이다. 그룹런 참가 정원과는 별개이며 현재 group_runs에는 capacity가 없다.
 
 ## 5. 알림 종류와 화면 이동
 
@@ -129,11 +129,43 @@ account_visibility와 location_collection_mode는 **NOT NULL**이다. 설정 행
 
 NULL은 미측정·아직 발생하지 않음·선택하지 않음을 표현할 수 있다. 센서 결측을 0으로 채우거나, 아직 평가하지 않은 goal_achieved를 FALSE로 바꾸지 않는다. 상태 ENUM만으로 전이와 상태별 필수값은 보장되지 않는다. 230개 컬럼의 NULL 정의를 검토했다. 사용자 확정에 따라 두 설정 컬럼만 NOT NULL로 반영했고 다른 NULL 정의는 유지했다.
 
-## 7. 구현 전에 확인할 제약
+## 7. DB가 보장하는 제약과 서비스 책임
 
-- **내보내기 SQL:** 인라인 ENUM 표기와 geography가 포함된다. 실제 PostgreSQL 마이그레이션에는 타입·공간 확장 준비가 필요하다. ID 자동 생성과 updated_at 자동 갱신도 이 SQL만으로 보장되지 않는다.
-- **지역 참조:** regions.region_code의 UNIQUE와 코스·크루·게시글의 지역 FK를 정의했다. 지역 마스터를 먼저 준비하고, 기존 데이터를 적용할 때는 중복 코드·미등록 참조를 보정해야 한다.
-- **유일성·범위:** 회원별 프로필/설정, 회원·날짜별 지표, 북마크·팔로우·좋아요·태그·그룹 참가 조합의 UNIQUE와 양수·정원·상태별 필수값 CHECK가 없다.
-- **댓글:** 같은 게시물 부모·자기 참조 금지·한 단계 대댓글은 주석의 의도이며 실제 복합 FK/CHECK는 없다. 서비스 검증과 물리 제약을 구분한다.
-- **동기화·소유권:** 배치/샘플의 중복 방지와 직접 연결, 연결 세션의 회원 일치, 호스트/참가 자격, 삭제·탈퇴 후 보존/조회 정책은 별도 검증이 필요하다.
-- **원본 오타:** users.health_data_access의 AGREEE, user_profiles.duraction은 원본 표기다. 이름 변경을 임의 적용하지 않았다.
+### 유일성
+
+| 테이블 | UNIQUE 조합 |
+| --- | --- |
+| users | login_id |
+| user_profiles / user_settings | 각각 user_id |
+| daily_health_metrics | user_id, metric_date |
+| daily_readiness | user_id, readiness_date |
+| course_bookmarks | user_id, course_id |
+| post_likes | post_id, user_id |
+| user_follows | follower_id, followee_id |
+| course_environment_tags | course_id, environment_type |
+| group_run_participants | group_run_id, user_id |
+| pace_plan_segments | pace_plan_id, segment_sequence |
+| crew_memberships | crew_id, user_id |
+| sync_batches | device_id, client_batch_id |
+| regions | region_code |
+| comments | post_id, id (부모 복합 FK의 참조 키) |
+
+크루 재가입은 같은 `(crew_id,user_id)` 행을 갱신한다. 상태 전이 시 요청·가입·탈퇴 시각을 새 상태에 맞게 정리하는 책임은 서비스에 있다. 가입 이력 전체를 별도 행으로 누적하는 모델은 이번 범위가 아니다. 로그인 아이디의 대소문자 정규화·탈퇴 후 재사용 정책은 이 UNIQUE만으로 결정되지 않는다.
+
+### 범위·댓글·자동 갱신
+
+- 목표 거리·시간·페이스와 평소 러닝 거리·시간·페이스는 입력된 경우 양수다. 목표 NULL과 미측정 NULL을 유지한다. 누적 거리·경과/운동시간·목표 도달 운동시간·진행거리·GPS 정확도는 0 이상이다. 고도·경사는 음수를 허용한다.
+- 페이스 구간 순서는 양수, 시작거리는 0 이상, 종료거리는 시작거리보다 크고 추천 페이스는 양수다. 구간 사이의 겹침·빈 구간은 이 행 단위 CHECK만으로 보장하지 않는다.
+- 위 범위 검사를 적용한 NUMERIC 컬럼은 `NaN`도 거부한다. PostgreSQL에서 NaN은 일반 수보다 크게 비교되므로 하한 검사만으로는 차단되지 않는다. NULL 허용은 유지한다.
+- 자기 팔로우와 댓글의 자기 부모 참조를 CHECK로 금지한다. 댓글 부모는 `(post_id,parent_comment_id)` 복합 FK로 같은 게시물에 제한한다. 일반 댓글은 부모 NULL을 허용하고, 한 단계 대댓글 깊이는 서비스에서 검사한다.
+- 기존 `updated_at` 보유 테이블은 BEFORE UPDATE 트리거가 `clock_timestamp()`로 갱신한다. INSERT는 기존 기본값을 사용한다. JPA가 같은 컬럼의 수정 시각을 중복 관리하지 않는다.
+- Enum 허용 값은 보존하고 PostgreSQL 명명 타입으로 선언한다. PostGIS 확장 준비를 SQL에 명시한다. 운영 확장 설치 권한과 실행 책임은 배포 업무에서 결정한다.
+
+### 후속 결정·검증
+
+- 지역 마스터 데이터는 별도 준비한다. 지역 FK가 존재해도 올바른 코드·행정구역 판정 자료가 자동으로 채워지지는 않는다.
+- 배치 UNIQUE는 같은 기기의 같은 배치 ID 재저장을 거부한다. 서비스는 기존 해시가 같으면 기존 결과, 다르면 충돌로 처리해야 한다. 서로 다른 배치에 겹친 원본 측정·GPS, 스트림 sequence·누락 구간·재설치 경계는 W07/W08 계약 확정 후 설계한다. 이 작업에서 원본 식별 컬럼을 임의 추가하지 않았다.
+- 게시글 작성자와 세션 소유자 일치, 그룹 참가자와 연결 세션 회원 일치, 기기·세션 소유권, 호스트/참가 자격, 정원 동시 승인과 상태 전이는 서비스 검증이 필요하다. 단순 FK와 범위 CHECK가 대신하지 않는다.
+- 크루 정원 1~200명은 사용자 확정에 따라 DB CHECK로 보장한다. 생리 지표의 허용 범위, 상태별 필수값, 삭제·탈퇴 후 보존 정책은 이번 제약 보완에서 새로 확정하지 않았다.
+- 원본 오타 `users.health_data_access`의 `AGREEE`, `user_profiles.duraction`은 유지했다.
+- 기준 SQL의 실행·정상/거부 동작은 `backend`의 `SchemaIntegrityTest`로 검증한다. 실제 실행 결과와 미실행 여부는 해당 업무 검증 기록에 남긴다. 서비스 Entity 매핑·첫 Flyway 이력 검증과 구분한다.

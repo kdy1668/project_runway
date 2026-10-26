@@ -300,7 +300,7 @@ crews와 crew_memberships를 구분한다. 크루 상태는 ACTIVE/INACTIVE, 가
 | `regionName` | string | O | 활동 지역 이름(검색해서 선택) |
 | `regionPosition` | GeoJSON | O | 활동 지역 좌표. '내 근처' 검색에 사용 |
 | `level` | string | O | BEGINNER/INTERMEDIATE/ADVANCED |
-| `capacity` | number | O | 모집 인원 |
+| `capacity` | number | O | 크루 정원. 1~200의 정수이며 필수다. 크루별로 명시하고 자동 200명 기본값은 두지 않는다. |
 
 ```json
 {
@@ -351,7 +351,7 @@ crews와 crew_memberships를 구분한다. 크루 상태는 ACTIVE/INACTIVE, 가
 
 | HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
 |---|---|---|
-| `422 INVALID_CREW` | 입력 값 | 크루 이름·지역·정원 등 생성 값이 확정 규칙/ERD 형식과 맞지 않음. 최대 200명은 예정 정책 |
+| `422 INVALID_CREW` | 입력 값 | 크루 이름·지역·정원 등 생성 값이 확정 규칙/ERD 형식과 맞지 않음. 크루 정원은 1~200명으로 확정 |
 | `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
 | `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
 | `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
@@ -676,7 +676,7 @@ PENDING 신청에 대해 APPROVED 또는 REJECTED 처리.
 
 | 후보 | 발생 가능 상황 |
 |---|---|
-| `409 CREW_CAPACITY_EXCEEDED` | 승인 직전 정원 확인. 동시 승인에서도 정원 초과 방지. 정원 상한 정책은 미정 |
+| `409 CREW_CAPACITY_EXCEEDED` | 승인 직전 해당 크루의 capacity(1~200명)와 실제 승인 인원 확인. 동시 승인에서도 정원 초과 방지. HTTP·오류 코드와 동시성 구현 방식은 초안으로 유지 |
 
 - **대상 없음·접근 차단 점검:** 경로 대상의 부재/삭제, 본인 소유·역할·참가 자격 불충족을 구분한다. 위 표에 없는 경우 `404` 자원 없음 또는 `403` 접근 거부의 추가 매핑을 확인한다. 존재 은닉을 위한 403/404 선택·검사 순서는 미정이며 새 코드로 단정하지 않는다.
 
