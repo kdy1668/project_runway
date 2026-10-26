@@ -1,21 +1,42 @@
-﻿CREATE TABLE "sync_batches" (
-	"id"	BIGINT		NOT NULL,
+-- PostgreSQL 17 / PostGIS 3.6 reference schema for an empty isolated database.
+-- Not a service migration or an update script for an existing database.
+CREATE EXTENSION IF NOT EXISTS postgis;
+
+CREATE TYPE "sync_batches_status_enum" AS ENUM('RECEIVED', 'COMMITTED', 'REJECTED');
+CREATE TYPE "daily_readiness_readiness_confidence_enum" AS ENUM('LOW','MEDIUM','HIGH');
+CREATE TYPE "users_gender_enum" AS ENUM('MALE', 'FEMALE');
+CREATE TYPE "users_account_status_enum" AS ENUM('ACTIVE', 'WITHDRAWN');
+CREATE TYPE "users_health_data_access_enum" AS ENUM('AGREEE', 'DISAGREE');
+CREATE TYPE "group_runs_status_enum" AS ENUM('SCHEDULED', 'RUNNING', 'COMPLETED', 'CANCELLED');
+CREATE TYPE "crew_memberships_status_enum" AS ENUM('PENDING', 'APPROVED', 'REJECTED', 'LEFT');
+CREATE TYPE "courses_status_enum" AS ENUM('ACTIVE', 'MERGED', 'BLOCKED');
+CREATE TYPE "course_environment_tags_environment_type_enum" AS ENUM('PARK', 'RIVERSIDE', 'URBAN', 'BEACH', 'TRACK');
+CREATE TYPE "user_profiles_running_level_enum" AS ENUM('BEGINNER', 'INTERMEDIATE', 'ADVANCED');
+CREATE TYPE "crews_status_enum" AS ENUM('ACTIVE', 'INACTIVE');
+CREATE TYPE "running_sessions_status_enum" AS ENUM('READY', 'RUNNING', 'PAUSED', 'COMPLETED', 'CANCELLED', 'INTERRUPTED');
+CREATE TYPE "user_devices_device_type_enum" AS ENUM('PHONE', 'WATCH');
+CREATE TYPE "user_settings_location_collection_mode_enum" AS ENUM('ALWAYS', 'RUNNING_ONLY', 'OFF');
+CREATE TYPE "user_settings_account_visibility_enum" AS ENUM('PUBLIC', 'PRIVATE');
+CREATE TYPE "notifications_delivery_status_enum" AS ENUM('PENDING', 'SENT', 'FAILED');
+
+CREATE TABLE "sync_batches" (
+	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
 	"client_batch_id"	VARCHAR(200)		NOT NULL,
 	"device_id"	BIGINT		NOT NULL,
 	"session_id"	BIGINT		NULL,
 	"payload_version"	VARCHAR(50)		NOT NULL,
 	"payload_hash"	TEXT		NOT NULL,
-	"status"	ENUM('RECEIVED', 'COMMITTED', 'REJECTED')	DEFAULT 'RECEIVED'	NOT NULL,
+	"status"	"sync_batches_status_enum"	DEFAULT 'RECEIVED'	NOT NULL,
 	"received_at"	TIMESTAMPTZ	DEFAULT now()	NOT NULL,
 	"committed_at"	TIMESTAMPTZ		NULL
 );
 
 CREATE TABLE "daily_readiness" (
-	"id"	BIGINT		NOT NULL,
+	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
 	"user_id"	BIGINT		NOT NULL,
 	"readiness_date"	DATE		NOT NULL,
 	"readiness_score"	NUMERIC(7,2)		NOT NULL,
-	"readiness_confidence"	ENUM('LOW','MEDIUM','HIGH')		NULL,
+	"readiness_confidence"	"daily_readiness_readiness_confidence_enum"		NULL,
 	"created_at"	TIMESTAMPTZ	DEFAULT now()	NOT NULL,
 	"updated_at"	TIMESTAMPTZ	DEFAULT now()	NOT NULL
 );
@@ -35,23 +56,23 @@ COMMENT ON COLUMN "daily_readiness"."created_at" IS '생성일시';
 COMMENT ON COLUMN "daily_readiness"."updated_at" IS '수정일시';
 
 CREATE TABLE "users" (
-	"id"	BIGINT		NOT NULL,
+	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
 	"login_id"	VARCHAR(16)		NOT NULL,
 	"password"	VARCHAR(255)		NOT NULL,
 	"nickname"	VARCHAR(10)		NOT NULL,
 	"birth_date"	DATE		NOT NULL,
-	"gender"	ENUM('MALE', 'FEMALE')		NOT NULL,
+	"gender"	"users_gender_enum"		NOT NULL,
 	"profile_image_key"	VARCHAR(1024)		NULL,
-	"account_status"	ENUM('ACTIVE', 'WITHDRAWN')	DEFAULT 'ACTIVE'	NOT NULL,
+	"account_status"	"users_account_status_enum"	DEFAULT 'ACTIVE'	NOT NULL,
 	"withdrawn_at"	TIMESTAMPTZ		NULL,
 	"phone_number"	VARCHAR(20)		NOT NULL,
-	"health_data_access"	ENUM('AGREEE', 'DISAGREE')		NOT NULL,
+	"health_data_access"	"users_health_data_access_enum"		NOT NULL,
 	"created_at"	TIMESTAMPTZ	DEFAULT now()	NOT NULL,
 	"updated_at"	TIMESTAMPTZ	DEFAULT now()	NOT NULL
 );
 
 CREATE TABLE "pace_plans" (
-	"id"	BIGINT		NOT NULL,
+	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
 	"session_id"	BIGINT		NOT NULL,
 	"recommended_pace"	NUMERIC(10,2)		NOT NULL,
 	"cue_bpm"	NUMERIC(7,2)		NULL,
@@ -66,7 +87,7 @@ COMMENT ON COLUMN "pace_plans"."cue_bpm" IS '추천 박자(BPM)';
 COMMENT ON COLUMN "pace_plans"."route_progress" IS '코스 진행거리(m)';
 
 CREATE TABLE "group_runs" (
-	"id"	BIGINT		NOT NULL,
+	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
 	"crew_id"	BIGINT		NOT NULL,
 	"host_id"	BIGINT		NOT NULL,
 	"course_id"	BIGINT		NULL,
@@ -78,7 +99,7 @@ CREATE TABLE "group_runs" (
 	"meeting_position"	geography(Point,4326)		NULL,
 	"goal_distance"	INTEGER		NULL,
 	"goal_duration"	INTEGER		NULL,
-	"status"	ENUM('SCHEDULED', 'RUNNING', 'COMPLETED', 'CANCELLED')	DEFAULT 'SCHEDULED'	NOT NULL,
+	"status"	"group_runs_status_enum"	DEFAULT 'SCHEDULED'	NOT NULL,
 	"started_at"	TIMESTAMPTZ		NULL,
 	"ended_at"	TIMESTAMPTZ		NULL,
 	"cancel_reason"	VARCHAR(50)		NULL,
@@ -89,10 +110,10 @@ CREATE TABLE "group_runs" (
 COMMENT ON COLUMN "group_runs"."cancel_reason" IS '그룹런 취소 사유. 취소 전 NULL. 사유 코드 목록은 서비스에서 확정.';
 
 CREATE TABLE "crew_memberships" (
-	"id"	BIGINT		NOT NULL,
+	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
 	"crew_id"	BIGINT		NOT NULL,
 	"user_id"	BIGINT		NOT NULL,
-	"status"	ENUM('PENDING', 'APPROVED', 'REJECTED', 'LEFT')	DEFAULT 'PENDING'	NOT NULL,
+	"status"	"crew_memberships_status_enum"	DEFAULT 'PENDING'	NOT NULL,
 	"requested_at"	TIMESTAMPTZ	DEFAULT now()	NOT NULL,
 	"joined_at"	TIMESTAMPTZ		NULL,
 	"left_at"	TIMESTAMPTZ		NULL,
@@ -101,7 +122,7 @@ CREATE TABLE "crew_memberships" (
 );
 
 CREATE TABLE "pace_plan_segments" (
-	"id"	BIGINT		NOT NULL,
+	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
 	"pace_plan_id"	BIGINT		NOT NULL,
 	"segment_sequence"	INTEGER		NOT NULL,
 	"start_distance"	NUMERIC(12,2)		NOT NULL,
@@ -125,7 +146,7 @@ COMMENT ON COLUMN "pace_plan_segments"."recommended_pace" IS '구간 추천 페�
 COMMENT ON COLUMN "pace_plan_segments"."created_at" IS '생성일시';
 
 CREATE TABLE "group_run_participants" (
-	"id"	BIGINT		NOT NULL,
+	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
 	"group_run_id"	BIGINT		NOT NULL,
 	"user_id"	BIGINT		NOT NULL,
 	"session_id"	BIGINT		NULL,
@@ -133,7 +154,7 @@ CREATE TABLE "group_run_participants" (
 );
 
 CREATE TABLE "running_route_points" (
-	"id"	BIGINT		NOT NULL,
+	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
 	"running_session_id"	BIGINT		NOT NULL,
 	"measured_at"	TIMESTAMPTZ		NOT NULL,
 	"position"	geography(Point,4326)		NOT NULL,
@@ -143,14 +164,14 @@ CREATE TABLE "running_route_points" (
 );
 
 CREATE TABLE "post_likes" (
-	"id"	BIGINT		NOT NULL,
+	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
 	"post_id"	BIGINT		NOT NULL,
 	"user_id"	BIGINT		NOT NULL,
 	"created_at"	TIMESTAMPTZ	DEFAULT now()	NOT NULL
 );
 
 CREATE TABLE "courses" (
-	"id"	BIGINT		NOT NULL,
+	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
 	"creator_id"	BIGINT		NULL,
 	"source_session_id"	BIGINT		NULL,
 	"description"	TEXT		NULL,
@@ -159,7 +180,7 @@ CREATE TABLE "courses" (
 	"distance"	NUMERIC(12,2)		NOT NULL,
 	"elevation_gain"	NUMERIC(10,2)		NULL,
 	"elevation_profile"	JSONB		NULL,
-	"status"	ENUM('ACTIVE', 'MERGED', 'BLOCKED')	DEFAULT 'ACTIVE'	NOT NULL,
+	"status"	"courses_status_enum"	DEFAULT 'ACTIVE'	NOT NULL,
 	"merged_into_course_id"	BIGINT		NULL,
 	"created_at"	TIMESTAMPTZ	DEFAULT now()	NOT NULL,
 	"updated_at"	TIMESTAMPTZ	DEFAULT now()	NOT NULL,
@@ -169,13 +190,13 @@ CREATE TABLE "courses" (
 COMMENT ON COLUMN "courses"."region_code" IS '출발 좌표 기준 시·군·구 코드. regions.region_code(UNIQUE)를 외래키로 참조한다. 지역 판정 전 또는 실패 시 NULL을 허용한다. 코스 표시명은 시·도명 + 시·군·구명 + 코스로 조합한다.';
 
 CREATE TABLE "course_environment_tags" (
-	"id"	BIGINT		NOT NULL,
+	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
 	"course_id"	BIGINT		NOT NULL,
-	"environment_type"	ENUM('PARK', 'RIVERSIDE', 'URBAN', 'BEACH', 'TRACK')		NOT NULL
+	"environment_type"	"course_environment_tags_environment_type_enum"		NOT NULL
 );
 
 CREATE TABLE "regions" (
-	"id"	BIGINT		NOT NULL,
+	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
 	"region_code"	VARCHAR(40) UNIQUE		NOT NULL,
 	"sido_name"	VARCHAR(100)		NOT NULL,
 	"sigungu_name"	VARCHAR(100)		NOT NULL
@@ -184,9 +205,9 @@ CREATE TABLE "regions" (
 COMMENT ON COLUMN "regions"."region_code" IS '시·군·구 코드. 중복 금지 UNIQUE 참조 키. courses/crews/posts의 지역 코드가 참조한다.';
 
 CREATE TABLE "user_profiles" (
-	"id"	BIGINT		NOT NULL,
+	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
 	"user_id"	BIGINT		NOT NULL,
-	"running_level"	ENUM('BEGINNER', 'INTERMEDIATE', 'ADVANCED')		NOT NULL,
+	"running_level"	"user_profiles_running_level_enum"		NOT NULL,
 	"average_pace"	NUMERIC(10,2)		NOT NULL,
 	"distance"	INTEGER		NULL,
 	"duraction"	INTEGER		NULL,
@@ -195,7 +216,7 @@ CREATE TABLE "user_profiles" (
 );
 
 CREATE TABLE "daily_health_metrics" (
-	"id"	BIGINT		NOT NULL,
+	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
 	"user_id"	BIGINT		NOT NULL,
 	"metric_date"	DATE		NOT NULL,
 	"sleep_duration_min"	NUMERIC(7,2)		NULL,
@@ -225,7 +246,7 @@ COMMENT ON COLUMN "daily_health_metrics"."created_at" IS '생성일시';
 COMMENT ON COLUMN "daily_health_metrics"."updated_at" IS '수정일시';
 
 CREATE TABLE "posts" (
-	"id"	BIGINT		NOT NULL,
+	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
 	"author_id"	BIGINT		NOT NULL,
 	"session_id"	BIGINT		NOT NULL,
 	"body"	TEXT		NULL,
@@ -239,7 +260,7 @@ CREATE TABLE "posts" (
 COMMENT ON COLUMN "posts"."region_code" IS '게시물 지역 코드. regions.region_code 참조. 시·군·구 단위. 미지정 시 NULL.';
 
 CREATE TABLE "coaching_decisions" (
-	"id"	BIGINT		NOT NULL,
+	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
 	"session_id"	BIGINT		NOT NULL,
 	"elapsed_duration"	INTEGER		NOT NULL,
 	"recommended_pace"	NUMERIC(10,2)		NOT NULL,
@@ -268,24 +289,24 @@ COMMENT ON COLUMN "coaching_decisions"."route_progress" IS '코스 진행거리(
 COMMENT ON COLUMN "coaching_decisions"."created_at" IS '생성일시';
 
 CREATE TABLE "crews" (
-	"id"	BIGINT		NOT NULL,
+	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
 	"owner_id"	BIGINT		NOT NULL,
 	"name"	VARCHAR(100)		NOT NULL,
 	"description"	TEXT		NULL,
 	"image_key"	VARCHAR(1024)		NULL,
 	"capacity"	INTEGER		NOT NULL,
-	"status"	ENUM('ACTIVE', 'INACTIVE')	DEFAULT 'ACTIVE'	NOT NULL,
+	"status"	"crews_status_enum"	DEFAULT 'ACTIVE'	NOT NULL,
 	"region_code"	VARCHAR(40)		NULL,
 	"created_at"	TIMESTAMPTZ	DEFAULT now()	NOT NULL,
 	"updated_at"	TIMESTAMPTZ	DEFAULT now()	NOT NULL
 );
 
 CREATE TABLE "running_sessions" (
-	"id"	BIGINT		NOT NULL,
+	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
 	"user_id"	BIGINT		NOT NULL,
 	"course_id"	BIGINT		NULL,
 	"comparison_session_id"	BIGINT		NULL,
-	"status"	ENUM('READY', 'RUNNING', 'PAUSED', 'COMPLETED', 'CANCELLED', 'INTERRUPTED')	DEFAULT 'READY'	NOT NULL,
+	"status"	"running_sessions_status_enum"	DEFAULT 'READY'	NOT NULL,
 	"goal_distance"	INTEGER		NULL,
 	"goal_duration"	INTEGER		NULL,
 	"goal_pace"	NUMERIC(10,2)		NULL,
@@ -308,7 +329,7 @@ CREATE TABLE "running_sessions" (
 COMMENT ON COLUMN "running_sessions"."max_heart_rate" IS '최대 심박수(bpm)';
 
 CREATE TABLE "comments" (
-	"id"	BIGINT		NOT NULL,
+	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
 	"post_id"	BIGINT		NOT NULL,
 	"parent_comment_id"	BIGINT		NULL,
 	"author_id"	BIGINT		NOT NULL,
@@ -323,7 +344,7 @@ COMMENT ON COLUMN "comments"."post_id" IS 'posts.id 참조. 대댓글은 부모�
 COMMENT ON COLUMN "comments"."parent_comment_id" IS '일반 댓글은 NULL. 대댓글 부모는 같은 게시물이어야 함. 복합 FK (post_id,parent_comment_id) REFERENCES comments(post_id,id); UNIQUE(post_id,id); CHECK(parent_comment_id IS NULL OR parent_comment_id <> id). 한 단계 대댓글 깊이는 서비스에서 검사.';
 
 CREATE TABLE "course_bookmarks" (
-	"id"	BIGINT		NOT NULL,
+	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
 	"user_id"	BIGINT		NOT NULL,
 	"course_id"	BIGINT		NOT NULL,
 	"custom_name"	VARCHAR(50)		NULL,
@@ -332,22 +353,22 @@ CREATE TABLE "course_bookmarks" (
 );
 
 CREATE TABLE "user_devices" (
-	"id"	BIGINT		NOT NULL,
+	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
 	"user_id"	BIGINT		NOT NULL,
-	"device_type"	ENUM('PHONE', 'WATCH')		NOT NULL,
+	"device_type"	"user_devices_device_type_enum"		NOT NULL,
 	"linked_at"	TIMESTAMPTZ		NOT NULL,
 	"unlinked_at"	TIMESTAMPTZ		NULL
 );
 
 CREATE TABLE "user_settings" (
-	"id"	BIGINT		NOT NULL,
+	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
 	"user_id"	BIGINT		NOT NULL,
 	"voice_coaching_enabled"	BOOLEAN		NOT NULL,
 	"bpm_guide_enabled"	BOOLEAN		NOT NULL,
 	"group_notifications_enabled"	BOOLEAN		NOT NULL,
 	"community_notifications_enabled"	BOOLEAN		NOT NULL,
-	"location_collection_mode"	ENUM('ALWAYS', 'RUNNING_ONLY', 'OFF')		NOT NULL,
-	"account_visibility"	ENUM('PUBLIC', 'PRIVATE')		NOT NULL,
+	"location_collection_mode"	"user_settings_location_collection_mode_enum"		NOT NULL,
+	"account_visibility"	"user_settings_account_visibility_enum"		NOT NULL,
 	"created_at"	TIMESTAMPTZ	DEFAULT now()	NOT NULL,
 	"updated_at"	TIMESTAMPTZ	DEFAULT now()	NOT NULL
 );
@@ -357,7 +378,7 @@ COMMENT ON COLUMN "user_settings"."location_collection_mode" IS '위치 수집 �
 COMMENT ON COLUMN "user_settings"."account_visibility" IS '계정의 기록 공개 범위. PUBLIC 또는 PRIVATE를 설정 행 생성 시 명시하며 NULL 불가. PUBLIC은 기록 공개 및 즉시 팔로우, PRIVATE는 팔로우 승인 후 성립하며 기록은 본인 및 승인된 팔로워만 열람 가능. 승인 관계는 user_follows.follower_id=열람자, followee_id=기록 소유자, is_approved=TRUE로 판정한다.';
 
 CREATE TABLE "user_follows" (
-	"id"	BIGINT		NOT NULL,
+	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
 	"follower_id"	BIGINT		NOT NULL,
 	"followee_id"	BIGINT		NOT NULL,
 	"created_at"	TIMESTAMPTZ	DEFAULT now()	NOT NULL,
@@ -367,11 +388,11 @@ CREATE TABLE "user_follows" (
 COMMENT ON COLUMN "user_follows"."is_approved" IS '팔로우 성립 여부. 공개(PUBLIC) 계정은 별도 승인 없이 요청 생성 시 TRUE로 저장한다. 비공개(PRIVATE) 계정은 FALSE로 요청을 저장하고 상대가 승인하면 TRUE로 변경한다. FALSE는 미승인 요청이며 팔로워 집계와 비공개 기록 열람에서 제외한다. 비공개 기록은 본인 또는 follower_id=열람자, followee_id=기록 소유자, is_approved=TRUE인 경우에만 열람한다.';
 
 CREATE TABLE "notifications" (
-	"id"	BIGINT		NOT NULL,
+	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
 	"user_id"	BIGINT		NOT NULL,
 	"sent_at"	TIMESTAMPTZ		NULL,
 	"read_at"	TIMESTAMPTZ		NULL,
-	"delivery_status"	ENUM('PENDING', 'SENT', 'FAILED')	DEFAULT 'PENDING'	NOT NULL,
+	"delivery_status"	"notifications_delivery_status_enum"	DEFAULT 'PENDING'	NOT NULL,
 	"message"	VARCHAR(100)		NOT NULL,
 	"created_at"	TIMESTAMPTZ	DEFAULT now()	NOT NULL,
 	"notification_type"	VARCHAR(50)		NOT NULL,
@@ -383,7 +404,7 @@ COMMENT ON COLUMN "notifications"."notification_type" IS '알림 종류 코드. 
 COMMENT ON COLUMN "notifications"."target_id" IS '알림 클릭 시 이동 대상 ID. GROUP_RUN_PARTICIPATION_CANCELLED/GROUP_RUN_START_REMINDER는 group_runs.id(그룹런 상세), CREW_JOIN_APPROVED/CREW_JOIN_REJECTED는 crews.id(크루 상세), POST_COMMENT는 posts.id(게시글 상세). 여러 테이블을 가리키므로 단일 FK는 두지 않고 서비스에서 종류별 대상 존재와 현재 열람 권한을 검증한다. 삭제된 대상은 이동 불가로 안내한다.';
 
 CREATE TABLE "running_metric_samples" (
-	"id"	BIGINT		NOT NULL,
+	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
 	"running_session_id"	BIGINT		NOT NULL,
 	"device_id"	BIGINT		NULL,
 	"measured_at"	TIMESTAMPTZ		NOT NULL,
@@ -759,13 +780,6 @@ REFERENCES "posts" (
 	"id"
 );
 
-ALTER TABLE "comments" ADD CONSTRAINT "FK_comments_TO_comments_1" FOREIGN KEY (
-	"parent_comment_id"
-)
-REFERENCES "comments" (
-	"id"
-);
-
 ALTER TABLE "comments" ADD CONSTRAINT "FK_users_TO_comments_1" FOREIGN KEY (
 	"author_id"
 )
@@ -842,3 +856,191 @@ ALTER TABLE "courses" ADD CONSTRAINT "FK_regions_TO_courses_1" FOREIGN KEY (
 REFERENCES "regions" (
 	"region_code"
 );
+
+-- Logical uniqueness, including the reference key for comment parents.
+
+ALTER TABLE "users" ADD CONSTRAINT "uq_users_login_id" UNIQUE ("login_id");
+
+ALTER TABLE "user_profiles" ADD CONSTRAINT "uq_user_profiles_user_id" UNIQUE ("user_id");
+
+ALTER TABLE "user_settings" ADD CONSTRAINT "uq_user_settings_user_id" UNIQUE ("user_id");
+
+ALTER TABLE "daily_health_metrics" ADD CONSTRAINT "uq_daily_health_metrics_user_id_metric_date" UNIQUE ("user_id", "metric_date");
+
+ALTER TABLE "daily_readiness" ADD CONSTRAINT "uq_daily_readiness_user_id_readiness_date" UNIQUE ("user_id", "readiness_date");
+
+ALTER TABLE "course_bookmarks" ADD CONSTRAINT "uq_course_bookmarks_user_id_course_id" UNIQUE ("user_id", "course_id");
+
+ALTER TABLE "post_likes" ADD CONSTRAINT "uq_post_likes_post_id_user_id" UNIQUE ("post_id", "user_id");
+
+ALTER TABLE "user_follows" ADD CONSTRAINT "uq_user_follows_follower_id_followee_id" UNIQUE ("follower_id", "followee_id");
+
+ALTER TABLE "course_environment_tags" ADD CONSTRAINT "uq_course_environment_tags_course_id_environment_type" UNIQUE ("course_id", "environment_type");
+
+ALTER TABLE "group_run_participants" ADD CONSTRAINT "uq_group_run_participants_group_run_id_user_id" UNIQUE ("group_run_id", "user_id");
+
+ALTER TABLE "pace_plan_segments" ADD CONSTRAINT "uq_pace_plan_segments_pace_plan_id_segment_sequence" UNIQUE ("pace_plan_id", "segment_sequence");
+
+ALTER TABLE "crew_memberships" ADD CONSTRAINT "uq_crew_memberships_crew_id_user_id" UNIQUE ("crew_id", "user_id");
+
+ALTER TABLE "sync_batches" ADD CONSTRAINT "uq_sync_batches_device_id_client_batch_id" UNIQUE ("device_id", "client_batch_id");
+
+ALTER TABLE "comments" ADD CONSTRAINT "uq_comments_post_id_id" UNIQUE ("post_id", "id");
+
+ALTER TABLE "comments" ADD CONSTRAINT "fk_comments_parent_same_post"
+    FOREIGN KEY ("post_id", "parent_comment_id") REFERENCES "comments" ("post_id", "id");
+
+-- NULL remains valid where a value is optional or not yet measured.
+
+ALTER TABLE "user_profiles" ADD CONSTRAINT "ck_user_profiles_values"
+    CHECK (
+        "average_pace" > 0
+        AND "distance" > 0
+        AND "duraction" > 0
+        AND "average_pace" <> 'NaN'::numeric
+    );
+
+ALTER TABLE "crews" ADD CONSTRAINT "ck_crews_capacity"
+    CHECK ("capacity" BETWEEN 1 AND 200);
+
+ALTER TABLE "group_runs" ADD CONSTRAINT "ck_group_runs_values"
+    CHECK (
+        "goal_distance" > 0
+        AND "goal_duration" > 0
+    );
+
+ALTER TABLE "running_sessions" ADD CONSTRAINT "ck_running_sessions_values"
+    CHECK (
+        "goal_distance" > 0
+        AND "goal_duration" > 0
+        AND "goal_pace" > 0
+        AND "total_distance" >= 0
+        AND "moving_duration" >= 0
+        AND "elapsed_duration" >= 0
+        AND "moving_duration_to_goal" >= 0
+        AND "average_pace" > 0
+        AND "goal_pace" <> 'NaN'::numeric
+        AND "total_distance" <> 'NaN'::numeric
+        AND "average_pace" <> 'NaN'::numeric
+    );
+
+ALTER TABLE "courses" ADD CONSTRAINT "ck_courses_values"
+    CHECK (
+        "distance" >= 0
+        AND "distance" <> 'NaN'::numeric
+    );
+
+ALTER TABLE "pace_plans" ADD CONSTRAINT "ck_pace_plans_values"
+    CHECK (
+        "recommended_pace" > 0
+        AND "route_progress" >= 0
+        AND "recommended_pace" <> 'NaN'::numeric
+        AND "route_progress" <> 'NaN'::numeric
+    );
+
+ALTER TABLE "pace_plan_segments" ADD CONSTRAINT "ck_pace_plan_segments_values"
+    CHECK (
+        "segment_sequence" > 0
+        AND "start_distance" >= 0
+        AND "end_distance" > "start_distance"
+        AND "recommended_pace" > 0
+        AND "start_distance" <> 'NaN'::numeric
+        AND "end_distance" <> 'NaN'::numeric
+        AND "recommended_pace" <> 'NaN'::numeric
+    );
+
+ALTER TABLE "running_route_points" ADD CONSTRAINT "ck_running_route_points_values"
+    CHECK (
+        "accuracy" >= 0
+        AND "accuracy" <> 'NaN'::numeric
+    );
+
+ALTER TABLE "running_metric_samples" ADD CONSTRAINT "ck_running_metric_samples_values"
+    CHECK (
+        "elapsed_duration" >= 0
+        AND "total_distance" >= 0
+        AND "route_progress" >= 0
+        AND "total_distance" <> 'NaN'::numeric
+        AND "route_progress" <> 'NaN'::numeric
+    );
+
+ALTER TABLE "coaching_decisions" ADD CONSTRAINT "ck_coaching_decisions_values"
+    CHECK (
+        "elapsed_duration" >= 0
+        AND "recommended_pace" > 0
+        AND "route_progress" >= 0
+        AND "recommended_pace" <> 'NaN'::numeric
+        AND "route_progress" <> 'NaN'::numeric
+    );
+
+ALTER TABLE "user_follows" ADD CONSTRAINT "ck_user_follows_values"
+    CHECK (
+        "follower_id" <> "followee_id"
+    );
+
+ALTER TABLE "comments" ADD CONSTRAINT "ck_comments_values"
+    CHECK (
+        "parent_comment_id" IS NULL OR "parent_comment_id" <> "id"
+    );
+
+-- The database is the only writer of updated_at during updates.
+
+CREATE FUNCTION set_updated_at() RETURNS trigger
+LANGUAGE plpgsql AS $updated_at$
+BEGIN
+    NEW.updated_at := clock_timestamp();
+    RETURN NEW;
+END;
+$updated_at$;
+
+CREATE TRIGGER "trg_daily_readiness_updated_at"
+    BEFORE UPDATE ON "daily_readiness"
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER "trg_users_updated_at"
+    BEFORE UPDATE ON "users"
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER "trg_group_runs_updated_at"
+    BEFORE UPDATE ON "group_runs"
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER "trg_crew_memberships_updated_at"
+    BEFORE UPDATE ON "crew_memberships"
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER "trg_courses_updated_at"
+    BEFORE UPDATE ON "courses"
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER "trg_user_profiles_updated_at"
+    BEFORE UPDATE ON "user_profiles"
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER "trg_daily_health_metrics_updated_at"
+    BEFORE UPDATE ON "daily_health_metrics"
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER "trg_posts_updated_at"
+    BEFORE UPDATE ON "posts"
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER "trg_crews_updated_at"
+    BEFORE UPDATE ON "crews"
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER "trg_running_sessions_updated_at"
+    BEFORE UPDATE ON "running_sessions"
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER "trg_comments_updated_at"
+    BEFORE UPDATE ON "comments"
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER "trg_course_bookmarks_updated_at"
+    BEFORE UPDATE ON "course_bookmarks"
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER "trg_user_settings_updated_at"
+    BEFORE UPDATE ON "user_settings"
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
