@@ -27,6 +27,10 @@ TYPES = [{"id": "10002", "name": "작업", "subtask": False},
 META = [{"fieldId": key, "name": key, "required": key in ("summary", "description", "issuetype", "project")}
         for key in ("project", "issuetype", "summary", "description", "assignee", "parent", "labels")]
 META.append({"fieldId": "customfield_10031", "name": "Story Points", "schema": {"type": "number"}})
+PRIORITIES = [{"id": "p-high", "name": "High"}, {"id": "p-low", "name": "Low"}]
+META.append({"fieldId": "priority", "name": "Priority", "schema": {"type": "priority"},
+             "allowedValues": deepcopy(PRIORITIES), "hasDefaultValue": True,
+             "defaultValue": {"id": "p-low", "name": "Low"}})
 
 
 class FakeClient:
@@ -47,6 +51,7 @@ class FakeClient:
         self.epic_project = "TEST"
         self.sprint_rows = [{"id": 7, "name": "이번 주", "state": "active"}]
         self.change_summary = False
+        self.change_priority = False
 
     def request(self, method, path, *, params=None, body=None):
         self.calls.append((method, path, params, deepcopy(body)))
@@ -82,6 +87,10 @@ class FakeClient:
             fields = deepcopy(self.created_fields)
             if self.change_summary:
                 fields["summary"] = "changed"
+            if "priority" in fields:
+                fields["priority"]["name"] = "High"
+                if self.change_priority:
+                    fields["priority"]["id"] = "p-low"
             return {"fields": fields}
         if path == "/rest/agile/1.0/issue/TEST-22":
             return {"fields": {"sprint": {"id": self.sprint} if self.sprint else None}}
@@ -283,6 +292,157 @@ class WorkflowTests(unittest.TestCase):
         plan = self.workflow.prepare(deepcopy(DRAFT))
         self.assertEqual(plan["fields"]["customfield_14"], "TEST-1")
         self.assertTrue(self.apply(plan)["verified"])
+
+    def priority_draft(self, **changes):
+        return {**DRAFT, "priority": "p-high", "priority_reason": "Blocks a dependent release", **changes}
+
+    def test_catalog_lists_priorities_per_supported_issue_type(self):
+        catalog = self.workflow.catalog("")
+        self.assertEqual(catalog.get("priorities"), [
+            {"issue_type_id": "10002", "issue_type": "작업", "values": PRIORITIES,
+             "default": {"id": "p-low", "name": "Low"}},
+            {"issue_type_id": "10000", "issue_type": "에픽", "values": PRIORITIES,
+             "default": {"id": "p-low", "name": "Low"}},
+        ])
+        self.assertFalse(self.writes())
+
+    def test_priority_preview_resolves_id_and_name_read_only(self):
+        for value in ("p-high", "High"):
+            with self.subTest(value=value):
+                plan = self.workflow.prepare(self.priority_draft(priority=value))
+                self.assertEqual(plan["fields"].get("priority"), {"id": "p-high"})
+                self.assertEqual(plan.get("priority"), {"id": "p-high", "name": "High",
+                                                       "reason": "Blocks a dependent release"})
+        self.assertFalse(self.writes())
+
+    def test_priority_is_saved_and_verified_by_id_with_receipt(self):
+        plan = self.workflow.prepare(self.priority_draft())
+        self.assertTrue(self.apply(plan)["verified"])
+        self.assertEqual(self.client.created_fields["priority"], {"id": "p-high"})
+        receipt = json.loads(next(self.state.glob("*.json")).read_text(encoding="utf-8"))
+        self.assertEqual(receipt["fields"]["priority"], {"id": "p-high"})
+        self.assertTrue(self.apply(plan)["reused_receipt"])
+        self.assertEqual(len(self.writes()), 2)
+
+    def test_unknown_or_ambiguous_priority_blocks_before_write(self):
+        for value in ("p-missing", "Urgent"):
+            with self.subTest(value=value), self.assertRaises(jira.JiraError):
+                self.workflow.prepare(self.priority_draft(priority=value))
+        self.client.metadata[-1]["allowedValues"].append({"id": "p-other", "name": "High"})
+        with self.assertRaises(jira.JiraError):
+            self.workflow.prepare(self.priority_draft(priority="High"))
+        self.assertFalse(self.writes())
+
+    def test_priority_must_be_allowed_for_selected_issue_type(self):
+        priority = next(x for x in self.client.epic_metadata if x["fieldId"] == "priority")
+        priority["allowedValues"] = [{"id": "p-low", "name": "Low"}]
+        draft = {**self.epic_draft(), "priority": "p-high", "priority_reason": "Dependent work"}
+        with self.assertRaises(jira.JiraError):
+            self.workflow.prepare(draft)
+        self.assertFalse(self.writes())
+
+    def test_unavailable_priority_field_or_values_blocks_explicit_priority(self):
+        for metadata in ([x for x in META if x["fieldId"] != "priority"],
+                         [dict(x, allowedValues=[]) if x["fieldId"] == "priority" else x for x in META]):
+            with self.subTest(metadata=metadata):
+                self.client.metadata = deepcopy(metadata)
+                with self.assertRaises(jira.JiraError):
+                    self.workflow.prepare(self.priority_draft())
+        self.assertFalse(self.writes())
+
+    def test_malformed_priority_metadata_blocks_before_write(self):
+        for values in (None, {}, [None], [{"id": "p-high"}], [{"id": 1, "name": "High"}]):
+            with self.subTest(values=values):
+                self.client.metadata[-1]["allowedValues"] = values
+                with self.assertRaises(jira.JiraError):
+                    self.workflow.prepare(self.priority_draft())
+        self.assertFalse(self.writes())
+
+    def test_priority_change_invalidates_previous_approval(self):
+        before = self.workflow.prepare(self.priority_draft())
+        after = self.workflow.prepare(self.priority_draft(priority="p-low"))
+        with self.assertRaises(jira.JiraError):
+            self.workflow.apply(after, before["approval_sha256"], False, self.state)
+        self.assertFalse(self.writes())
+        self.assertFalse(self.state.exists())
+
+    def test_cli_rejects_changed_priority_or_reason_before_network(self):
+        draft = self.priority_draft()
+        approved = jira.draft_hash(CONFIG, jira.validate_draft(draft))
+        for change in ({"priority": "p-low"}, {"priority_reason": "Changed rationale"}):
+            with self.subTest(change=change):
+                path = Path(self.directory.name) / "draft.json"
+                path.write_text(json.dumps({**draft, **change}), encoding="utf-8")
+                with patch.object(jira.Config, "load", return_value=CONFIG), \
+                        patch.object(jira.Client, "request") as request, \
+                        contextlib.redirect_stderr(io.StringIO()):
+                    self.assertEqual(jira.main(["--input", str(path), "--apply", "--approved-sha256", approved]), 1)
+                request.assert_not_called()
+
+    def test_null_priority_uses_jira_default_without_requiring_field(self):
+        self.client.metadata = [x for x in self.client.metadata if x["fieldId"] != "priority"]
+        plan = self.workflow.prepare({**DRAFT, "priority": None, "priority_reason": None})
+        self.assertNotIn("priority", plan["fields"])
+        self.assertTrue(self.apply(plan)["verified"])
+
+    def test_required_priority_without_default_rejects_legacy_draft(self):
+        priority = next(x for x in self.client.metadata if x["fieldId"] == "priority")
+        priority.update(required=True, hasDefaultValue=False)
+        with self.assertRaisesRegex(jira.JiraError, "추가 필수"):
+            self.workflow.prepare(deepcopy(DRAFT))
+        self.assertFalse(self.writes())
+
+    def test_catalog_marks_unavailable_priority_field_with_empty_values(self):
+        self.client.metadata = [x for x in self.client.metadata if x["fieldId"] != "priority"]
+        catalog = self.workflow.catalog("")
+        self.assertEqual(catalog["priorities"][0]["values"], [])
+        self.assertIsNone(catalog["priorities"][0]["default"])
+        self.assertFalse(self.writes())
+
+    def test_priority_mismatch_is_detected_on_create_and_reverification(self):
+        plan = self.workflow.prepare(self.priority_draft())
+        self.client.change_priority = True
+        result = self.apply(plan)
+        self.assertFalse(result["verified"])
+        self.assertIn("priority", result["mismatches"])
+        self.assertIn("priority", self.apply(plan)["mismatches"])
+        self.assertEqual(len(self.writes()), 2)
+
+    def test_cli_verify_checks_receipt_priority_and_returns_mismatch(self):
+        self.state = Path(self.directory.name) / ".jira" / "receipts"
+        plan = self.workflow.prepare(self.priority_draft())
+        self.apply(plan)
+        self.client.change_priority = True
+        output = io.StringIO()
+        with patch.object(jira, "ROOT", Path(self.directory.name)), \
+                patch.object(jira.Config, "load", return_value=CONFIG), \
+                patch.object(jira, "Client", return_value=self.client), contextlib.redirect_stdout(output):
+            self.assertEqual(jira.main(["--verify", "TEST-22"]), 2)
+        self.assertIn("priority", json.loads(output.getvalue())["mismatches"])
+        self.assertEqual(len(self.writes()), 2)
+
+    def test_legacy_draft_keeps_hash_and_omits_priority_for_jira_default(self):
+        plan = self.workflow.prepare(deepcopy(DRAFT))
+        canonical = json.dumps({"site": CONFIG.base_url, "project": "TEST", "board": 42,
+                                "draft": {**DRAFT, "labels": ["automation"]}},
+                               sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+        import hashlib
+        self.assertEqual(plan["approval_sha256"], hashlib.sha256(canonical.encode()).hexdigest())
+        self.assertNotIn("priority", plan["fields"])
+        self.assertTrue(self.apply(plan)["verified"])
+
+    def test_epic_supports_priority(self):
+        draft = {**self.epic_draft(), "priority": "High", "priority_reason": "Dependent work"}
+        self.assertTrue(self.apply(self.workflow.prepare(draft))["verified"])
+
+    def test_invalid_priority_draft_fails_before_network(self):
+        for changes in ({"priority": ""}, {"priority": " "}, {"priority": 1}, {"priority": True},
+                        {"priority": {}}, {"priority": "High\n"}, {"priority_reason": ""},
+                        {"priority_reason": None}, {"priority_reason": []},
+                        {"priority": None}, {"priority": None, "priority_reason": "Reason"}):
+            with self.subTest(changes=changes), self.assertRaises(jira.JiraError):
+                self.workflow.prepare(self.priority_draft(**changes))
+        self.assertFalse(self.client.calls)
 
     def epic_draft(self, **changes):
         draft = {"issue_type": "Epic", "summary": "[BE] 러닝 기록 관리", "description": "러닝 기록 업무 관리",
