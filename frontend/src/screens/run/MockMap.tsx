@@ -139,6 +139,7 @@ export function MockMap({
   segmentPaces,
   showPaceLabels = false,
   routeArea = { top: 140, bottom: 420 },
+  positionY = 300,
   formatLabel,
 }: {
   night?: boolean;
@@ -148,12 +149,14 @@ export function MockMap({
   showPaceLabels?: boolean;
   // Where the course sits on screen, in the 360×760 frame, above the bottom card.
   routeArea?: { top: number; bottom: number };
+  // Height in the 360×760 frame where a lone position dot sits.
+  positionY?: number;
   formatLabel?: (km: number, pace: number) => string;
 }) {
   const look = looks[night ? 'night' : 'day'];
   const project = projector(
     [...(route ?? []), ...(position ? [position] : [])],
-    route ? routeArea : { top: 300, bottom: 300 },
+    route ? routeArea : { top: positionY, bottom: positionY },
   );
   const parts =
     route && segmentPaces && segmentPaces.length > 0

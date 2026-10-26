@@ -64,9 +64,48 @@ export type RunRecordSummary = {
 export type SavedCourse = {
   id: string;
   name: string;
+  // C09 myAlias: the nickname only I see (3.1c 카드 제목). null shows the course name.
+  myAlias: string | null;
   distanceM: number;
   expectedMinutes: number;
   shape: [number, number][];
+};
+
+// U10 환경 코드 (3.1 환경 · 여러 개 선택).
+export type EnvironmentType =
+  | 'PARK'
+  | 'RIVERSIDE'
+  | 'URBAN'
+  | 'BEACH'
+  | 'TRACK';
+
+export type Place = { name: string; position: [number, number] };
+
+// C01 코스 추천 request, from 3.1 오늘의 러닝.
+export type CourseSearch = {
+  origin: Place;
+  targetDistanceM: number;
+  goalInputType: 'TIME' | 'PACE';
+  targetDurationSec: number | null;
+  targetPaceSecPerKm: number | null;
+  environmentTypes: EnvironmentType[];
+};
+
+// One card of 3.1b 추천 코스; the back of the card is the course detail.
+export type RecommendedCourse = {
+  id: string;
+  name: string;
+  distanceM: number;
+  estimatedDurationSec: number;
+  // 순환 · 왕복 · 편도 순환
+  shapeKind: string;
+  environmentLabels: string[];
+  elevationGainM: number;
+  // Relative height of each tenth of the course, 0–100 (구간 고도).
+  elevationProfile: number[];
+  reason: string;
+  route: [number, number][];
+  saved: boolean;
 };
 
 export type NotificationKind =
@@ -242,7 +281,13 @@ export type Repositories = {
   };
   courses: {
     getSaved: () => Promise<SavedCourse[]>;
+    // 2.0's plan for the course picked last with choose(); a default course until then.
     getTodayPlan: () => Promise<CoursePlan>;
+    getOrigins: () => Promise<Place[]>;
+    recommend: (search: CourseSearch) => Promise<RecommendedCourse[]>;
+    save: (courseId: string) => Promise<void>;
+    unsave: (courseId: string) => Promise<void>;
+    choose: (courseId: string) => Promise<void>;
   };
   notifications: {
     list: () => Promise<AppNotification[]>;

@@ -59,6 +59,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             {toast.actionLabel ? (
               <Pressable
                 accessibilityRole="button"
+                accessibilityLabel={toast.actionLabel}
                 onPress={() => {
                   toast.onAction?.();
                   setToast(null);

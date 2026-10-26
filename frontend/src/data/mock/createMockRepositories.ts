@@ -1,12 +1,14 @@
 import { DataError } from '../errors';
 import type {
   AuthSession,
+  CoursePlan,
   MusicSource,
   MusicState,
   PhoneCodeRequest,
   RecordSort,
   Repositories,
   RunRecordSummary,
+  SavedCourse,
   TodayCondition,
 } from '../types';
 import * as fixtures from './fixtures';
@@ -29,7 +31,10 @@ export type MockScenario =
   | 'musicDisconnected'
   | 'musicNeedsSetup'
   // 2.0N: after sunset.
-  | 'night';
+  | 'night'
+  // 3.1 추천 결과 없음 · 추천 실패.
+  | 'noCourses'
+  | 'courseError';
 
 export type MockOptions = {
   scenario?: MockScenario;
@@ -138,6 +143,50 @@ function musicFor(scenario: MockScenario = 'default'): MusicState {
   }
 }
 
+// Fits a GeoJSON route into the 0–1 box used by list thumbnails.
+function shapeOf(route: [number, number][]): [number, number][] {
+  const xs = route.map(point => point[0]);
+  const ys = route.map(point => point[1]);
+  const [minX, maxX, minY, maxY] = [
+    Math.min(...xs),
+    Math.max(...xs),
+    Math.min(...ys),
+    Math.max(...ys),
+  ];
+  const span = Math.max(maxX - minX, maxY - minY, 1e-6);
+  return route.map(([x, y]) => [
+    0.1 + ((x - minX) / span) * 0.8,
+    0.9 - ((y - minY) / span) * 0.8,
+  ]);
+}
+
+// 2.0 shows the course chosen on 3.1b or 3.1c; the paces spread around the 6′00″ goal.
+function planFor(courseId: string | null, saved: SavedCourse[]): CoursePlan {
+  const recommended = fixtures.recommendedCourses.find(
+    item => item.id === courseId,
+  );
+  const mine = saved.find(item => item.id === courseId);
+  if (!recommended && !mine) {
+    return fixtures.todayPlan;
+  }
+  const distanceM = recommended?.distanceM ?? mine!.distanceM;
+  const km = Math.ceil(distanceM / 1000);
+  const base = fixtures.todayPlan.segmentPacesSecPerKm;
+  return {
+    ...fixtures.todayPlan,
+    courseId: courseId!,
+    name: mine?.myAlias ?? recommended?.name ?? mine!.name,
+    distanceM,
+    route: recommended?.route ?? fixtures.todayPlan.route,
+    segmentPacesSecPerKm: Array.from(
+      { length: km },
+      (_, index) => base[index % base.length],
+    ),
+    expectedDurationSec:
+      recommended?.estimatedDurationSec ?? mine!.expectedMinutes * 60,
+  };
+}
+
 type Account = {
   password: string;
   phoneNumber: string;
@@ -164,6 +213,8 @@ export function createMockRepositories(
     ]),
   );
   let notifications = fixtures.notifications;
+  let saved = fixtures.savedCourses;
+  let chosen: string | null = null;
   let music = musicFor(options.scenario);
   const loginFailures = new Map<
     string,
@@ -332,8 +383,50 @@ export function createMockRepositories(
         ),
     },
     courses: {
-      getSaved: () => respond(fixtures.savedCourses, options),
-      getTodayPlan: () => respond(fixtures.todayPlan, options),
+      getSaved: () => respond(saved, options),
+      getTodayPlan: () => respond(planFor(chosen, saved), options),
+      getOrigins: () => respond(fixtures.origins, options),
+      recommend: () => {
+        if (options.scenario === 'courseError') {
+          return fail(new DataError('UNKNOWN', '추천 실패'), options);
+        }
+        return respond(
+          options.scenario === 'noCourses'
+            ? []
+            : fixtures.recommendedCourses.map(course => ({
+                ...course,
+                saved: saved.some(item => item.id === course.id),
+              })),
+          options,
+        );
+      },
+      save: courseId => {
+        const course = fixtures.recommendedCourses.find(
+          item => item.id === courseId,
+        );
+        if (course && !saved.some(item => item.id === courseId)) {
+          saved = [
+            ...saved,
+            {
+              id: course.id,
+              name: course.name,
+              myAlias: null,
+              distanceM: course.distanceM,
+              expectedMinutes: Math.round(course.estimatedDurationSec / 60),
+              shape: shapeOf(course.route),
+            },
+          ];
+        }
+        return respond(undefined, options);
+      },
+      unsave: courseId => {
+        saved = saved.filter(item => item.id !== courseId);
+        return respond(undefined, options);
+      },
+      choose: courseId => {
+        chosen = courseId;
+        return respond(undefined, options);
+      },
     },
     notifications: {
       list: () =>
