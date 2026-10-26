@@ -9,7 +9,8 @@ import com.facebook.react.defaults.DefaultReactActivityDelegate
 
 class MainActivity : ReactActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
-    super.onCreate(savedInstanceState)
+    // react-native-screens cannot restore fragments after process death, so start fresh.
+    super.onCreate(null)
     HealthConnectPermissionDelegate.setPermissionDelegate(this)
   }
 

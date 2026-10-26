@@ -1,18 +1,40 @@
-import React from 'react';
-import { StatusBar, StyleSheet } from 'react-native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { HealthScreen } from './src/screens/HealthScreen';
-import { provider } from './src/health/healthProvider';
-export default function App() {
+import React, { useMemo } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ToastProvider } from './src/components';
+import { appConfig } from './src/config';
+import {
+  createRepositories,
+  DataProvider,
+  type Repositories,
+} from './src/data';
+import { RootNavigator } from './src/navigation/RootNavigator';
+import { SessionProvider } from './src/session/SessionProvider';
+import { ThemeProvider, type ThemePreference } from './src/theme';
+
+export default function App({
+  repositories,
+  initialSignedIn = false,
+  initialTheme = 'system',
+}: {
+  repositories?: Repositories;
+  initialSignedIn?: boolean;
+  initialTheme?: ThemePreference;
+}) {
+  const data = useMemo(
+    () => repositories ?? createRepositories(appConfig.dataSource),
+    [repositories],
+  );
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle="light-content" />
-      <SafeAreaView style={styles.root}>
-        <HealthScreen provider={provider} />
-      </SafeAreaView>
+      <ThemeProvider initialPreference={initialTheme}>
+        <DataProvider repositories={data}>
+          <SessionProvider initialSignedIn={initialSignedIn}>
+            <ToastProvider>
+              <RootNavigator />
+            </ToastProvider>
+          </SessionProvider>
+        </DataProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0B0C10' },
-});
