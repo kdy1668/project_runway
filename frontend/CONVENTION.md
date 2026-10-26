@@ -18,6 +18,7 @@
 | `src/data/` | Repository 인터페이스(`types.ts`), 목 구현(`mock/`), `DataProvider`·`useResource` |
 | `src/session/` | 로그인 여부. 토큰 저장은 인증 API 연동 업무에서 추가한다 |
 | `src/screens/` | 화면. 아직 구현하지 않은 화면은 `PlaceholderScreen`이 대신한다 |
+| `src/screens/onboarding/` | 1.x 시작·로그인·회원가입·초기 설정·워치 연결·비밀번호 찾기(S15P31E105-145) |
 | `assets/fonts/` | Noto Sans KR(400·500·700·900), Barlow(400~700). 라이선스는 `assets/licenses/` |
 
 ## 2. 화면 이동
@@ -30,7 +31,11 @@
   `routes`와 해당 목록(`authRoutes`·`mainRoutes`·`runTabRoutes`·`groupTabRoutes`)에 추가한다.
 - 다른 화면으로 갈 때는 `navigateTo(navigation, 'RunMode')`를 쓴다. 탭 안 화면이면 탭을 거쳐 이동한다.
 - 상태 화면(1.2r·2.1La·4.5F·6.2f 등)은 별도 화면으로 만들지 않고 해당 화면의 상태로 구현한다.
-- 화면을 구현하면 `RootNavigator.tsx`에서 그 이름의 자리 화면을 실제 컴포넌트로 바꾼다.
+- 화면을 구현하면 `RootNavigator.tsx`의 `screens`에 실제 컴포넌트를 넣어 자리 화면을 바꾼다.
+  1.x 화면은 `src/screens/onboarding/index.tsx`의 `onboardingScreens`로 한 번에 넣는다.
+- 회원가입은 1.3 계정 → 1.4 동의 → 1.5 기본 프로필을 `SignUpDraftProvider`에 모은 뒤 1.5의 다음에서
+  U15 회원가입을 한 번 호출한다. 1.6 러닝 프로필부터는 가입된 계정으로 저장하고, 1.6w 휴대폰만 또는
+  1.7 시작하기에서 `signIn`으로 홈에 들어간다. 로그인한 계정의 `onboardingCompleted`가 false면 1.6부터 이어 간다.
 
 ## 3. 디자인 토큰
 
@@ -38,6 +43,7 @@
   원래 색 값은 `palette`에 있다. 디자인 1차 시안(S15P31E105-89)이 나오면 `tokens.ts`·`themes.ts`의 값만 바꾼다.
 - 다크는 2.1 홈·6.0 그룹, 라이트는 2.1La·7.1 커뮤니티를 따른다. 기본값은 기기 설정이며
   8.1 설정의 화면 모드에서 바꿀 수 있다. 하단 탭 바는 프로토타입처럼 두 모드 모두 어두운 색이다.
+- 1.x 온보딩 화면은 프로토타입처럼 화면 모드와 관계없이 항상 다크다. 흰색 주 버튼(`inverse`)이 어두운 배경을 전제로 한다.
 - 글자는 `AppText`의 `variant`(`display`·`heading`·`body`·`caption`·`metric` 등)로 고른다.
   Android는 굵기를 파일로 구분하므로 `fontWeight` 대신 variant의 `fontFamily`를 쓴다.
   숫자는 프로토타입의 Bahnschrift 대신 대체 글꼴인 Barlow를 쓴다.
@@ -87,9 +93,30 @@ function Greeting() {
 - API 연동 업무에서는 같은 `Repositories`를 구현한 API 저장소를 만들고 `src/config.ts`의 `dataSource`와
   `createRepositories`에 추가한다. 화면은 바꾸지 않는다.
 - 화면 안에 목 값을 직접 쓰지 않는다. 시연 버튼이 필요한 상태는 목 시나리오로 만든다.
+- 오류에 따라 화면이 달라지는 호출은 `DataError`의 `code`(API 명세의 오류 코드)와 `failedCount`로 구분한다.
+
+목 데이터로 1.x 화면을 확인할 때는 아래 값을 쓴다. 값은 `src/data/mock/fixtures.ts`에 있다.
+
+| 상황 | 값 |
+| --- | --- |
+| 로그인 | 아이디 `minjun01` · 비밀번호 `runway123` (5회 틀리면 10분 제한) |
+| 이미 사용 중인 아이디 | `minjun01`, `runner01` |
+| 가입된 전화번호(비밀번호 찾기) | `010-2483-5917`. 그 밖의 번호는 1.2r 가입되지 않은 번호 |
+| 인증번호 | `482913`. 그 밖의 값은 1.2s 인증번호 오류(5회 틀리면 다시 받기) |
+| 1.8 워치 연결 문제 | `createMockRepositories({ scenario: 'watchDisconnected' })` |
 
 ## 6. 와이어프레임과 다른 점
 
 - 유리 흐림(backdrop-filter)은 React Native 기본 기능에 없어 반투명 배경만 쓴다. 흐림이 필요하면 별도 라이브러리를 검토한다.
 - 2.P의 하단 호를 끌어 넘기는 동작은 홈 화면 업무(S15P31E105-146)에서 구현한다. 지금은 아이콘을 눌러 이동한다.
 - 프로토타입의 상단 상태 표시(12:45·87%)는 기기 상태 표시줄을 쓴다.
+- 1.x 온보딩(S15P31E105-145)
+  - 1.1·1.2의 흐린 러너 사진은 출처가 정해지지 않아 어두운 그라데이션으로 대신한다. 디자인 1차 시안(S15P31E105-89)에서 정한다.
+  - 1.3 전화번호는 프로토타입에 인증 완료 상태만 있어 인증번호 받기 → 6자리 입력(3분) → 인증 완료 순서를 더했다.
+  - 1.4 버튼 문구는 ‘동의하고 가입하기’ 그대로지만, U15가 닉네임·성별·생년월일을 함께 받아야 해서 계정은 1.5 다음에서 만든다.
+    계정을 만든 뒤에는 1.5에서 뒤로 가지 않는다. 1.4의 ‘보기’는 약관 전문이 정해질 때까지 항목 설명만 보여 준다.
+  - 1.5 생년월일 선택은 React Native에 드롭다운이 없어 아래에서 올라오는 목록으로 고른다.
+  - 1.7·1.8 하단의 큰 호 손잡이는 가로 밀기 막대로 구현했다. 화면 낭독기에서는 두 번 탭으로 실행한다.
+  - 프로토타입의 예시 아이디 `minjun_run`은 API 규칙(영문·숫자 4–16자)에 맞지 않아 목 계정은 `minjun01`이다.
+  - 전화번호 인증·비밀번호 재설정 API는 아직 명세가 없어 `auth.requestPhoneCode`·`verifyPhoneCode`·`resetPassword`는
+    화면에 필요한 모양으로 정했다. 로그인 실패 횟수(2/5)도 U01 오류 응답에 없어 `failedCount`가 있을 때만 표시한다.

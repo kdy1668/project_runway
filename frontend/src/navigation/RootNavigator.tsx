@@ -9,6 +9,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { appConfig } from '../config';
 import { ComponentGalleryScreen } from '../screens/ComponentGalleryScreen';
+import { onboardingScreens, SignUpDraftProvider } from '../screens/onboarding';
 import { PlaceholderScreen } from '../screens/PlaceholderScreen';
 import { HomePreview, SettingsPreview } from '../screens/previews';
 import { useSession } from '../session/SessionProvider';
@@ -63,6 +64,12 @@ const placeholders = Object.fromEntries(
   }),
 ) as unknown as Record<RouteName, React.ComponentType>;
 
+// Implemented screens replace their placeholders here.
+const screens: Record<RouteName, React.ComponentType> = {
+  ...placeholders,
+  ...onboardingScreens,
+};
+
 const modalRoutes: ReadonlySet<RouteName> = new Set<RouteName>([
   'MusicCard',
   'MusicSource',
@@ -82,7 +89,7 @@ function RunTab() {
         <RunStack.Screen
           key={name}
           name={name}
-          component={placeholders[name]}
+          component={screens[name]}
         />
       ))}
     </RunStack.Navigator>
@@ -96,7 +103,7 @@ function GroupTab() {
         <GroupStack.Screen
           key={name}
           name={name}
-          component={placeholders[name]}
+          component={screens[name]}
         />
       ))}
     </GroupStack.Navigator>
@@ -110,10 +117,10 @@ function renderTabBar(props: React.ComponentProps<typeof PillTabBar>) {
 function MainTabs() {
   return (
     <Tabs.Navigator screenOptions={noHeader} tabBar={renderTabBar}>
-      <Tabs.Screen name="HomeTab" component={placeholders.Home} />
+      <Tabs.Screen name="HomeTab" component={screens.Home} />
       <Tabs.Screen name="RunTab" component={RunTab} />
       <Tabs.Screen name="GroupTab" component={GroupTab} />
-      <Tabs.Screen name="CommunityTab" component={placeholders.Community} />
+      <Tabs.Screen name="CommunityTab" component={screens.Community} />
     </Tabs.Navigator>
   );
 }
@@ -142,6 +149,7 @@ export function RootNavigator() {
   };
   return (
     <NavigationContainer theme={navigationTheme}>
+      <SignUpDraftProvider>
       <Root.Navigator screenOptions={noHeader}>
         {/* 1.7 워치 연결 exists in both groups; the key makes sign-in/out start a fresh stack instead of staying on it. */}
         {signedIn ? (
@@ -151,7 +159,7 @@ export function RootNavigator() {
               <Root.Screen
                 key={route}
                 name={route}
-                component={placeholders[route]}
+                component={screens[route]}
                 options={
                   modalRoutes.has(route) ? { presentation: 'modal' } : undefined
                 }
@@ -173,12 +181,13 @@ export function RootNavigator() {
               <Root.Screen
                 key={route}
                 name={route}
-                component={placeholders[route]}
+                component={screens[route]}
               />
             ))}
           </Root.Group>
         )}
       </Root.Navigator>
+      </SignUpDraftProvider>
     </NavigationContainer>
   );
 }
