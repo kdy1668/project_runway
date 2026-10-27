@@ -14,7 +14,7 @@ import {
 } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Polyline } from 'react-native-svg';
-import { AppText, EmptyState, IconButton } from '../../components';
+import { AppText, Backdrop, EmptyState, IconButton } from '../../components';
 import {
   useRepositories,
   useResource,
@@ -32,7 +32,6 @@ import {
 import { navigateTo } from '../../navigation/navigateTo';
 import type { RootStackParamList } from '../../navigation/types';
 import { radius, size, spacing, useTheme } from '../../theme';
-import { PhotoBackground } from '../home/parts';
 import { MonthStepper, kstMonth, shiftMonth, weekGroups } from './parts';
 
 const filters: { value: RecordFilter; label: string }[] = [
@@ -40,9 +39,6 @@ const filters: { value: RecordFilter; label: string }[] = [
   { value: 'SOLO', label: '개인' },
   { value: 'GROUP', label: '그룹런' },
 ];
-
-// How far the photo stays sharp before the list scrolls over it.
-const heroHeight = 260;
 
 function Stat({
   label,
@@ -177,36 +173,23 @@ export function RecordsScreen() {
   const data = useResource(
     useCallback(
       (repositories: Repositories) =>
-        Promise.all([
-          repositories.records.getMonth(month, filter),
-          repositories.home.getBackdrop(),
-        ]),
+        repositories.records.getMonth(month, filter),
       [month, filter],
     ),
   );
-  const [records, backdrop] = data.status === 'ready' ? data.data : [];
-  const photo = backdrop
-    ? colors.statusBar === 'light-content'
-      ? backdrop.dark
-      : backdrop.light
-    : null;
+  const records = data.status === 'ready' ? data.data : null;
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={colors.statusBar} />
-      {/* The photo fills the top of the screen behind the month totals, as on 5.1. */}
-      <View style={styles.photo} pointerEvents="none">
-        <PhotoBackground
-          photo={photo}
-          scrollY={scrollY}
-          sharpFor={heroHeight}
-        />
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Backdrop />
       </View>
       <Animated.ScrollView
         contentContainerStyle={[
           styles.content,
           {
-            paddingTop: insets.top + size.header + 120,
+            paddingTop: insets.top + size.header + spacing.xl,
             paddingBottom: insets.bottom + spacing.xxxl,
           },
         ]}
@@ -353,7 +336,7 @@ export function RecordsScreen() {
         )}
       </Animated.ScrollView>
       <View style={[styles.header, { paddingTop: insets.top }]}>
-        {/* Once the month row scrolls up to it, the header gets a solid background. */}
+        {/* As soon as the list moves under it, the header gets a solid background. */}
         <Animated.View
           pointerEvents="none"
           style={[
@@ -361,10 +344,7 @@ export function RecordsScreen() {
             {
               backgroundColor: colors.background,
               opacity: scrollY.interpolate({
-                inputRange: [
-                  heroHeight - size.header * 2,
-                  heroHeight - size.header,
-                ],
+                inputRange: [0, spacing.xxxl],
                 outputRange: [0, 1],
                 extrapolate: 'clamp',
               }),
@@ -386,14 +366,6 @@ export function RecordsScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  photo: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 520,
-    overflow: 'hidden',
-  },
   flex: { flex: 1 },
   content: { paddingHorizontal: spacing.screen, gap: spacing.xl },
   header: {

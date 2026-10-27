@@ -106,21 +106,14 @@ test('home shows the prototype values and re-sorts past runs', async () => {
   await act(async () => screen.unmount());
 });
 
-test.each([
-  ['dark', 'file:///dark.jpg'],
-  ['light', 'file:///light.jpg'],
-] as const)(
-  'the %s home uses its own background photo and keeps the profile photo as the avatar',
-  async (theme, backdrop) => {
+test.each(['dark', 'light'] as const)(
+  'the %s home has no background photo and keeps the profile photo as the avatar',
+  async theme => {
     const repositories = createMockRepositories({ latencyMs: 0 });
     const getMe = repositories.profile.getMe;
     repositories.profile.getMe = async () => ({
       ...(await getMe()),
       profileImageUrl: 'file:///profile.jpg',
-    });
-    repositories.home.getBackdrop = async () => ({
-      dark: 'file:///dark.jpg',
-      light: 'file:///light.jpg',
     });
     let screen: Screen;
     await act(async () => {
@@ -133,16 +126,14 @@ test.each([
       );
     });
     await settle();
-    const images = (uri: string) =>
-      screen!.root.findAll(
-        node => node.props.source?.uri === uri && typeof node.type === 'string',
-      );
-    // Sharp background plus the blurred copy that fades in on scroll.
-    expect(images(backdrop)).toHaveLength(2);
-    expect(images(backdrop).some(node => node.props.blurRadius === 18)).toBe(
-      true,
+    const images = screen!.root.findAll(
+      node =>
+        node.props.source?.uri !== undefined && typeof node.type === 'string',
     );
-    expect(images('file:///profile.jpg')).toHaveLength(1);
+    // Only the avatar shows a photo; the background is the default backdrop.
+    expect(images.map(node => node.props.source.uri)).toEqual([
+      'file:///profile.jpg',
+    ]);
     await act(async () => screen!.unmount());
   },
 );
