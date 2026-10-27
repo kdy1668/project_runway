@@ -132,14 +132,19 @@ public class PostService {
     @Transactional(readOnly = true)
     public PostDetailResponse getDetail(long userId, long postId) {
         requireExistingUser(userId);
-        Post post = requireActivePost(postId);
-        requireAccountAccess(userId, post.getAuthorId());
+        Post post = requireReadablePost(userId, postId);
 
         String nickname =
                 communityUserQueryRepository.findNickname(post.getAuthorId()).orElse(null);
         SessionShareInfo session =
                 runningSessionLookupRepository.findById(post.getSessionId()).orElse(null);
         return PostDetailResponse.from(post, nickname, session);
+    }
+
+    public Post requireReadablePost(long userId, long postId) {
+        Post post = requireActivePost(postId);
+        requireAccountAccess(userId, post.getAuthorId());
+        return post;
     }
 
     @Transactional
