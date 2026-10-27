@@ -207,6 +207,29 @@ const icons = {
       <Path d="m9 9 6 6" />
     </>
   ),
+  stop: <Rect x="6" y="6" width="12" height="12" rx="2" />,
+  turnLeft: (
+    <>
+      <Polyline points="9 14 4 9 9 4" />
+      <Path d="M20 20v-7a4 4 0 0 0-4-4H4" />
+    </>
+  ),
+  straight: (
+    <>
+      <Polyline points="7 9 12 4 17 9" />
+      <Path d="M12 4v16" />
+    </>
+  ),
+  locate: (
+    <>
+      <Path d="M2 12h3" />
+      <Path d="M19 12h3" />
+      <Path d="M12 2v3" />
+      <Path d="M12 19v3" />
+      <Circle cx="12" cy="12" r="7" />
+      <Circle cx="12" cy="12" r="3" />
+    </>
+  ),
 } as const;
 
 export type IconName = keyof typeof icons;
@@ -216,6 +239,7 @@ const filled: ReadonlySet<IconName> = new Set<IconName>([
   'skipBack',
   'skipForward',
   'pause',
+  'stop',
 ]);
 
 export function Icon({

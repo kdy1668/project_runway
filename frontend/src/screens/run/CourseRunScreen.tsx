@@ -9,6 +9,7 @@ import { radius, spacing, useTheme } from '../../theme';
 import { MapScreenFrame } from './MapScreenFrame';
 import { MockMap, paceColors } from './MockMap';
 import { PlaceCard, RunStartBar } from './parts';
+import type { RunConfig } from './RunSession';
 
 const loadCourse = (repositories: Repositories) =>
   Promise.all([
@@ -56,6 +57,15 @@ export function CourseRunScreen() {
   const resource = useResource(useCallback(loadCourse, []));
   const [plan, place] = resource.status === 'ready' ? resource.data : [];
   const glass = { backgroundColor: colors.surface, borderColor: colors.border };
+  // A course run aims at the course distance and the plan's pace.
+  const courseConfig: RunConfig | null = plan
+    ? {
+        mode: 'COURSE',
+        plan,
+        goalDistanceM: plan.distanceM,
+        goalPaceSecPerKm: plan.targetPaceSecPerKm,
+      }
+    : null;
 
   const top = !plan ? null : night && place ? (
     <PlaceCard name={place.name} gps={place.gps} />
@@ -103,7 +113,7 @@ export function CourseRunScreen() {
         </View>
         <ChangeLink />
       </View>
-      <RunStartBar night />
+      <RunStartBar night config={courseConfig} />
     </>
   ) : (
     <>
@@ -123,7 +133,7 @@ export function CourseRunScreen() {
           ) : null}
         </AppText>
       </View>
-      <RunStartBar night={false} />
+      <RunStartBar night={false} config={courseConfig} />
     </>
   );
 

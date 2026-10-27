@@ -1,3 +1,4 @@
+import { routeLengthM, walkAlong } from '../../geo';
 import { DataError } from '../errors';
 import type {
   AuthSession,
@@ -8,6 +9,7 @@ import type {
   RecordSort,
   Repositories,
   RunRecordSummary,
+  RunSample,
   SavedCourse,
   TodayCondition,
 } from '../types';
@@ -34,11 +36,15 @@ export type MockScenario =
   | 'night'
   // 3.1 추천 결과 없음 · 추천 실패.
   | 'noCourses'
-  | 'courseError';
+  | 'courseError'
+  // 4.5 휴대폰에 저장하지 못했어요.
+  | 'recordSaveFailed';
 
 export type MockOptions = {
   scenario?: MockScenario;
   latencyMs?: number;
+  // Real time between run samples; tests shorten it. Each sample is one second of running.
+  tickMs?: number;
 };
 
 function respond<T>(
@@ -184,6 +190,22 @@ function planFor(courseId: string | null, saved: SavedCourse[]): CoursePlan {
     ),
     expectedDurationSec:
       recommended?.estimatedDurationSec ?? mine!.expectedMinutes * 60,
+  };
+}
+
+// One second of a steady mock run: pace drifts around 5′58″, heart rate climbs to the 150s.
+function nextSample(previous: RunSample): RunSample {
+  const elapsedSec = previous.elapsedSec + 1;
+  const paceSecPerKm = Math.round(358 + 8 * Math.sin(elapsedSec / 20));
+  return {
+    elapsedSec,
+    distanceM: previous.distanceM + 1000 / paceSecPerKm,
+    paceSecPerKm,
+    heartRate: Math.round(
+      Math.min(158, 120 + elapsedSec / 4) + 3 * Math.sin(elapsedSec / 7),
+    ),
+    cadence: Math.round(170 + 2 * Math.sin(elapsedSec / 9)),
+    position: previous.position,
   };
 }
 
@@ -423,6 +445,21 @@ export function createMockRepositories(
         saved = saved.filter(item => item.id !== courseId);
         return respond(undefined, options);
       },
+      saveFromRun: ({ recordId, route, distanceM, durationSec }) => {
+        const id = `course-${recordId}`;
+        saved = [
+          ...saved.filter(item => item.id !== id),
+          {
+            id,
+            name: '자유 러닝 코스',
+            myAlias: null,
+            distanceM: Math.round(distanceM),
+            expectedMinutes: Math.round(durationSec / 60),
+            shape: shapeOf(route),
+          },
+        ];
+        return respond({ courseId: id }, options);
+      },
       choose: courseId => {
         chosen = courseId;
         return respond(undefined, options);
@@ -441,6 +478,30 @@ export function createMockRepositories(
     },
     run: {
       getCurrentPlace: () => respond(fixtures.currentPlace, options),
+      startTracking: (from, route, onSample) => {
+        let sample = from;
+        const path = route ?? fixtures.freeRunTrack;
+        const lap = routeLengthM(path);
+        const timer = setInterval(() => {
+          sample = nextSample(sample);
+          const along = walkAlong(path, sample.distanceM % lap);
+          sample = { ...sample, position: along[along.length - 1] };
+          const step = fixtures.guidance.find(
+            item => sample.distanceM < item.untilM,
+          );
+          onSample(
+            sample,
+            step
+              ? { instruction: step.instruction, detail: step.detail }
+              : null,
+          );
+        }, options.tickMs ?? 1000);
+        return () => clearInterval(timer);
+      },
+      saveRecord: () =>
+        options.scenario === 'recordSaveFailed'
+          ? fail(new DataError('UNKNOWN', '기록 저장 실패'), options)
+          : respond({ recordId: 'run-new' }, options),
     },
     music: {
       getState: () => respond(music, options),
