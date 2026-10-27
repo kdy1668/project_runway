@@ -1,22 +1,28 @@
 package com.runway.backend;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import jakarta.persistence.EntityManagerFactory;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@AutoConfigureMockMvc
 @Testcontainers
 class BackendApplicationIntegrationTest {
 
@@ -37,13 +43,14 @@ class BackendApplicationIntegrationTest {
     @Autowired private EntityManagerFactory entityManagerFactory;
     @Autowired private Flyway flyway;
     @Autowired private Environment environment;
+    @Autowired private MockMvc mockMvc;
 
     @Test
     void 빈DB_기동_연결구성과확장을확인한다() {
         assertThat(jdbc.queryForObject("SELECT 1", Integer.class)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT postgis_version()", String.class)).startsWith("3.6");
         assertThat(entityManagerFactory.isOpen()).isTrue();
-        assertThat(entityManagerFactory.getMetamodel().getEntities()).isEmpty();
+        assertThat(entityManagerFactory.getMetamodel().getEntities()).isNotEmpty();
         assertThat(flyway.info().pending()).isEmpty();
         assertThat(flyway.info().applied()).hasSize(1);
         assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("1");
@@ -89,5 +96,14 @@ class BackendApplicationIntegrationTest {
                         "user_follows",
                         "notifications",
                         "running_metric_samples");
+    }
+
+    @Test
+    void OpenAPI문서와_Swagger_UI경로를_제공한다() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.info.title").value("RunWay API"));
+
+        mockMvc.perform(get("/swagger-ui/index.html")).andExpect(status().isOk());
     }
 }
