@@ -45,6 +45,13 @@ class BackendApplicationIntegrationTest {
         assertThat(entityManagerFactory.isOpen()).isTrue();
         assertThat(entityManagerFactory.getMetamodel().getEntities()).isEmpty();
         assertThat(flyway.info().pending()).isEmpty();
+        assertThat(flyway.info().applied()).hasSize(1);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("1");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM flyway_schema_history WHERE version = '1' AND success",
+                                Integer.class))
+                .isEqualTo(1);
         assertThat(environment.getProperty("spring.jpa.hibernate.ddl-auto")).isEqualTo("validate");
         assertThat(environment.getProperty("spring.jpa.open-in-view", Boolean.class)).isFalse();
         assertThat(
@@ -55,6 +62,32 @@ class BackendApplicationIntegrationTest {
                   AND tablename NOT IN ('spatial_ref_sys', 'flyway_schema_history')
                 """,
                                 String.class))
-                .isEmpty();
+                .containsExactlyInAnyOrder(
+                        "sync_batches",
+                        "daily_readiness",
+                        "users",
+                        "pace_plans",
+                        "group_runs",
+                        "crew_memberships",
+                        "pace_plan_segments",
+                        "group_run_participants",
+                        "running_route_points",
+                        "post_likes",
+                        "courses",
+                        "course_environment_tags",
+                        "regions",
+                        "user_profiles",
+                        "daily_health_metrics",
+                        "posts",
+                        "coaching_decisions",
+                        "crews",
+                        "running_sessions",
+                        "comments",
+                        "course_bookmarks",
+                        "user_devices",
+                        "user_settings",
+                        "user_follows",
+                        "notifications",
+                        "running_metric_samples");
     }
 }
