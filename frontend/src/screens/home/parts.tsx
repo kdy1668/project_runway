@@ -1,21 +1,13 @@
 import React from 'react';
 import {
-  Animated,
-  Image,
   Pressable,
   StyleSheet,
   View,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import Svg, {
-  Defs,
-  LinearGradient,
-  Polyline,
-  Rect,
-  Stop,
-} from 'react-native-svg';
-import { AppText, Backdrop } from '../../components';
+import Svg, { Polyline } from 'react-native-svg';
+import { AppText } from '../../components';
 import { radius, spacing, useTheme } from '../../theme';
 
 // The rounded glass panels that stack on 2.1 홈 (러닝 분석, 과거 러닝 기록, 저장한 코스).
@@ -147,63 +139,6 @@ export function ListRow({
   );
 }
 
-// The profile photo behind 2.1 홈 and 5.1 전체 기록. It stays sharp for `sharpFor` points of scrolling,
-// then blurs as the cards scroll over it.
-export function PhotoBackground({
-  photo,
-  scrollY,
-  sharpFor,
-}: {
-  photo: string | null;
-  scrollY: Animated.Value;
-  sharpFor: number;
-}) {
-  const { colors } = useTheme();
-  if (!photo) {
-    return <Backdrop />;
-  }
-  return (
-    <>
-      <Image source={{ uri: photo }} style={styles.photo} />
-      {/* The prototype blurs the profile photo as the cards scroll over it. */}
-      <Animated.Image
-        source={{ uri: photo }}
-        blurRadius={18}
-        style={[
-          styles.photo,
-          {
-            opacity: scrollY.interpolate({
-              inputRange: [0, sharpFor],
-              outputRange: [0, 1],
-              extrapolate: 'clamp',
-            }),
-          },
-        ]}
-      />
-      <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
-        <Defs>
-          <LinearGradient id="photoFade" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={colors.background} stopOpacity={0.35} />
-            <Stop offset="0.22" stopColor={colors.background} stopOpacity={0} />
-            <Stop
-              offset="0.42"
-              stopColor={colors.background}
-              stopOpacity={0.15}
-            />
-            <Stop
-              offset="0.64"
-              stopColor={colors.background}
-              stopOpacity={0.78}
-            />
-            <Stop offset="0.88" stopColor={colors.background} stopOpacity={1} />
-          </LinearGradient>
-        </Defs>
-        <Rect width="100%" height="100%" fill="url(#photoFade)" />
-      </Svg>
-    </>
-  );
-}
-
 const styles = StyleSheet.create({
   card: {
     borderRadius: radius.xl + 2,
@@ -239,12 +174,4 @@ const styles = StyleSheet.create({
   },
   rowText: { flex: 1, gap: spacing.xxs },
   pressed: { opacity: 0.7 },
-  photo: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: '100%',
-    height: '100%',
-    transform: [{ scale: 1.08 }],
-  },
 });

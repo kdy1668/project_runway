@@ -3,7 +3,6 @@ import type {
   AppNotification,
   CoursePlan,
   CurrentPlace,
-  HomeBackdrop,
   MonthlyRunSummary,
   MusicLibrary,
   MusicState,
@@ -59,11 +58,9 @@ export const disconnectedWatch: WatchConnection = {
   },
 };
 
-// The profile photo behind 2.1 홈, taken from the prototype. It is a third-party poster kept only as
-// mock data; replace it before release.
+// The 2.1 홈 avatar, taken from the prototype. It is a third-party poster kept only as mock data;
+// replace it before release.
 const mockProfilePhoto = require('../../../assets/images/mock-profile.jpg');
-// 2.1La's brighter background photo, also a third-party poster from the prototype.
-const mockLightBackdrop = require('../../../assets/images/mock-backdrop-light.jpg');
 
 const assetUri = (asset: number) =>
   Image.resolveAssetSource(asset)?.uri ?? null;
@@ -74,12 +71,6 @@ export const me: UserProfile = {
   nickname: '민준',
   runningLevel: 'intermediate',
   profileImageUrl: assetUri(mockProfilePhoto),
-};
-
-// 2.1 dark uses the profile photo; 2.1La uses the brighter photo.
-export const homeBackdrop: HomeBackdrop = {
-  dark: assetUri(mockProfilePhoto),
-  light: assetUri(mockLightBackdrop),
 };
 
 export const todayCondition: TodayCondition = {

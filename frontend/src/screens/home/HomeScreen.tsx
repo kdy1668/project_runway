@@ -1,9 +1,9 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Animated,
   Image,
   Pressable,
+  ScrollView,
   StatusBar,
   StyleSheet,
   View,
@@ -15,6 +15,7 @@ import {
 } from 'react-native-safe-area-context';
 import {
   AppText,
+  Backdrop,
   Button,
   Icon,
   IconButton,
@@ -37,13 +38,7 @@ import {
 } from '../../format';
 import { navigateTo } from '../../navigation/navigateTo';
 import { radius, size, spacing, useTheme } from '../../theme';
-import {
-  CardTitle,
-  GlassCard,
-  ListRow,
-  PhotoBackground,
-  PillLink,
-} from './parts';
+import { CardTitle, GlassCard, ListRow, PillLink } from './parts';
 import { ReadinessSection } from './ReadinessSection';
 
 const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
@@ -61,11 +56,10 @@ const loadHome = (repositories: Repositories) =>
     repositories.home.getMonthlySummary(),
     repositories.courses.getSaved(),
     repositories.notifications.list(),
-    repositories.home.getBackdrop(),
   ]);
 
-// How far the hero photo stays sharp before it blurs behind the cards.
-const heroHeight = 200;
+// Space above the greeting. The prototype leaves room here for the photo, which S15P31E105-186 removed.
+const heroHeight = 96;
 
 function Avatar({
   nickname,
@@ -147,16 +141,13 @@ function RecordsCard() {
 // 2.1 홈 (dark) and 2.1La 홈 라이트, following the app's screen mode.
 export function HomeScreen() {
   const navigation = useNavigation();
-  const { colors, name } = useTheme();
+  const { colors } = useTheme();
   const repositories = useRepositories();
   const home = useResource(useCallback(loadHome, []));
-  const scrollY = useRef(new Animated.Value(0)).current;
   const insets = useSafeAreaInsets();
-  const [me, today, summary, courses, notifications, backdrops] =
+  const [me, today, summary, courses, notifications] =
     home.status === 'ready' ? home.data : [];
   const photo = me?.profileImageUrl ?? null;
-  // The background follows the screen mode (2.1 / 2.1La); the avatar always shows the profile photo.
-  const backdrop = backdrops?.[name] ?? photo;
   const unread = notifications?.some(item => !item.read) ?? false;
   const peak = summary ? Math.max(...summary.weekdayRatios) : 0;
 
@@ -164,23 +155,14 @@ export function HomeScreen() {
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={colors.statusBar} />
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        <PhotoBackground
-          photo={backdrop}
-          scrollY={scrollY}
-          sharpFor={heroHeight}
-        />
+        <Backdrop />
       </View>
-      <Animated.ScrollView
+      <ScrollView
         contentContainerStyle={[
           styles.content,
           { paddingTop: insets.top + size.header },
         ]}
         showsVerticalScrollIndicator={false}
-        scrollEventThrottle={16}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: true },
-        )}
       >
         <View style={styles.hero} />
         <View style={styles.greeting}>
@@ -324,7 +306,7 @@ export function HomeScreen() {
             />
           </GlassCard>
         ) : null}
-      </Animated.ScrollView>
+      </ScrollView>
       {/* The header floats over the cards as they scroll up, as in the prototype. */}
       <SafeAreaView
         edges={['top']}

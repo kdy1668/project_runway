@@ -9,7 +9,7 @@ export type UserProfile = {
   id: string;
   nickname: string;
   runningLevel: 'beginner' | 'intermediate' | 'advanced';
-  // 2.1 홈 uses the profile photo as its background; null shows the default backdrop.
+  // 2.1 홈 avatar; null shows the first letter of the nickname.
   profileImageUrl: string | null;
 };
 
@@ -31,10 +31,6 @@ export type TodayCondition = {
   // 2.P′ 오래된 데이터: when the last score was made.
   lastAssessedDate: string | null;
 };
-
-// 2.1 홈 배경. The real API returns the profile photo for both; the mock follows the prototype,
-// which pairs the light mode (2.1La) with a brighter photo.
-export type HomeBackdrop = { dark: string | null; light: string | null };
 
 // 2.1 러닝 분석 card.
 export type MonthlyRunSummary = {
@@ -373,7 +369,6 @@ export type Repositories = {
   home: {
     getTodayCondition: () => Promise<TodayCondition>;
     getMonthlySummary: () => Promise<MonthlyRunSummary>;
-    getBackdrop: () => Promise<HomeBackdrop>;
   };
   records: {
     // 2.1 과거 러닝 기록: my own runs only; group runs are listed in 5.1.

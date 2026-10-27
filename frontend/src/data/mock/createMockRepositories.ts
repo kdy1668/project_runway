@@ -406,7 +406,6 @@ export function createMockRepositories(
     home: {
       getTodayCondition: () => respond(conditionFor(options.scenario), options),
       getMonthlySummary: () => respond(fixtures.monthlySummary, options),
-      getBackdrop: () => respond(fixtures.homeBackdrop, options),
     },
     records: {
       getRecent: (sort, limit) =>
