@@ -107,6 +107,11 @@ URL·사용자 이름은 개인 `.env`의 설정과 맞춘다. 정상 기동은 
 확인한다. 아직 업무 API가 없어 루트 경로 요청의 404는 예상된 결과다. 테스트 전용
 `/__test/echo`는 실행 JAR에 포함되지 않는다. 서버는 IntelliJ 종료 버튼 또는 Ctrl+C로 종료한다.
 
+OpenAPI·Swagger UI는 springdoc-openapi로 제공한다. 서버 기동 후 로컬에서
+`http://127.0.0.1:8080/swagger-ui.html`(또는 `/swagger-ui/index.html`)과
+`http://127.0.0.1:8080/v3/api-docs`로 확인한다. Spring Boot 4.1.1 기준 의존성은
+`org.springdoc:springdoc-openapi-starter-webmvc-ui:3.2.0`이다.
+
 DB 중지·재시작(데이터 유지):
 
 ```text
