@@ -10,6 +10,9 @@ import com.runway.backend.domain.crew.dto.response.DecideJoinResponse;
 import com.runway.backend.domain.crew.dto.response.JoinRequestItemResponse;
 import com.runway.backend.domain.crew.dto.response.JoinRequestListResponse;
 import com.runway.backend.domain.crew.dto.response.JoinRequestResponse;
+import com.runway.backend.domain.crew.dto.response.MemberItemResponse;
+import com.runway.backend.domain.crew.dto.response.MemberLeaveResponse;
+import com.runway.backend.domain.crew.dto.response.MemberListResponse;
 import com.runway.backend.domain.crew.dto.response.MyCrewItemResponse;
 import com.runway.backend.domain.crew.dto.response.MyCrewListResponse;
 import com.runway.backend.domain.crew.entity.Crew;
@@ -249,6 +252,69 @@ public class CrewService {
             membership.reject();
         }
         return DecideJoinResponse.from(membership);
+    }
+
+    @Transactional(readOnly = true)
+    public MemberListResponse listMembers(long userId, long crewId) {
+        requireExistingUser(userId);
+        Crew crew = requireCrew(crewId);
+        List<CrewMembership> memberships =
+                crewMembershipRepository.findByCrewIdAndStatus(
+                        crewId, CrewMembershipStatus.APPROVED);
+        Map<Long, String> nicknames =
+                userExistsRepository.findNicknamesByIds(
+                        memberships.stream().map(CrewMembership::getUserId).toList());
+        List<MemberItemResponse> items =
+                memberships.stream()
+                        .map(
+                                m ->
+                                        MemberItemResponse.from(
+                                                m,
+                                                nicknames.getOrDefault(m.getUserId(), null),
+                                                crew.isOwnedBy(m.getUserId())))
+                        .toList();
+        return new MemberListResponse(items);
+    }
+
+    @Transactional
+    public MemberLeaveResponse leave(long userId, long crewId) {
+        requireExistingUser(userId);
+        Crew crew = requireCrew(crewId);
+        if (crew.isOwnedBy(userId)) {
+            throw new ApiException(
+                    HttpStatus.CONFLICT, "OWNER_CANNOT_LEAVE", "크루장은 권한 이양 없이 탈퇴할 수 없습니다.");
+        }
+        CrewMembership membership = requireApprovedMembership(crewId, userId);
+        membership.leave();
+        return MemberLeaveResponse.from(membership);
+    }
+
+    @Transactional
+    public MemberLeaveResponse removeMember(long ownerUserId, long crewId, long targetUserId) {
+        requireExistingUser(ownerUserId);
+        Crew crew = requireCrew(crewId);
+        requireOwner(crew, ownerUserId);
+        if (crew.isOwnedBy(targetUserId)) {
+            throw new ApiException(HttpStatus.CONFLICT, "CANNOT_REMOVE_OWNER", "크루장은 내보낼 수 없습니다.");
+        }
+        CrewMembership membership = requireApprovedMembership(crewId, targetUserId);
+        membership.leave();
+        return MemberLeaveResponse.from(membership);
+    }
+
+    private CrewMembership requireApprovedMembership(long crewId, long userId) {
+        CrewMembership membership =
+                crewMembershipRepository
+                        .findByCrewIdAndUserId(crewId, userId)
+                        .orElseThrow(CrewService::memberNotFound);
+        if (membership.getStatus() != CrewMembershipStatus.APPROVED) {
+            throw memberNotFound();
+        }
+        return membership;
+    }
+
+    private static ApiException memberNotFound() {
+        return new ApiException(HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND", "멤버를 찾을 수 없습니다.");
     }
 
     private Crew requireActiveCrew(long crewId) {

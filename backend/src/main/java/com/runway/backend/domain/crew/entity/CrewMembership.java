@@ -72,15 +72,22 @@ public class CrewMembership {
         this.status = CrewMembershipStatus.PENDING;
         this.requestedAt = Instant.now();
         this.joinedAt = null;
+        this.leftAt = null;
     }
 
     public void approve() {
         this.status = CrewMembershipStatus.APPROVED;
         this.joinedAt = Instant.now();
+        this.leftAt = null;
     }
 
     public void reject() {
         this.status = CrewMembershipStatus.REJECTED;
         this.joinedAt = null;
+    }
+
+    public void leave() {
+        this.status = CrewMembershipStatus.LEFT;
+        this.leftAt = Instant.now();
     }
 }
