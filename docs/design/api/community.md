@@ -41,12 +41,13 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 
 ### 설명
 
-본인 러닝 기록의 표시용 결과를 게시물로 공유한다. 원본 기록 소유권을 확인하며 게시물 공개 범위는 계정 정책을 따른다.
+본인 완료 러닝 세션(`sessionId`)을 게시물로 공유한다. 세션 소유권·COMPLETED 상태 검증과 `body` 저장은 **구현됨**. `title`·`imageId` 저장과 `imageUrl` 응답은 명세에 두되 **미구현**이다.
 
 ### 인증 및 권한
 
 - 로그인 사용자 본인 또는 서비스 리소스 접근 권한 검사.
 - 건강정보·실시간 위치·타인 기록 조회 시 동의 상태 및 공개 범위가 우선한다.
+- 인증 구현 전에는 임시로 `X-User-Id`(BIGINT, `users.id`) 헤더로 호출자를 식별한다.
 
 ### Path Parameters
 
@@ -60,10 +61,10 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `title` | string / object (확인 필요) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `body` | string / object (확인 필요) | O | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `title` | string | X | **미구현** — 요청에 포함해도 `posts`에 컬럼이 없어 저장하지 않음 |
+| `body` | string / null | O | `posts.body`에 저장. NULL·생략 허용 |
 | `sessionId` | integer (int64) | O | 본인의 공유할 완료 러닝 세션 BIGINT 식별자 |
-| `imageId` | string (UUID) | X | 결과 화면 사진([F01](files.md#f01-이미지-업로드)). 서버 생성 시 생략 |
+| `imageId` | string (UUID) | X | 결과 화면 사진([F01](files.md#f01-이미지-업로드)). **미구현** — 받아도 저장·검증하지 않음 |
 
 ```json
 {
@@ -83,8 +84,7 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
   "authorId": 101,
   "sessionId": 101,
   "courseId": 101,
-  "createdAt": "2026-10-24T09:00:00Z",
-  "imageUrl": null
+  "createdAt": "2026-10-24T09:00:00Z"
 }
 ```
 
@@ -93,25 +93,22 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
 | `id` | integer (int64) | O | `posts.id` (BIGINT). 저장 값은 NULL 불가. |
-| `title` | string / object (확인 필요) | X | 저장 컬럼과 직접 대응하지 않는 응답 값. 산출·표시 구조 확인 필요 (ERD만으로 응답 형식을 확정하지 않음.) |
+| `title` | string | X | **미구현** — `posts`에 컬럼 없음. 응답에 포함하지 않음 |
 | `body` | string / null | O | `posts.body` (TEXT). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
-| `authorId` | integer (int64) | O | `posts.author_id` (BIGINT). 저장 값은 NULL 불가. |
+| `authorId` | integer (int64) | O | `posts.author_id` (BIGINT). 저장 값은 NULL 불가. 호출자(`X-User-Id`)로 설정 |
 | `sessionId` | integer (int64) | O | `posts.session_id` (BIGINT). 저장 값은 NULL 불가. |
-| `courseId` | integer (int64) / null | X | `courses.id` 참조. 기존 응답 노출 범위 유지. |
+| `courseId` | integer (int64) / null | X | 연결 세션의 `course_id` 파생값. 자유러닝은 null. 쓰기 입력이 아님 |
 | `createdAt` | string (ISO 8601 UTC) | O | `posts.created_at` (TIMESTAMPTZ). 저장 값은 NULL 불가. |
-
-
-`title`은 posts에 없는 필드로 생성 근거 확인 필요. `courseId`는 연결 세션의 course_id를 참조하며 nullable이다.
 
 **사용 흐름과 응답 판단**
 
-생성 게시물 ID로 상세 이동하고 실제 저장한 본문·이미지·연결 기록을 확인한다. title은 posts에 없는 쓰기 필드로 별도 검토가 필요하다. courseId는 쓰기 입력이 아닌 연결 세션의 읽기 전용 파생값이다.
+생성 게시물 ID로 상세 이동하고 저장한 본문·연결 세션을 확인한다. `courseId`는 쓰기 입력이 아닌 연결 세션의 읽기 전용 파생값이다.
 
-기능상 필요한 응답 필드 보완안:
+기능상 필요한 응답 필드 보완안(후속·미구현):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `imageUrl` | string / null | O | 게시물 업로드 이미지의 접근 제어된 표시 참조. image_key의 URL 매핑 확인 필요. 경로 그림과 별개. |
+| `imageUrl` | string / null | O | **미구현** — 게시물 업로드 이미지 표시 참조. image_key URL 매핑 후속 |
 
 ### 오류 응답
 
@@ -119,42 +116,37 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 
 | HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
 |---|---|---|
-| `403 RESOURCE_NOT_OWNED` | 소유권 | 공유 세션·참조 이미지 등 본인 소유여야 하는 자원이 다른 회원 소유임 |
-| `422 INVALID_POST` | 입력/참조 | 공유 세션이 없거나 공유 가능한 완료 기록이 아님. 게시물 내용·이미지 참조 조합이 유효하지 않음 |
-| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 RESOURCE_NOT_OWNED` | 소유권 | 공유 세션이 호출자 소유가 아님 |
+| `422 INVALID_POST` | 입력/참조 | 세션이 없거나 COMPLETED가 아님. 게시물로 공유할 수 없는 상태 |
+| `401 UNAUTHORIZED` | 인증 | `X-User-Id`가 없거나 형식이 맞지 않아 호출자를 확인할 수 없음 |
 | `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
 | `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
 
-**추가 오류 후보 — HTTP·코드·판정 정책 확인 필요**
-
-| 후보 | 발생 가능 상황 |
-|---|---|
-| `422 INVALID_IMAGE_REFERENCE` | 이미지 없음·타인 소유·purpose 불일치. 키/ID 매핑 먼저 확정 |
-
 - 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
 - **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
+- `imageId`는 현재 저장·검증하지 않으므로 `INVALID_IMAGE_REFERENCE` 후보는 이미지 연동 구현 전까지 적용하지 않는다.
 
 ### 처리 규칙
 
-- 게시물별·연결 러닝 기록별 공개 설정은 없다. 공개 계정의 게시물은 전체에, 비공개 계정은 본인·승인된 팔로워에게만 제공한다. 대기 요청자는 접근할 수 없다.
-- 목록·상세·연결 이미지·댓글·반응 등 관련 접근에서도 작성자 계정 정책을 검증한다. 원본 H02 조회 권한을 타인에게 부여하지 않고 공유 표시용 요약·경로 그림만 제공한다.
-
-- 새 글은 4.5 러닝 결과·6.7 그룹런 결과의 '기록 공유'에서만 쓰며 sessionId는 필수다. 모든 게시물은 러닝 기록 공유이므로 별도의 게시물 유형 필드를 사용하지 않는다.
-- 코스 공유 선택·해제 요청은 없다. 공유한 세션에 코스가 있으면 응답 courseId는 그 세션의 코스를 참조하며 자유러닝은 null이다.
-- 본인 러닝 기록의 표시용 결과를 게시물로 공유한다. 원본 기록 소유권을 확인하며 게시물 공개 범위는 계정 정책을 따른다.
-- 사용자 소유권·그룹 참가 권한·상태 전이·재요청 여부를 검증한다(적용 범위는 API별로 결정).
+- 새 글은 4.5 러닝 결과·6.7 그룹런 결과의 '기록 공유'에서만 쓰며 `sessionId`는 필수다. 모든 게시물은 러닝 기록 공유이므로 별도의 게시물 유형 필드를 사용하지 않는다.
+- 세션은 호출자 소유이고 상태가 COMPLETED여야 한다. 아니면 `403 RESOURCE_NOT_OWNED` 또는 `422 INVALID_POST`.
+- `title`·`imageId`는 요청에 포함해도 되며 null/생략 가능하나 **현재 저장·검증하지 않는다**.
+- 코스 공유 선택·해제 요청은 없다. 공유한 세션에 코스가 있으면 응답 `courseId`는 그 세션의 코스를 참조하며 자유러닝은 null이다.
+- 게시물별·연결 러닝 기록별 공개 설정은 없다. 공개(PUBLIC) 계정의 게시물은 전체에, 비공개(PRIVATE) 계정은 본인·승인된 팔로워에게만 제공한다. 대기 요청자는 접근할 수 없다.
+- 원본 H02 조회 권한을 타인에게 부여하지 않고 공유 표시용 요약만 제공한다. 경로 그림(`routePreview`)은 **미구현**.
 - 예시는 **명세 구조를 보여주는 가상 값**이며, 확정되지 않은 제한·동기화 주기·AI 호출 주기를 의미하지 않는다.
 
 ### 상태값
 
-- 게시물별 공개 설정 없음. 작성자 계정 정책과 게시물 삭제 상태를 적용한다.
+- 게시물별 공개 설정 없음. 작성자 계정 정책(PUBLIC/PRIVATE)과 게시물 삭제 상태(`deleted_at`)를 적용한다.
 
 ### 미정 사항
 
+- [ ] `title` 저장 컬럼·응답 형식
+- [ ] `imageId`/`imageUrl` 연동(업로드·키 매핑)
 - [ ] 결과 사진을 클라이언트 캡처 업로드로 받을지 서버에서 생성할지
-- [ ] 요청·응답의 세부 필드 타입, 허용 범위, nullable 규칙 및 실제 JSON 구조 검토
 - [ ] HTTP 성공 코드 및 각 예외의 오류 코드 최종 확정
-- [ ] 접근 권한과 데이터 정합성의 구체적인 처리 조건 확정
+- [ ] 인증 수단을 토큰으로 교체할 때 `X-User-Id` 제거
 
 ## CMT02 게시물 목록
 
@@ -171,12 +163,13 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 
 ### 설명
 
-삭제된 게시물은 제외하고 작성자 계정 공개 여부·승인된 팔로워 관계로 접근을 제한한다.
+삭제되지 않은 게시물만 반환한다. 작성자 계정 PUBLIC/PRIVATE와 승인된 팔로우로 접근을 제한한다. 이번 구현 필터는 `scope`·`authorId`다. `regionCode`·`cursor`·`limit`는 명세에 유지하되 **미구현**이다.
 
 ### 인증 및 권한
 
 - 로그인 사용자 본인 또는 서비스 리소스 접근 권한 검사.
 - 건강정보·실시간 위치·타인 기록 조회 시 동의 상태 및 공개 범위가 우선한다.
+- 인증 구현 전에는 임시로 `X-User-Id`(BIGINT, `users.id`) 헤더로 호출자를 식별한다.
 
 ### Path Parameters
 
@@ -186,11 +179,11 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `regionCode` | string | X | 도시 코드(부산·서울 등). 기본값 내 위치의 도시 |
-| `scope` | string | X | ALL/FOLLOWING(팔로우한 러너 글만) |
-| `authorId` | integer (int64) | X | 특정 러너의 글만 |
-| `cursor` | string / object (확인 필요) | X | 서버 발급 불투명 페이지 커서 |
-| `limit` | number | X | 조회 결과 최대 개수(최대값 미정) |
+| `regionCode` | string | X | 도시 코드(부산·서울 등). **미구현** — 받아도 필터하지 않음 |
+| `scope` | string | X | `ALL` \| `FOLLOWING`. 기본값 `ALL`. FOLLOWING은 승인된 팔로우 대상 글 + **본인 글** 포함 |
+| `authorId` | integer (int64) | X | 특정 러너의 글만. 접근 가능한 게시물에만 적용 |
+| `cursor` | string / object (확인 필요) | X | 서버 발급 불투명 페이지 커서. **미구현** |
+| `limit` | number | X | 조회 결과 최대 개수(최대값 미정). **미구현** |
 
 ### Request Body
 
@@ -209,10 +202,8 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
       "authorId": 101,
       "sessionId": 101,
       "body": null,
-      "imageKey": null,
       "regionCode": null,
       "createdAt": "2026-10-24T09:00:00Z",
-      "imageUrl": null,
       "author": {
         "userId": 101,
         "nickname": "러너"
@@ -231,8 +222,8 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `items` | array | X | 접근 가능한 기록 공유 게시물 요약 목록. 세부 객체 계약 미정 |
-| `page` | string / object (확인 필요) | X | 페이지 메타데이터는 저장 엔티티가 아니다. cursor/limit 등 공통 페이지 형식 확정 필요. |
+| `items` | array | O | 접근 가능한 기록 공유 게시물 요약 목록 |
+| `page` | string / object (확인 필요) | X | **미구현** — cursor/limit 페이지 메타. 현재 응답에 포함하지 않음 |
 
 중첩 객체의 저장 필드 대응(추가 표시·집계 값은 기존 후보를 유지하며 별도 확인):
 
@@ -242,22 +233,24 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 | `items[].authorId` | integer (int64) | O | `posts.author_id` (BIGINT). 저장 값은 NULL 불가. |
 | `items[].sessionId` | integer (int64) | O | `posts.session_id` (BIGINT). 저장 값은 NULL 불가. |
 | `items[].body` | string / null | O | `posts.body` (TEXT). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
-| `items[].imageKey` | string / null | O | `posts.image_key` (VARCHAR(1024)). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
-| `items[].regionCode` | string / null | O | `posts.region_code` (VARCHAR(40)). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `items[].imageKey` | string / null | X | `posts.image_key`. **미구현** — 이미지 연동 전까지 응답에 의존하지 않음 |
+| `items[].regionCode` | string / null | O | `posts.region_code` (VARCHAR(40)). NULL 허용. 목록 필터로는 미사용 |
 | `items[].createdAt` | string (ISO 8601 UTC) | O | `posts.created_at` (TIMESTAMPTZ). 저장 값은 NULL 불가. |
-
 
 **사용 흐름과 응답 판단**
 
-피드에는 게시물 ID·작성자 표시·본문·이미지 조회 참조·공유 기록요약·반응수가 필요하다. imageKey를 그대로 공개 URL로 사용하지 않는다.
+피드에는 게시물 ID·작성자 표시·본문·공유 기록요약이 필요하다. `imageKey`를 그대로 공개 URL로 사용하지 않는다.
 
-표시·선택·후속 이동에 필요한 필드 보완안:
+표시·선택·후속 이동에 필요한 필드(구현/미구현 구분):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `items[].imageUrl` | string / null | O | 업로드 이미지 표시용 접근 참조. imageKey를 공개 URL로 간주하지 않는다. |
-| `items[].author` | object | O | 최소 표시용 작성자 정보. 비공개 접근 검사 후 제공. |
-| `items[].recordSummary` | object | O | 공유 세션 결과의 표시용 요약. 원본 조회 권한과 구분. |
+| `items[].author` | object | O | 최소 표시용 작성자 정보. 비공개 접근 검사 후 제공 |
+| `items[].recordSummary` | object | O | 연결 세션에서 파생한 표시용 요약(거리·이동시간·평균 페이스). 원본 GPS 미포함 |
+| `items[].imageUrl` | string / null | X | **미구현** |
+| `items[].commentCount` | number | X | **미구현** |
+| `items[].reactionCount` | number | X | **미구현** |
+| `items[].myReaction` | string / object (확인 필요) | X | **미구현** |
 
 ### 오류 응답
 
@@ -265,8 +258,8 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 
 | HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
 |---|---|---|
-| `400 INVALID_FILTER` | 검색 조건 | 정렬·필터·페이지 조건이 명세의 허용값/형식에 맞지 않음 |
-| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `400 INVALID_FILTER` | 검색 조건 | `scope` 등 허용값/형식이 맞지 않음 |
+| `401 UNAUTHORIZED` | 인증 | `X-User-Id`가 없거나 형식이 맞지 않아 호출자를 확인할 수 없음 |
 | `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
 | `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
 
@@ -275,25 +268,25 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 
 ### 처리 규칙
 
-- 공유 표시용 데이터에 거리·시간·평균 페이스 등 요약과 경로 그림을 포함한다. 경로 이미지 참조의 생성·조회 권한은 게시물 정책을 따르며 원본 GPS 배열을 노출하지 않는다.
-
-- 게시물별·연결 러닝 기록별 공개 설정은 없다. 공개 계정의 게시물은 전체에, 비공개 계정은 본인·승인된 팔로워에게만 제공한다. 대기 요청자는 접근할 수 없다.
-- 목록·상세·연결 이미지·댓글·반응 등 관련 접근에서도 작성자 계정 정책을 검증한다. 원본 H02 조회 권한을 타인에게 부여하지 않고 공유 표시용 요약·경로 그림만 제공한다.
-
-- 목록 항목에 작성자 프로필·연결 기록 요약(코스·거리·시간·페이스·심박·케이던스)·좋아요·댓글 수·저장 여부를 포함한다.
-- 삭제된 게시물은 제외하고 작성자 계정 공개 여부·승인된 팔로워 관계로 접근을 제한한다.
-- 사용자 소유권·그룹 참가 권한·상태 전이·재요청 여부를 검증한다(적용 범위는 API별로 결정).
+- `deleted_at`이 설정된 게시물은 제외한다.
+- 공개(PUBLIC) 작성자 글은 전체에, 비공개(PRIVATE)는 본인·승인된 정방향 팔로워에게만 노출한다. 대기·거절·역방향 관계는 접근할 수 없다.
+- 이번 구현 필터: `scope`(`ALL` 기본, `FOLLOWING`), `authorId`. `FOLLOWING`에는 승인된 팔로우 대상 글과 **본인 글**을 포함한다.
+- `regionCode`·`cursor`·`limit`는 명세에 두되 **미구현**. 서버는 이 파라미터로 필터·페이징하지 않는다.
+- `recordSummary`는 연결 세션에서 파생한다. `imageUrl`·`commentCount`·`reactionCount`·`myReaction`·경로 그림은 **미구현**.
+- 원본 H02 조회 권한을 타인에게 부여하지 않는다.
 - 예시는 **명세 구조를 보여주는 가상 값**이며, 확정되지 않은 제한·동기화 주기·AI 호출 주기를 의미하지 않는다.
 
 ### 상태값
 
-- 게시물별 공개 설정 없음. 작성자 계정 정책과 게시물 삭제 상태를 적용한다.
+- 게시물별 공개 설정 없음. 작성자 계정 정책(PUBLIC/PRIVATE)과 게시물 삭제 상태(`deleted_at`)를 적용한다.
 
 ### 미정 사항
 
-- [ ] 요청·응답의 세부 필드 타입, 허용 범위, nullable 규칙 및 실제 JSON 구조 검토
+- [ ] `regionCode` 필터 구현
+- [ ] `cursor`/`limit` 등 공통 페이지 형식
+- [ ] `imageUrl`·`commentCount`·`reactionCount`·`myReaction` 응답
 - [ ] HTTP 성공 코드 및 각 예외의 오류 코드 최종 확정
-- [ ] 접근 권한과 데이터 정합성의 구체적인 처리 조건 확정
+- [ ] 인증 수단을 토큰으로 교체할 때 `X-User-Id` 제거
 
 
 ## CMT03 게시물 상세
@@ -310,18 +303,19 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 
 ### 설명
 
-작성자 계정 정책으로 공유 게시물 접근을 검사하고 연결 코스의 서비스 상태를 확인한다.
+작성자 계정 PUBLIC/PRIVATE와 승인된 팔로우로 접근을 검사한다. 본문·세션 파생 `courseId`·`recordSummary`는 **구현됨**. `title`·`imageUrl`·`routePreviewImageUrl`·`commentCount`·`reactionCount`·`myReaction`은 명세에 두되 **미구현**이다.
 
 ### 인증 및 권한
 
 - 로그인 사용자 본인 또는 서비스 리소스 접근 권한 검사.
 - 건강정보·실시간 위치·타인 기록 조회 시 동의 상태 및 공개 범위가 우선한다.
+- 인증 구현 전에는 임시로 `X-User-Id`(BIGINT, `users.id`) 헤더로 호출자를 식별한다.
 
 ### Path Parameters
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `postId` | integer (int64) | O | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `postId` | integer (int64) | O | `posts.id` |
 
 ### Query Parameters
 
@@ -345,7 +339,6 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
   "courseId": 101,
   "createdAt": "2026-10-24T09:00:00Z",
   "updatedAt": "2026-10-24T09:00:00Z",
-  "imageUrl": null,
   "author": {
     "userId": 101,
     "nickname": "러너"
@@ -363,37 +356,29 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
 | `id` | integer (int64) | O | `posts.id` (BIGINT). 저장 값은 NULL 불가. |
-| `title` | string / object (확인 필요) | X | 저장 컬럼과 직접 대응하지 않는 응답 값. 산출·표시 구조 확인 필요 (ERD만으로 응답 형식을 확정하지 않음.) |
+| `title` | string | X | **미구현** — `posts`에 컬럼 없음. 응답에 포함하지 않음 |
 | `body` | string / null | O | `posts.body` (TEXT). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
 | `authorId` | integer (int64) | O | `posts.author_id` (BIGINT). 저장 값은 NULL 불가. |
-| `routePreviewImageUrl` | string / null (제안) | X | 원본 경로에서 생성한 표시용 이미지 참조. 해당 저장 컬럼·준비 상태는 미정. 원본 GPS 응답으로 대체하지 않는다. |
+| `routePreviewImageUrl` | string / null (제안) | X | **미구현** — 경로 표시용 이미지 참조. 원본 GPS로 대체하지 않음 |
 | `sessionId` | integer (int64) | O | `posts.session_id` (BIGINT). 저장 값은 NULL 불가. |
-| `courseId` | integer (int64) / null | X | `courses.id` 참조. 기존 응답 노출 범위 유지. |
+| `courseId` | integer (int64) / null | X | 연결 세션의 `course_id` 파생값. 자유러닝은 null |
 | `createdAt` | string (ISO 8601 UTC) | O | `posts.created_at` (TIMESTAMPTZ). 저장 값은 NULL 불가. |
 | `updatedAt` | string (ISO 8601 UTC) | O | `posts.updated_at` (TIMESTAMPTZ). 저장 값은 NULL 불가. |
-| `reactionCount` | number | X | 저장 컬럼과 직접 대응하지 않는 응답 값. 산출·표시 구조 확인 필요 (ERD만으로 응답 형식을 확정하지 않음.) |
-| `commentCount` | number | X | 저장 컬럼과 직접 대응하지 않는 응답 값. 산출·표시 구조 확인 필요 (ERD만으로 응답 형식을 확정하지 않음.) |
-| `myReaction` | string / object (확인 필요) | X | 저장 컬럼과 직접 대응하지 않는 응답 값. 산출·표시 구조 확인 필요 (ERD만으로 응답 형식을 확정하지 않음.) |
-
-
-`title`은 posts에 없는 필드로 생성 근거 확인 필요. `courseId`는 연결 세션의 course_id를 참조하며 nullable이다.
+| `reactionCount` | number | X | **미구현** |
+| `commentCount` | number | X | **미구현** |
+| `myReaction` | string / object (확인 필요) | X | **미구현** |
 
 **사용 흐름과 응답 판단**
 
-상세는 작성자 표시·이미지·기록요약과 본인 반응·댓글 수를 제공한다. sessionId를 타인 원본 기록 접근권한으로 해석하지 않는다.
+상세는 작성자 표시·기록요약·본문을 제공한다. `sessionId`를 타인 원본 기록 접근 권한으로 해석하지 않는다.
 
-기능상 필요한 응답 필드 보완안:
-
-| 필드 | 타입 | 필수 | 설명 |
-|---|---|:---:|---|
-| `imageUrl` | string / null | O | 게시물 업로드 이미지의 접근 제어된 표시 참조. image_key의 URL 매핑 확인 필요. 경로 그림과 별개. |
-
-표시·선택·후속 이동에 필요한 필드 보완안:
+표시·선택·후속 이동에 필요한 필드(구현/미구현 구분):
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `author` | object | O | 작성자 최소 표시 정보. |
-| `recordSummary` | object | O | 연결 기록의 공개 가능한 표시요약. 원본 GPS 미포함. |
+| `author` | object | O | 작성자 최소 표시 정보 |
+| `recordSummary` | object | O | 연결 세션에서 파생한 표시요약. 원본 GPS 미포함 |
+| `imageUrl` | string / null | X | **미구현** — 게시물 업로드 이미지 표시 참조 |
 
 ### 오류 응답
 
@@ -401,36 +386,33 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 
 | HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
 |---|---|---|
-| `404 POST_NOT_FOUND` | 대상 없음 | 게시물이 없거나 삭제됨 |
+| `404 POST_NOT_FOUND` | 대상 없음 | 게시물이 없거나 `deleted_at`이 설정됨 |
 | `403 ACCOUNT_ACCESS_DENIED` | 공개 범위 | 작성자가 PRIVATE이고 열람자가 본인·승인된 정방향 팔로워가 아님. 미승인/역방향 관계 제외 |
-| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `401 UNAUTHORIZED` | 인증 | `X-User-Id`가 없거나 형식이 맞지 않아 호출자를 확인할 수 없음 |
 | `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
 | `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
 
-- **대상 없음·접근 차단 점검:** 경로 대상의 부재/삭제, 본인 소유·역할·참가 자격 불충족을 구분한다. 위 표에 없는 경우 `404` 자원 없음 또는 `403` 접근 거부의 추가 매핑을 확인한다. 존재 은닉을 위한 403/404 선택·검사 순서는 미정이며 새 코드로 단정하지 않는다.
-
+- **대상 없음·접근 차단 점검:** 경로 대상의 부재/삭제와 공개 범위 거부를 구분한다. `404 POST_NOT_FOUND`와 `403 ACCOUNT_ACCESS_DENIED`를 사용한다.
 - 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
 
 ### 처리 규칙
 
-- 공유 표시용 데이터에 거리·시간·평균 페이스 등 요약과 경로 그림을 포함한다. 경로 이미지 참조의 생성·조회 권한은 게시물 정책을 따르며 원본 GPS 배열을 노출하지 않는다.
-
-- 게시물별·연결 러닝 기록별 공개 설정은 없다. 공개 계정의 게시물은 전체에, 비공개 계정은 본인·승인된 팔로워에게만 제공한다. 대기 요청자는 접근할 수 없다.
-- 목록·상세·연결 이미지·댓글·반응 등 관련 접근에서도 작성자 계정 정책을 검증한다. 원본 H02 조회 권한을 타인에게 부여하지 않고 공유 표시용 요약·경로 그림만 제공한다.
-
-- 작성자 계정 정책으로 공유 게시물 접근을 검사하고 연결 코스의 서비스 상태를 확인한다.
-- 사용자 소유권·그룹 참가 권한·상태 전이·재요청 여부를 검증한다(적용 범위는 API별로 결정).
+- `deleted_at`이 설정된 게시물은 `404 POST_NOT_FOUND`.
+- 공개(PUBLIC) 작성자 글은 전체에, 비공개(PRIVATE)는 본인·승인된 정방향 팔로워만 열람한다. 그 외는 `403 ACCOUNT_ACCESS_DENIED`.
+- `recordSummary`는 연결 세션에서 파생한다. `title`·`imageUrl`·`routePreviewImageUrl`·`commentCount`·`reactionCount`·`myReaction`은 **미구현**.
+- 원본 H02 조회 권한을 타인에게 부여하지 않는다.
 - 예시는 **명세 구조를 보여주는 가상 값**이며, 확정되지 않은 제한·동기화 주기·AI 호출 주기를 의미하지 않는다.
 
 ### 상태값
 
-- 게시물별 공개 설정 없음. 작성자 계정 정책과 게시물 삭제 상태를 적용한다.
+- 게시물별 공개 설정 없음. 작성자 계정 정책(PUBLIC/PRIVATE)과 게시물 삭제 상태(`deleted_at`)를 적용한다.
 
 ### 미정 사항
 
-- [ ] 요청·응답의 세부 필드 타입, 허용 범위, nullable 규칙 및 실제 JSON 구조 검토
+- [ ] `title`·`imageUrl`·`routePreviewImageUrl` 응답
+- [ ] `commentCount`·`reactionCount`·`myReaction` 응답
 - [ ] HTTP 성공 코드 및 각 예외의 오류 코드 최종 확정
-- [ ] 접근 권한과 데이터 정합성의 구체적인 처리 조건 확정
+- [ ] 인증 수단을 토큰으로 교체할 때 `X-User-Id` 제거
 
 
 ## CMT04 게시물 수정
@@ -448,18 +430,19 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 
 ### 설명
 
-본인 글만 수정.
+본인 글의 `body`만 수정한다. `title` 저장은 **미구현**이며, 연결 세션·코스는 수정하지 않는다.
 
 ### 인증 및 권한
 
 - 로그인 사용자 본인 또는 서비스 리소스 접근 권한 검사.
 - 건강정보·실시간 위치·타인 기록 조회 시 동의 상태 및 공개 범위가 우선한다.
+- 인증 구현 전에는 임시로 `X-User-Id`(BIGINT, `users.id`) 헤더로 호출자를 식별한다.
 
 ### Path Parameters
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `postId` | integer (int64) | O | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `postId` | integer (int64) | O | `posts.id` |
 
 ### Query Parameters
 
@@ -469,11 +452,13 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `title` | string / object (확인 필요) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
-| `body` | string / object (확인 필요) | X | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `title` | string | X | **미구현** — 요청에 포함해도 저장하지 않음 |
+| `body` | string / null | X | `posts.body` 수정. 생략 시 기존 값 유지(부분 수정) |
 
 ```json
-{}
+{
+  "body": "오늘 5km를 달렸어요."
+}
 ```
 
 ### Response
@@ -483,7 +468,7 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 ```json
 {
   "id": 101,
-  "body": null,
+  "body": "오늘 5km를 달렸어요.",
   "updatedAt": "2026-10-24T09:00:00Z"
 }
 ```
@@ -493,15 +478,13 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
 | `id` | integer (int64) | O | `posts.id` (BIGINT). 저장 값은 NULL 불가. |
-| `title` | string / object (확인 필요) | X | 저장 컬럼과 직접 대응하지 않는 응답 값. 산출·표시 구조 확인 필요 (ERD만으로 응답 형식을 확정하지 않음.) |
+| `title` | string | X | **미구현** — 응답에 포함하지 않음 |
 | `body` | string / null | O | `posts.body` (TEXT). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
 | `updatedAt` | string (ISO 8601 UTC) | O | `posts.updated_at` (TIMESTAMPTZ). 저장 값은 NULL 불가. |
 
-
 **사용 흐름과 응답 판단**
 
-수정 후 저장된 필드를 돌려주거나 상세 재조회로 복원한다. title의 저장 근거는 별도 검토하며 연결 세션·코스는 수정하지 않는다.
-
+수정 후 저장된 `body`·`updatedAt`을 돌려주거나 상세 재조회로 복원한다. 연결 세션·코스는 수정하지 않는다.
 
 ### 오류 응답
 
@@ -509,43 +492,35 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 
 | HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
 |---|---|---|
-| `403 NOT_AUTHOR` | 소유권 | 게시물·댓글 작성자가 아닌 사용자의 수정·삭제 요청 |
-| `404 POST_NOT_FOUND` | 대상 없음 | 게시물이 없거나 삭제됨 |
-| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 NOT_AUTHOR` | 소유권 | 게시물 작성자가 아닌 사용자의 수정 요청 |
+| `404 POST_NOT_FOUND` | 대상 없음 | 게시물이 없거나 `deleted_at`이 설정됨 |
+| `401 UNAUTHORIZED` | 인증 | `X-User-Id`가 없거나 형식이 맞지 않아 호출자를 확인할 수 없음 |
 | `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
 | `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
 
-**추가 오류 후보 — HTTP·코드·판정 정책 확인 필요**
-
-| 후보 | 발생 가능 상황 |
-|---|---|
-| `422 INVALID_IMAGE_REFERENCE` | 이미지 없음·타인 소유·purpose 불일치 |
-
-- **대상 없음·접근 차단 점검:** 경로 대상의 부재/삭제, 본인 소유·역할·참가 자격 불충족을 구분한다. 위 표에 없는 경우 `404` 자원 없음 또는 `403` 접근 거부의 추가 매핑을 확인한다. 존재 은닉을 위한 403/404 선택·검사 순서는 미정이며 새 코드로 단정하지 않는다.
-
+- **대상 없음·접근 차단 점검:** 부재/삭제(`404 POST_NOT_FOUND`)와 비작성자(`403 NOT_AUTHOR`)를 구분한다.
 - 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
-- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
+- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다.
 
-**응답·복구 행동과의 연결:** 게시물 수정은 본문 등 허용된 게시물 필드에만 적용한다. courseId 입력을 받지 않으며 코스 공유 해제나 원본 러닝 세션 코스 변경을 수행하지 않는다.
+**응답·복구 행동과의 연결:** 게시물 수정은 허용된 `body`에만 적용한다. `courseId` 입력을 받지 않으며 코스 공유 해제나 원본 러닝 세션 변경을 수행하지 않는다. `title`·이미지는 현재 저장하지 않는다.
 
 ### 처리 규칙
 
-- 게시물별·연결 러닝 기록별 공개 설정은 없다. 공개 계정의 게시물은 전체에, 비공개 계정은 본인·승인된 팔로워에게만 제공한다. 대기 요청자는 접근할 수 없다.
-- 목록·상세·연결 이미지·댓글·반응 등 관련 접근에서도 작성자 계정 정책을 검증한다. 원본 H02 조회 권한을 타인에게 부여하지 않고 공유 표시용 요약·경로 그림만 제공한다.
-
-- 본인 글만 수정.
-- 사용자 소유권·그룹 참가 권한·상태 전이·재요청 여부를 검증한다(적용 범위는 API별로 결정).
+- 본인 글만 수정. 비작성자 → `403 NOT_AUTHOR`. 삭제된 글 → `404 POST_NOT_FOUND`.
+- `title`은 요청에 포함해도 **저장하지 않는다**(미구현).
+- 연결 `sessionId`·`courseId`는 수정하지 않는다.
 - 예시는 **명세 구조를 보여주는 가상 값**이며, 확정되지 않은 제한·동기화 주기·AI 호출 주기를 의미하지 않는다.
 
 ### 상태값
 
-- 게시물별 공개 설정 없음. 작성자 계정 정책과 게시물 삭제 상태를 적용한다.
+- 게시물별 공개 설정 없음. 작성자 계정 정책과 게시물 삭제 상태(`deleted_at`)를 적용한다.
 
 ### 미정 사항
 
-- [ ] 요청·응답의 세부 필드 타입, 허용 범위, nullable 규칙 및 실제 JSON 구조 검토
+- [ ] `title` 저장·응답
+- [ ] 이미지 교체 필드 연동
 - [ ] HTTP 성공 코드 및 각 예외의 오류 코드 최종 확정
-- [ ] 접근 권한과 데이터 정합성의 구체적인 처리 조건 확정
+- [ ] 인증 수단을 토큰으로 교체할 때 `X-User-Id` 제거
 
 
 ## CMT05 게시물 삭제
@@ -563,18 +538,19 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 
 ### 설명
 
-soft delete.
+본인 글을 `posts.deleted_at`에 시각을 기록하는 soft delete로 처리한다. 물리 삭제는 하지 않는다.
 
 ### 인증 및 권한
 
 - 로그인 사용자 본인 또는 서비스 리소스 접근 권한 검사.
 - 건강정보·실시간 위치·타인 기록 조회 시 동의 상태 및 공개 범위가 우선한다.
+- 인증 구현 전에는 임시로 `X-User-Id`(BIGINT, `users.id`) 헤더로 호출자를 식별한다.
 
 ### Path Parameters
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `postId` | integer (int64) | O | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `postId` | integer (int64) | O | `posts.id` |
 
 ### Query Parameters
 
@@ -599,13 +575,11 @@ soft delete.
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `success` | boolean | X | 저장 컬럼과 직접 대응하지 않는 응답 값. 산출·표시 구조 확인 필요 (ERD만으로 응답 형식을 확정하지 않음.) |
-| `deletedAt` | string (ISO 8601 UTC) / null | O | `posts.deleted_at` (TIMESTAMPTZ). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
-
+| `deletedAt` | string (ISO 8601 UTC) | O | `posts.deleted_at` (TIMESTAMPTZ). soft delete 시각 |
 
 **사용 흐름과 응답 판단**
 
-삭제 성공은 success=true와 deletedAt으로 피드에서 행을 제거한다. 재삭제/댓글·좋아요 후속처리 정책은 별도 결정한다.
+삭제 성공은 `deletedAt`으로 피드에서 행을 제거한다. 이미 삭제된 글의 재삭제·댓글·좋아요 후속 처리는 별도 결정한다.
 
 ### 오류 응답
 
@@ -613,32 +587,31 @@ soft delete.
 
 | HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
 |---|---|---|
-| `403 NOT_AUTHOR` | 소유권 | 게시물·댓글 작성자가 아닌 사용자의 수정·삭제 요청 |
-| `404 POST_NOT_FOUND` | 대상 없음 | 게시물이 없거나 삭제됨 |
-| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 NOT_AUTHOR` | 소유권 | 게시물 작성자가 아닌 사용자의 삭제 요청 |
+| `404 POST_NOT_FOUND` | 대상 없음 | 게시물이 없거나 이미 `deleted_at`이 설정됨 |
+| `401 UNAUTHORIZED` | 인증 | `X-User-Id`가 없거나 형식이 맞지 않아 호출자를 확인할 수 없음 |
 | `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
 | `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
 
-- **대상 없음·접근 차단 점검:** 경로 대상의 부재/삭제, 본인 소유·역할·참가 자격 불충족을 구분한다. 위 표에 없는 경우 `404` 자원 없음 또는 `403` 접근 거부의 추가 매핑을 확인한다. 존재 은닉을 위한 403/404 선택·검사 순서는 미정이며 새 코드로 단정하지 않는다.
-
+- **대상 없음·접근 차단 점검:** 부재/이미 삭제(`404 POST_NOT_FOUND`)와 비작성자(`403 NOT_AUTHOR`)를 구분한다.
 - 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
-- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
+- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다.
 
 ### 처리 규칙
 
-- soft delete.
-- 사용자 소유권·그룹 참가 권한·상태 전이·재요청 여부를 검증한다(적용 범위는 API별로 결정).
+- 본인 글만 soft delete. `posts.deleted_at`에 시각을 기록한다. 비작성자 → `403 NOT_AUTHOR`. 없거나 이미 삭제됨 → `404 POST_NOT_FOUND`.
+- 목록·상세에서는 `deleted_at`이 있는 글을 제외하거나 `404`로 응답한다.
 - 예시는 **명세 구조를 보여주는 가상 값**이며, 확정되지 않은 제한·동기화 주기·AI 호출 주기를 의미하지 않는다.
 
 ### 상태값
 
-- 게시물별 공개 설정 없음. 작성자 계정 정책과 게시물 삭제 상태를 적용한다.
+- 게시물별 공개 설정 없음. 작성자 계정 정책과 게시물 삭제 상태(`deleted_at`)를 적용한다.
 
 ### 미정 사항
 
-- [ ] 요청·응답의 세부 필드 타입, 허용 범위, nullable 규칙 및 실제 JSON 구조 검토
+- [ ] 재삭제·댓글·좋아요 후속 처리 정책
 - [ ] HTTP 성공 코드 및 각 예외의 오류 코드 최종 확정
-- [ ] 접근 권한과 데이터 정합성의 구체적인 처리 조건 확정
+- [ ] 인증 수단을 토큰으로 교체할 때 `X-User-Id` 제거
 
 
 ## CMT06 댓글 목록
