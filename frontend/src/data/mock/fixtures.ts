@@ -9,6 +9,7 @@ import type {
   MusicState,
   Place,
   RecommendedCourse,
+  PeriodSummary,
   RunRecordSummary,
   SavedCourse,
   TodayCondition,
@@ -124,7 +125,7 @@ export const monthlySummary: MonthlyRunSummary = {
   paceImprovementSec: 8,
 };
 
-const shapes: Record<string, [number, number][]> = {
+export const shapes: Record<string, [number, number][]> = {
   coast: [
     [0.05, 0.6],
     [0.3, 0.45],
@@ -152,55 +153,6 @@ const shapes: Record<string, [number, number][]> = {
     [0.95, 0.45],
   ],
 };
-
-// 2.1 과거 러닝 기록, newest first.
-export const recentRecords: RunRecordSummary[] = [
-  {
-    id: 'run-1015',
-    title: '민락수변공원 출발',
-    startedAt: '2026-10-15T06:30:00+09:00',
-    distanceM: 5020,
-    durationSec: 1781,
-    averagePaceSecPerKm: 355,
-    shape: shapes.coast,
-  },
-  {
-    id: 'run-1013',
-    title: '민락수변 왕복',
-    startedAt: '2026-10-13T06:40:00+09:00',
-    distanceM: 5400,
-    durationSec: 1930,
-    averagePaceSecPerKm: 357,
-    shape: shapes.line,
-  },
-  {
-    id: 'run-1009',
-    title: '남천 해변 언덕길',
-    startedAt: '2026-10-09T07:00:00+09:00',
-    distanceM: 5200,
-    durationSec: 1985,
-    averagePaceSecPerKm: 382,
-    shape: shapes.hill,
-  },
-  {
-    id: 'run-1005',
-    title: '해운대 백사장',
-    startedAt: '2026-10-05T06:50:00+09:00',
-    distanceM: 4100,
-    durationSec: 1470,
-    averagePaceSecPerKm: 358,
-    shape: shapes.line,
-  },
-  {
-    id: 'run-0930',
-    title: '수영강 하천길',
-    startedAt: '2026-09-30T06:35:00+09:00',
-    distanceM: 4800,
-    durationSec: 1740,
-    averagePaceSecPerKm: 362,
-    shape: shapes.loop,
-  },
-];
 
 // 3.1c 저장한 코스 (2.1 shows the first three). The title is my own nickname (myAlias).
 export const savedCourses: SavedCourse[] = [
@@ -570,4 +522,271 @@ export const musicState: MusicState = {
   nowPlaying: { ...melonLibrary.liked[0], positionSec: 84, playing: true },
   library: melonLibrary,
   premium: false,
+};
+
+// 5.1 전체 기록 (and 2.1 과거 러닝 기록), newest first. October follows the prototype's 5.1 list and
+// month summary (7회 · 34.2km · 3:21 · 5′52″); September matches 5.3's 지난달 (5회 · 26.8km · 6′00″).
+export type RecordFixture = Omit<
+  RunRecordSummary,
+  'averagePaceSecPerKm' | 'goalAchieved'
+> & {
+  route: [number, number][] | null;
+  targetDurationSec: number | null;
+  targetPaceSecPerKm: number | null;
+  courseId: string | null;
+  // Runs without a watch have no heart rate or cadence (5.2 hides those tabs).
+  watch: boolean;
+  aiAdvice: string | null;
+};
+
+const solo = { runType: 'SOLO' as const, group: null };
+const crew = (finisherCount: number) => ({
+  runType: 'GROUP' as const,
+  group: { crewName: '광안리 새벽 크루', finisherCount },
+});
+const courseRoute = (id: string) =>
+  recommendedCourses.find(course => course.id === id)!.route;
+
+export const runRecords: RecordFixture[] = [
+  {
+    id: 'run-1015',
+    title: '민락수변공원 출발',
+    startedAt: '2026-10-15T06:30:00+09:00',
+    distanceM: 5020,
+    durationSec: 1781,
+    shape: shapes.coast,
+    ...solo,
+    route: minrakLoop,
+    targetDurationSec: 1800,
+    targetPaceSecPerKm: 360,
+    courseId: 'course-minrak',
+    watch: true,
+    aiAdvice: '3km에서 빨라져 심박이 올랐어요. 다음엔 3km를 5초만 늦춰 보세요.',
+  },
+  {
+    id: 'run-1013',
+    title: '민락수변공원 출발',
+    startedAt: '2026-10-13T06:40:00+09:00',
+    distanceM: 5020,
+    durationSec: 1788,
+    shape: shapes.coast,
+    ...solo,
+    route: minrakLoop,
+    targetDurationSec: 1800,
+    targetPaceSecPerKm: 360,
+    courseId: 'course-minrak',
+    watch: true,
+    aiAdvice: null,
+  },
+  {
+    id: 'run-1011',
+    title: '광안대교 루프 함께 달리기',
+    startedAt: '2026-10-11T06:00:00+09:00',
+    distanceM: 5400,
+    durationSec: 1928,
+    shape: shapes.line,
+    ...crew(8),
+    route: courseRoute('course-gwangalli'),
+    targetDurationSec: 1944,
+    targetPaceSecPerKm: 360,
+    courseId: 'course-gwangalli',
+    watch: true,
+    aiAdvice: null,
+  },
+  {
+    id: 'run-1008',
+    title: '남천 해변 언덕길',
+    startedAt: '2026-10-08T07:00:00+09:00',
+    distanceM: 5200,
+    durationSec: 1982,
+    shape: shapes.hill,
+    ...solo,
+    route: freeRunTrack,
+    targetDurationSec: 1872,
+    targetPaceSecPerKm: 360,
+    courseId: null,
+    watch: false,
+    aiAdvice:
+      '언덕에서 페이스가 크게 떨어졌어요. 오르막은 보폭을 줄이고 리듬을 유지해 보세요.',
+  },
+  {
+    id: 'run-1005',
+    title: '해운대 백사장',
+    startedAt: '2026-10-05T06:50:00+09:00',
+    distanceM: 4100,
+    durationSec: 1470,
+    shape: shapes.line,
+    ...solo,
+    route: courseRoute('course-gwangalli'),
+    targetDurationSec: null,
+    targetPaceSecPerKm: null,
+    courseId: null,
+    watch: true,
+    aiAdvice: null,
+  },
+  {
+    id: 'run-1003',
+    title: '수영강 하천길',
+    startedAt: '2026-10-03T07:10:00+09:00',
+    distanceM: 4800,
+    durationSec: 1584,
+    shape: shapes.loop,
+    ...solo,
+    route: courseRoute('course-apec-river'),
+    targetDurationSec: 1680,
+    targetPaceSecPerKm: 350,
+    courseId: 'course-apec-river',
+    watch: true,
+    aiAdvice: null,
+  },
+  {
+    id: 'run-1001',
+    title: '이기대 갈맷길',
+    startedAt: '2026-10-01T06:45:00+09:00',
+    distanceM: 4660,
+    durationSec: 1505,
+    shape: shapes.hill,
+    ...solo,
+    // Recorded without location: no route, so it cannot become a course.
+    route: null,
+    targetDurationSec: null,
+    targetPaceSecPerKm: null,
+    courseId: null,
+    watch: true,
+    aiAdvice: null,
+  },
+  {
+    id: 'run-0930',
+    title: '민락수변공원 출발',
+    startedAt: '2026-09-30T06:35:00+09:00',
+    distanceM: 5020,
+    durationSec: 1830,
+    shape: shapes.coast,
+    ...solo,
+    route: minrakLoop,
+    targetDurationSec: 1800,
+    targetPaceSecPerKm: 360,
+    courseId: 'course-minrak',
+    watch: true,
+    aiAdvice: null,
+  },
+  {
+    id: 'run-0926',
+    title: '광안대교 루프 함께 달리기',
+    startedAt: '2026-09-26T06:00:00+09:00',
+    distanceM: 5400,
+    durationSec: 1960,
+    shape: shapes.line,
+    ...crew(9),
+    route: courseRoute('course-gwangalli'),
+    targetDurationSec: 1998,
+    targetPaceSecPerKm: 370,
+    courseId: 'course-gwangalli',
+    watch: true,
+    aiAdvice: null,
+  },
+  {
+    id: 'run-0923',
+    title: '수영강 하천길',
+    startedAt: '2026-09-23T07:10:00+09:00',
+    distanceM: 4800,
+    durationSec: 1750,
+    shape: shapes.loop,
+    ...solo,
+    route: courseRoute('course-apec-river'),
+    targetDurationSec: null,
+    targetPaceSecPerKm: null,
+    courseId: 'course-apec-river',
+    watch: true,
+    aiAdvice: null,
+  },
+  {
+    id: 'run-0919',
+    title: '남천 해변 언덕길',
+    startedAt: '2026-09-19T07:00:00+09:00',
+    distanceM: 5200,
+    durationSec: 1900,
+    shape: shapes.hill,
+    ...solo,
+    route: freeRunTrack,
+    targetDurationSec: 1872,
+    targetPaceSecPerKm: 360,
+    courseId: null,
+    watch: true,
+    aiAdvice: null,
+  },
+  {
+    id: 'run-0915',
+    title: '광안리 해변 롱런',
+    startedAt: '2026-09-15T06:20:00+09:00',
+    distanceM: 6380,
+    durationSec: 2208,
+    shape: shapes.line,
+    ...solo,
+    route: courseRoute('course-gwangalli'),
+    targetDurationSec: null,
+    targetPaceSecPerKm: null,
+    courseId: null,
+    watch: true,
+    aiAdvice: null,
+  },
+];
+
+// 5.2 graphs for the prototype's run, in 500m splits (5′41″ 최고 at 3km, 평균 156 · 171 최고,
+// 평균 172 · 178 최고).
+export const recordSplits: Record<
+  string,
+  { pace: number[]; heartRate: number[]; cadence: number[] }
+> = {
+  'run-1015': {
+    pace: [367, 363, 359, 356, 350, 341, 352, 357, 354, 351],
+    heartRate: [137, 146, 151, 155, 160, 171, 166, 161, 159, 154],
+    cadence: [167, 169, 170, 172, 173, 178, 175, 173, 171, 172],
+  },
+};
+
+// 5.3 러닝 분석 values that come from longer history than the mock records.
+// October: 1주 6.2 · 2주 10.4 · 3주 12.6 · 4주 5 (km).
+export const octoberWeeklyDistanceM = [6200, 10400, 12600, 5000];
+export const octoberHeartZones = [0.12, 0.46, 0.28, 0.11, 0.03];
+export const defaultHeartZones = [0.15, 0.48, 0.25, 0.09, 0.03];
+// Average pace by month; the prototype's 최근 6개월 runs from 6′31″ (5월) to 5′52″ (10월).
+export const monthlyPace: Record<string, number> = {
+  '2026-04': 398,
+  '2026-05': 391,
+  '2026-06': 380,
+  '2026-07': 372,
+  '2026-08': 366,
+  '2026-09': 360,
+  '2026-10': 352,
+};
+// Distance by month this year (km) for 5.3 년, January to October.
+export const monthlyDistanceKm = [
+  18.2, 15.6, 22.4, 25.1, 27, 28.3, 30.5, 21.4, 26.8, 34.2,
+];
+export const yearSummaries: Record<string, PeriodSummary> = {
+  '2024': {
+    runCount: 31,
+    totalDistanceM: 158000,
+    totalDurationSec: 62410,
+    averagePaceSecPerKm: 395,
+  },
+  '2025': {
+    runCount: 38,
+    totalDistanceM: 201300,
+    totalDurationSec: 76091,
+    averagePaceSecPerKm: 378,
+  },
+  '2026': {
+    runCount: 49,
+    totalDistanceM: 249500,
+    totalDurationSec: 90319,
+    averagePaceSecPerKm: 362,
+  },
+};
+export const augustSummary: PeriodSummary = {
+  runCount: 4,
+  totalDistanceM: 21400,
+  totalDurationSec: 7832,
+  averagePaceSecPerKm: 366,
 };

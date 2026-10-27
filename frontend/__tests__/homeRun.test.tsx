@@ -88,10 +88,11 @@ test('home shows the prototype values and re-sorts past runs', async () => {
   ]) {
     expect(home).toContain(text);
   }
-  // Newest four runs; the fifth (09.30) is left for 전체 기록 보기.
+  // Newest four of my own runs; group runs (10.11) and older ones are left for 전체 기록 보기.
   expect(home).toContain('10.15 · 5.02km · 29:41');
   expect(home).toContain('10.05 · 4.10km · 24:30');
-  expect(home).not.toContain('09.30');
+  expect(home).not.toContain('10.11 ·');
+  expect(home).not.toContain('10.03 ·');
   await press(screen, '거리순');
   const sorted = screen.root
     .findAll(
@@ -101,7 +102,7 @@ test('home shows the prototype values and re-sorts past runs', async () => {
         typeof node.props.onPress === 'function',
     )
     .map(node => node.props.accessibilityLabel);
-  expect(sorted[0]).toContain('민락수변 왕복');
+  expect(sorted[0]).toContain('광안리 해변 롱런');
   await act(async () => screen.unmount());
 });
 

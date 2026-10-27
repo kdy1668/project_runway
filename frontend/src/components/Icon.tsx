@@ -220,6 +220,13 @@ const icons = {
       <Path d="M12 4v16" />
     </>
   ),
+  share: (
+    <>
+      <Path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7" />
+      <Polyline points="16 6 12 2 8 6" />
+      <Path d="M12 2v13" />
+    </>
+  ),
   locate: (
     <>
       <Path d="M2 12h3" />

@@ -14,6 +14,15 @@ import type {
   TodayCondition,
 } from '../types';
 import * as fixtures from './fixtures';
+import {
+  fromDraft,
+  kstDay,
+  monthOf,
+  paceTrendOf,
+  statisticsOf,
+  toDetail,
+  toSummary,
+} from './records';
 
 export type MockScenario =
   | 'default'
@@ -237,6 +246,8 @@ export function createMockRepositories(
   let notifications = fixtures.notifications;
   let saved = fixtures.savedCourses;
   let chosen: string | null = null;
+  // Finished runs (4.5) join the list that 5.1·5.2·5.3 and 2.1 read.
+  let records = fixtures.runRecords;
   let music = musicFor(options.scenario);
   const loginFailures = new Map<
     string,
@@ -400,7 +411,26 @@ export function createMockRepositories(
     records: {
       getRecent: (sort, limit) =>
         respond(
-          [...fixtures.recentRecords].sort(recordOrder[sort]).slice(0, limit),
+          records
+            .filter(run => run.runType === 'SOLO')
+            .map(toSummary)
+            .sort(recordOrder[sort])
+            .slice(0, limit),
+          options,
+        ),
+      getMonth: (month, filter) =>
+        respond(monthOf(records, month, filter), options),
+      getDetail: recordId => {
+        const record = records.find(run => run.id === recordId);
+        return record
+          ? respond(toDetail(record, saved), options)
+          : fail(new DataError('RECORD_NOT_FOUND', '기록 없음'), options);
+      },
+      getStatistics: (period, baseDate) =>
+        respond(statisticsOf(records, period, baseDate), options),
+      getPaceTrend: months =>
+        respond(
+          paceTrendOf(records, months, kstDay(fixtures.now).slice(0, 7)),
           options,
         ),
     },
@@ -498,10 +528,30 @@ export function createMockRepositories(
         }, options.tickMs ?? 1000);
         return () => clearInterval(timer);
       },
-      saveRecord: () =>
-        options.scenario === 'recordSaveFailed'
-          ? fail(new DataError('UNKNOWN', '기록 저장 실패'), options)
-          : respond({ recordId: 'run-new' }, options),
+      saveRecord: draft => {
+        if (options.scenario === 'recordSaveFailed') {
+          return fail(new DataError('UNKNOWN', '기록 저장 실패'), options);
+        }
+        const id = `run-${kstDay(draft.startedAt).replace(/-/g, '')}-${
+          records.length + 1
+        }`;
+        const course =
+          saved.find(item => item.id === draft.courseId) ??
+          fixtures.recommendedCourses.find(item => item.id === draft.courseId);
+        const title = course
+          ? ('myAlias' in course && course.myAlias) || course.name
+          : '자유 러닝';
+        records = [
+          fromDraft(
+            draft,
+            id,
+            title,
+            draft.route ? shapeOf(draft.route) : fixtures.shapes.line,
+          ),
+          ...records,
+        ];
+        return respond({ recordId: id }, options);
+      },
     },
     music: {
       getState: () => respond(music, options),

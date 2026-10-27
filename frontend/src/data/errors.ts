@@ -8,6 +8,8 @@ export type DataErrorCode =
   | 'VERIFICATION_CODE_MISMATCH'
   | 'VERIFICATION_ATTEMPTS_EXCEEDED'
   | 'VERIFICATION_EXPIRED'
+  // H02 러닝 기록 상세 (docs/design/api/running-records.md).
+  | 'RECORD_NOT_FOUND'
   | 'UNKNOWN';
 
 export class DataError extends Error {

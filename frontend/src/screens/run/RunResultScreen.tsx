@@ -407,7 +407,11 @@ export function RunResultScreen() {
               title="기록 보기"
               look="secondary"
               disabled={saveState !== 'saved'}
-              onPress={() => navigateTo(navigation, 'RecordDetail')}
+              onPress={() =>
+                recordId
+                  ? navigation.navigate('RecordDetail', { recordId })
+                  : undefined
+              }
             />
             <ResultButton
               title="기록 공유"

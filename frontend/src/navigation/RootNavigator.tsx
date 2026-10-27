@@ -13,6 +13,7 @@ import { CourseSearchProvider, courseScreens } from '../screens/course';
 import { homeScreens } from '../screens/home';
 import { onboardingScreens, SignUpDraftProvider } from '../screens/onboarding';
 import { PlaceholderScreen } from '../screens/PlaceholderScreen';
+import { recordScreens } from '../screens/records';
 import { SettingsPreview } from '../screens/previews';
 import { runScreens } from '../screens/run';
 import { RunSessionProvider } from '../screens/run/RunSession';
@@ -74,6 +75,7 @@ const screens: Record<RouteName, React.ComponentType> = {
   ...homeScreens,
   ...runScreens,
   ...courseScreens,
+  ...recordScreens,
 };
 
 // 2.7·2.8 float over the run screen, which stays visible behind the dimmed backdrop.
