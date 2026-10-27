@@ -8,11 +8,14 @@ import com.runway.backend.domain.crew.dto.response.CrewListResponse;
 import com.runway.backend.domain.crew.dto.response.DecideJoinResponse;
 import com.runway.backend.domain.crew.dto.response.JoinRequestListResponse;
 import com.runway.backend.domain.crew.dto.response.JoinRequestResponse;
+import com.runway.backend.domain.crew.dto.response.MemberLeaveResponse;
+import com.runway.backend.domain.crew.dto.response.MemberListResponse;
 import com.runway.backend.domain.crew.service.CrewService;
 import com.runway.backend.global.auth.CurrentUserIdResolver;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -89,5 +92,33 @@ public class CrewController {
             @Valid @RequestBody DecideJoinRequest request) {
         long ownerUserId = currentUserIdResolver.requireUserId(userIdHeader);
         return crewService.decideJoinRequest(ownerUserId, crewId, userId, request);
+    }
+
+    @GetMapping("/{crewId}/members")
+    public MemberListResponse listMembers(
+            @RequestHeader(value = CurrentUserIdResolver.HEADER, required = false)
+                    String userIdHeader,
+            @PathVariable long crewId) {
+        long userId = currentUserIdResolver.requireUserId(userIdHeader);
+        return crewService.listMembers(userId, crewId);
+    }
+
+    @DeleteMapping("/{crewId}/members/me")
+    public MemberLeaveResponse leave(
+            @RequestHeader(value = CurrentUserIdResolver.HEADER, required = false)
+                    String userIdHeader,
+            @PathVariable long crewId) {
+        long userId = currentUserIdResolver.requireUserId(userIdHeader);
+        return crewService.leave(userId, crewId);
+    }
+
+    @DeleteMapping("/{crewId}/members/{userId}")
+    public MemberLeaveResponse removeMember(
+            @RequestHeader(value = CurrentUserIdResolver.HEADER, required = false)
+                    String userIdHeader,
+            @PathVariable long crewId,
+            @PathVariable long userId) {
+        long ownerUserId = currentUserIdResolver.requireUserId(userIdHeader);
+        return crewService.removeMember(ownerUserId, crewId, userId);
     }
 }

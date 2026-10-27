@@ -1,6 +1,7 @@
 package com.runway.backend.domain.crew;
 
 import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -219,6 +220,93 @@ class CrewApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.memberCount").value(2))
                 .andExpect(jsonPath("$.myMembershipStatus").value("APPROVED"));
+    }
+
+    @Test
+    void 멤버목록_탈퇴_내보내기_흐름() throws Exception {
+        long memberId = insertUser("member_user", "멤버", "01099990000");
+        long outsiderId = insertUser("kick_outsider", "외부", "01088887777");
+        long crewId = createCrew(userId, "멤버 관리 크루", 10);
+
+        mockMvc.perform(
+                        post("/api/v1/crews/{crewId}/join-requests", crewId)
+                                .header(CurrentUserIdResolver.HEADER, memberId))
+                .andExpect(status().isOk());
+        mockMvc.perform(
+                        patch("/api/v1/crews/{crewId}/join-requests/{userId}", crewId, memberId)
+                                .header(CurrentUserIdResolver.HEADER, userId)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {"status":"APPROVED"}
+                                        """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(
+                        get("/api/v1/crews/{crewId}/members", crewId)
+                                .header(CurrentUserIdResolver.HEADER, userId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(2))
+                .andExpect(jsonPath("$.items[?(@.userId==" + userId + ")].isOwner").value(true))
+                .andExpect(jsonPath("$.items[?(@.userId==" + memberId + ")].nickname").value("멤버"))
+                .andExpect(
+                        jsonPath("$.items[?(@.userId==" + memberId + ")].status")
+                                .value("APPROVED"));
+
+        mockMvc.perform(
+                        delete("/api/v1/crews/{crewId}/members/me", crewId)
+                                .header(CurrentUserIdResolver.HEADER, userId))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("OWNER_CANNOT_LEAVE"));
+
+        mockMvc.perform(
+                        delete("/api/v1/crews/{crewId}/members/{userId}", crewId, userId)
+                                .header(CurrentUserIdResolver.HEADER, userId))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CANNOT_REMOVE_OWNER"));
+
+        mockMvc.perform(
+                        delete("/api/v1/crews/{crewId}/members/{userId}", crewId, memberId)
+                                .header(CurrentUserIdResolver.HEADER, outsiderId))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("NOT_ADMIN"));
+
+        // re-approve path already done; member still APPROVED — leave as self
+        mockMvc.perform(
+                        delete("/api/v1/crews/{crewId}/members/me", crewId)
+                                .header(CurrentUserIdResolver.HEADER, memberId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("LEFT"))
+                .andExpect(jsonPath("$.leftAt").isNotEmpty());
+
+        mockMvc.perform(
+                        get("/api/v1/crews/{crewId}/members", crewId)
+                                .header(CurrentUserIdResolver.HEADER, userId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].userId").value(userId));
+
+        // bring member back then OWNER removes
+        mockMvc.perform(
+                        post("/api/v1/crews/{crewId}/join-requests", crewId)
+                                .header(CurrentUserIdResolver.HEADER, memberId))
+                .andExpect(status().isOk());
+        mockMvc.perform(
+                        patch("/api/v1/crews/{crewId}/join-requests/{userId}", crewId, memberId)
+                                .header(CurrentUserIdResolver.HEADER, userId)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {"status":"APPROVED"}
+                                        """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(
+                        delete("/api/v1/crews/{crewId}/members/{userId}", crewId, memberId)
+                                .header(CurrentUserIdResolver.HEADER, userId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("LEFT"))
+                .andExpect(jsonPath("$.leftAt").isNotEmpty());
     }
 
     @Test
