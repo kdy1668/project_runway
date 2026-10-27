@@ -628,25 +628,26 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 
 ### 설명
 
-삭제 댓글 제외.
+삭제되지 않은 댓글을 평면(`flat`) `items`로 반환한다. 게시물 접근은 상세(CMT03)와 동일하게 작성자 계정 PUBLIC/PRIVATE와 승인된 팔로우로 검사한다. `cursor`·`limit`·`page`는 명세에 유지하되 **미구현**이다.
 
 ### 인증 및 권한
 
 - 로그인 사용자 본인 또는 서비스 리소스 접근 권한 검사.
 - 건강정보·실시간 위치·타인 기록 조회 시 동의 상태 및 공개 범위가 우선한다.
+- 인증 구현 전에는 임시로 `X-User-Id`(BIGINT, `users.id`) 헤더로 호출자를 식별한다.
 
 ### Path Parameters
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `postId` | integer (int64) | O | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `postId` | integer (int64) | O | `posts.id` |
 
 ### Query Parameters
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `cursor` | string / object (확인 필요) | X | 서버 발급 불투명 페이지 커서 |
-| `limit` | number | X | 조회 결과 최대 개수(최대값 미정) |
+| `cursor` | string / object (확인 필요) | X | 서버 발급 불투명 페이지 커서. **미구현** |
+| `limit` | number | X | 조회 결과 최대 개수(최대값 미정). **미구현** |
 
 ### Request Body
 
@@ -676,8 +677,8 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `items` | array | X | 조회 권한이 있는 게시물의 댓글 목록. 세부 객체 계약 미정 |
-| `page` | string / object (확인 필요) | X | 페이지 메타데이터는 저장 엔티티가 아니다. cursor/limit 등 공통 페이지 형식 확정 필요. |
+| `items` | array | O | 접근 가능한 게시물의 삭제되지 않은 댓글 목록(평면) |
+| `page` | string / object (확인 필요) | X | **미구현** — cursor/limit 페이지 메타. 현재 응답에 포함하지 않음 |
 
 중첩 객체의 저장 필드 대응(추가 표시·집계 값은 기존 후보를 유지하며 별도 확인):
 
@@ -686,14 +687,13 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 | `items[].id` | integer (int64) | O | `comments.id` (BIGINT). 저장 값은 NULL 불가. |
 | `items[].postId` | integer (int64) | O | `comments.post_id` (BIGINT). 저장 값은 NULL 불가. |
 | `items[].authorId` | integer (int64) | O | `comments.author_id` (BIGINT). 저장 값은 NULL 불가. |
-| `items[].parentCommentId` | integer (int64) / null | O | `comments.parent_comment_id` (BIGINT). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
+| `items[].parentCommentId` | integer (int64) / null | O | `comments.parent_comment_id` (BIGINT). NULL이면 루트 댓글. NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
 | `items[].body` | string | O | `comments.body` (TEXT). 저장 값은 NULL 불가. |
 | `items[].createdAt` | string (ISO 8601 UTC) | O | `comments.created_at` (TIMESTAMPTZ). 저장 값은 NULL 불가. |
 
-
 **사용 흐름과 응답 판단**
 
-댓글 ID·부모 ID·작성자 표시·본문·시각으로 트리를 표시한다. 삭제 부모의 대댓글 표시는 별도 결정하며 부모 부재와 빈목록을 혼동하지 않는다.
+댓글 ID·부모 ID·작성자·본문·시각으로 목록을 표시한다. 서버는 평면 목록을 반환하며, 트리 구성은 클라이언트가 `parentCommentId`로 한다. 댓글이 0건이면 빈 `items`다.
 
 ### 오류 응답
 
@@ -701,40 +701,32 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 
 | HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
 |---|---|---|
-| `404 POST_NOT_FOUND` | 대상 없음 | 게시물이 없거나 삭제됨 |
-| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `404 POST_NOT_FOUND` | 대상 없음 | 게시물이 없거나 `deleted_at`이 설정됨 |
+| `403 ACCOUNT_ACCESS_DENIED` | 공개 범위 | 작성자가 PRIVATE이고 열람자가 본인·승인된 정방향 팔로워가 아님. 미승인/역방향 관계 제외 |
+| `401 UNAUTHORIZED` | 인증 | `X-User-Id`가 없거나 형식이 맞지 않아 호출자를 확인할 수 없음 |
 | `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
 | `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
 
-**추가 오류 후보 — HTTP·코드·판정 정책 확인 필요**
-
-| 후보 | 발생 가능 상황 |
-|---|---|
-| `403 ACCOUNT_ACCESS_DENIED` | 비공개 게시물의 댓글 조회를 통한 우회 접근 |
-
-- **대상 없음·접근 차단 점검:** 경로 대상의 부재/삭제, 본인 소유·역할·참가 자격 불충족을 구분한다. 위 표에 없는 경우 `404` 자원 없음 또는 `403` 접근 거부의 추가 매핑을 확인한다. 존재 은닉을 위한 403/404 선택·검사 순서는 미정이며 새 코드로 단정하지 않는다.
-
+- **대상 없음·접근 차단 점검:** 경로 대상의 부재/삭제와 공개 범위 거부를 구분한다. `404 POST_NOT_FOUND`와 `403 ACCOUNT_ACCESS_DENIED`를 사용한다.
 - 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
 - 검색/조회 결과가 0건인 경우 자체는 오류가 아니다. 유효한 빈 목록과 잘못된 조회 조건을 구분한다.
 
 ### 처리 규칙
 
-- 게시물별·연결 러닝 기록별 공개 설정은 없다. 공개 계정의 게시물은 전체에, 비공개 계정은 본인·승인된 팔로워에게만 제공한다. 대기 요청자는 접근할 수 없다.
-- 목록·상세·연결 이미지·댓글·반응 등 관련 접근에서도 작성자 계정 정책을 검증한다. 원본 H02 조회 권한을 타인에게 부여하지 않고 공유 표시용 요약·경로 그림만 제공한다.
-
-- 삭제 댓글 제외.
-- 사용자 소유권·그룹 참가 권한·상태 전이·재요청 여부를 검증한다(적용 범위는 API별로 결정).
+- `deleted_at`이 설정된 댓글은 제외한다.
+- 게시물 접근은 CMT03과 같다. 공개(PUBLIC) 작성자 글은 전체에, 비공개(PRIVATE)는 본인·승인된 정방향 팔로워만 열람한다. 없거나 삭제된 게시물 → `404 POST_NOT_FOUND`. 그 외 접근 거부 → `403 ACCOUNT_ACCESS_DENIED`.
+- `cursor`·`limit`·`page`는 명세에 두되 **미구현**. 서버는 이 파라미터로 페이징하지 않는다.
 - 예시는 **명세 구조를 보여주는 가상 값**이며, 확정되지 않은 제한·동기화 주기·AI 호출 주기를 의미하지 않는다.
 
 ### 상태값
 
-- 게시물별 공개 설정 없음. 작성자 계정 정책과 게시물 삭제 상태를 적용한다.
+- 게시물별 공개 설정 없음. 작성자 계정 정책(PUBLIC/PRIVATE)과 게시물·댓글 삭제 상태(`deleted_at`)를 적용한다.
 
 ### 미정 사항
 
-- [ ] 요청·응답의 세부 필드 타입, 허용 범위, nullable 규칙 및 실제 JSON 구조 검토
+- [ ] `cursor`/`limit`/`page` 등 공통 페이지 형식
 - [ ] HTTP 성공 코드 및 각 예외의 오류 코드 최종 확정
-- [ ] 접근 권한과 데이터 정합성의 구체적인 처리 조건 확정
+- [ ] 인증 수단을 토큰으로 교체할 때 `X-User-Id` 제거
 
 
 ## CMT07 댓글 작성
@@ -751,18 +743,19 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 
 ### 설명
 
-공백만 있는 댓글 거부.
+접근 가능한 게시물에 댓글을 작성한다. `body`는 필수·비공백이며, 선택 `parentCommentId`로 루트 댓글에만 1단계 대댓글을 달 수 있다. 게시물 작성자 대상 알림 연계는 **미구현**이다.
 
 ### 인증 및 권한
 
 - 로그인 사용자 본인 또는 서비스 리소스 접근 권한 검사.
 - 건강정보·실시간 위치·타인 기록 조회 시 동의 상태 및 공개 범위가 우선한다.
+- 인증 구현 전에는 임시로 `X-User-Id`(BIGINT, `users.id`) 헤더로 호출자를 식별한다.
 
 ### Path Parameters
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `postId` | integer (int64) | O | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `postId` | integer (int64) | O | `posts.id` |
 
 ### Query Parameters
 
@@ -772,11 +765,13 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `body` | string / object (확인 필요) | O | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `body` | string | O | `comments.body`에 저장. 비어 있거나 공백만이면 `422 EMPTY_COMMENT` |
+| `parentCommentId` | integer (int64) | X | 대댓글 대상 부모. 생략·null이면 루트 댓글. 같은 게시물·미삭제·루트(`parent_comment_id` NULL)만 허용. 아니면 `422 INVALID_PARENT_COMMENT` |
 
 ```json
 {
-  "body": "오늘 5km를 달렸어요."
+  "body": "오늘 5km를 달렸어요.",
+  "parentCommentId": null
 }
 ```
 
@@ -789,6 +784,7 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
   "id": 101,
   "postId": 101,
   "authorId": 101,
+  "parentCommentId": null,
   "body": "오늘 5km를 달렸어요.",
   "createdAt": "2026-10-24T09:00:00Z"
 }
@@ -800,14 +796,14 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 |---|---|:---:|---|
 | `id` | integer (int64) | O | `comments.id` (BIGINT). 저장 값은 NULL 불가. |
 | `postId` | integer (int64) | O | `comments.post_id` (BIGINT). 저장 값은 NULL 불가. |
-| `authorId` | integer (int64) | O | `comments.author_id` (BIGINT). 저장 값은 NULL 불가. |
+| `authorId` | integer (int64) | O | `comments.author_id` (BIGINT). 저장 값은 NULL 불가. 호출자(`X-User-Id`)로 설정 |
+| `parentCommentId` | integer (int64) / null | O | `comments.parent_comment_id` (BIGINT). NULL이면 루트 댓글 |
 | `body` | string | O | `comments.body` (TEXT). 저장 값은 NULL 불가. |
 | `createdAt` | string (ISO 8601 UTC) | O | `comments.created_at` (TIMESTAMPTZ). 저장 값은 NULL 불가. |
 
-
 **사용 흐름과 응답 판단**
 
-작성 후 댓글을 바로 붙일 수 있는 ID·본문·작성자·시각이 필요하다. 현 요청에 부모 ID가 없어 대댓글 작성 필드 매핑은 결정 필요하다.
+작성 후 댓글을 바로 붙일 수 있는 ID·부모 ID·본문·작성자·시각을 반환한다.
 
 ### 오류 응답
 
@@ -815,43 +811,36 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 
 | HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
 |---|---|---|
-| `422 EMPTY_COMMENT` | 입력 값 | 댓글이 비어 있거나 공백뿐임. 최대 길이 등 추가 제한은 별도 확정 |
-| `404 POST_NOT_FOUND` | 대상 없음 | 게시물이 없거나 삭제됨 |
-| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `422 EMPTY_COMMENT` | 입력 값 | `body`가 비어 있거나 공백만임 |
+| `422 INVALID_PARENT_COMMENT` | 입력/참조 | `parentCommentId`가 없거나 삭제됨·다른 게시물·루트가 아님(대댓글에 대댓글 등 1단계 초과) |
+| `404 POST_NOT_FOUND` | 대상 없음 | 게시물이 없거나 `deleted_at`이 설정됨 |
+| `403 ACCOUNT_ACCESS_DENIED` | 공개 범위 | 작성자가 PRIVATE이고 호출자가 본인·승인된 정방향 팔로워가 아님 |
+| `401 UNAUTHORIZED` | 인증 | `X-User-Id`가 없거나 형식이 맞지 않아 호출자를 확인할 수 없음 |
 | `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
 | `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
 
-**추가 오류 후보 — HTTP·코드·판정 정책 확인 필요**
-
-| 후보 | 발생 가능 상황 |
-|---|---|
-| `422 INVALID_PARENT_COMMENT` | 부모 식별자의 요청 매핑 확정 후 적용할 후보. 현재 body만 있는 요청에 새 필드를 도입한 것이 아님. 부모가 다른 게시물에 속하거나 삭제됨·자기 참조·허용 깊이 위반 |
-
-- **대상 없음·접근 차단 점검:** 경로 대상의 부재/삭제, 본인 소유·역할·참가 자격 불충족을 구분한다. 위 표에 없는 경우 `404` 자원 없음 또는 `403` 접근 거부의 추가 매핑을 확인한다. 존재 은닉을 위한 403/404 선택·검사 순서는 미정이며 새 코드로 단정하지 않는다.
-
+- **대상 없음·접근 차단 점검:** 부재/삭제(`404 POST_NOT_FOUND`)와 공개 범위 거부(`403 ACCOUNT_ACCESS_DENIED`)를 구분한다.
 - 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
-- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
+- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다.
 
 ### 처리 규칙
 
-- 댓글 저장이 확정되면 게시물 작성자 대상 댓글 알림을 자동 연계한다. 재전송 중복 제거와 자기 댓글 제외·묶음·삭제 후 처리 정책은 [알림 정책](../requirements.md#알림-정책)를 따른다.
-
-- 게시물별·연결 러닝 기록별 공개 설정은 없다. 공개 계정의 게시물은 전체에, 비공개 계정은 본인·승인된 팔로워에게만 제공한다. 대기 요청자는 접근할 수 없다.
-- 목록·상세·연결 이미지·댓글·반응 등 관련 접근에서도 작성자 계정 정책을 검증한다. 원본 H02 조회 권한을 타인에게 부여하지 않고 공유 표시용 요약·경로 그림만 제공한다.
-
-- 공백만 있는 댓글 거부.
-- 사용자 소유권·그룹 참가 권한·상태 전이·재요청 여부를 검증한다(적용 범위는 API별로 결정).
+- 게시물 접근은 CMT03·CMT06과 같다. 공개(PUBLIC)는 전체, 비공개(PRIVATE)는 본인·승인된 정방향 팔로워만 작성할 수 있다.
+- `body`는 필수이며 공백만이면 `422 EMPTY_COMMENT`.
+- `parentCommentId`가 있으면 같은 게시물·미삭제·루트 댓글이어야 한다. 아니면 `422 INVALID_PARENT_COMMENT`. 대댓글은 1단계만 허용한다.
+- 게시물 작성자 대상 댓글 알림은 **미구현**.
 - 예시는 **명세 구조를 보여주는 가상 값**이며, 확정되지 않은 제한·동기화 주기·AI 호출 주기를 의미하지 않는다.
 
 ### 상태값
 
-- 게시물별 공개 설정 없음. 작성자 계정 정책과 게시물 삭제 상태를 적용한다.
+- 게시물별 공개 설정 없음. 작성자 계정 정책과 게시물 삭제 상태(`deleted_at`)를 적용한다.
 
 ### 미정 사항
 
-- [ ] 요청·응답의 세부 필드 타입, 허용 범위, nullable 규칙 및 실제 JSON 구조 검토
+- [ ] 댓글 알림 연계
+- [ ] `body` 최대 길이 등 추가 제한
 - [ ] HTTP 성공 코드 및 각 예외의 오류 코드 최종 확정
-- [ ] 접근 권한과 데이터 정합성의 구체적인 처리 조건 확정
+- [ ] 인증 수단을 토큰으로 교체할 때 `X-User-Id` 제거
 
 
 ## CMT08 댓글 수정
@@ -868,18 +857,19 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 
 ### 설명
 
-본인 댓글만 수정.
+본인 댓글의 `body`만 수정한다. 비어 있거나 공백만인 `body`는 `422 EMPTY_COMMENT`다.
 
 ### 인증 및 권한
 
 - 로그인 사용자 본인 또는 서비스 리소스 접근 권한 검사.
 - 건강정보·실시간 위치·타인 기록 조회 시 동의 상태 및 공개 범위가 우선한다.
+- 인증 구현 전에는 임시로 `X-User-Id`(BIGINT, `users.id`) 헤더로 호출자를 식별한다.
 
 ### Path Parameters
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `commentId` | integer (int64) | O | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `commentId` | integer (int64) | O | `comments.id` |
 
 ### Query Parameters
 
@@ -889,7 +879,7 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `body` | string / object (확인 필요) | O | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `body` | string | O | `comments.body` 수정. 비어 있거나 공백만이면 `422 EMPTY_COMMENT` |
 
 ```json
 {
@@ -917,10 +907,9 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 | `body` | string | O | `comments.body` (TEXT). 저장 값은 NULL 불가. |
 | `updatedAt` | string (ISO 8601 UTC) | O | `comments.updated_at` (TIMESTAMPTZ). 저장 값은 NULL 불가. |
 
-
 **사용 흐름과 응답 판단**
 
-수정된 댓글 ID·본문·updatedAt으로 해당 행만 갱신한다. 빈 댓글 검증은 작성과 동일하게 필요하다.
+수정된 댓글 ID·본문·`updatedAt`으로 해당 행만 갱신한다.
 
 ### 오류 응답
 
@@ -928,34 +917,32 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 
 | HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
 |---|---|---|
-| `403 NOT_AUTHOR` | 소유권 | 게시물·댓글 작성자가 아닌 사용자의 수정·삭제 요청 |
-| `404 COMMENT_NOT_FOUND` | 대상 없음 | 댓글이 없거나 삭제됨 |
-| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `422 EMPTY_COMMENT` | 입력 값 | `body`가 비어 있거나 공백만임 |
+| `403 NOT_AUTHOR` | 소유권 | 댓글 작성자가 아닌 사용자의 수정 요청 |
+| `404 COMMENT_NOT_FOUND` | 대상 없음 | 댓글이 없거나 `deleted_at`이 설정됨 |
+| `401 UNAUTHORIZED` | 인증 | `X-User-Id`가 없거나 형식이 맞지 않아 호출자를 확인할 수 없음 |
 | `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
 | `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
 
-- **대상 없음·접근 차단 점검:** 경로 대상의 부재/삭제, 본인 소유·역할·참가 자격 불충족을 구분한다. 위 표에 없는 경우 `404` 자원 없음 또는 `403` 접근 거부의 추가 매핑을 확인한다. 존재 은닉을 위한 403/404 선택·검사 순서는 미정이며 새 코드로 단정하지 않는다.
-
+- **대상 없음·접근 차단 점검:** 부재/삭제(`404 COMMENT_NOT_FOUND`)와 비작성자(`403 NOT_AUTHOR`)를 구분한다.
 - 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
-- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
-
-**응답·복구 행동과의 연결:** 공백뿐인 body 수정도 작성과 마찬가지로 422 EMPTY_COMMENT 후보로 검증한다. 현재 404/403만으로 입력 오류를 설명할 수 없다.
+- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다.
 
 ### 처리 규칙
 
-- 본인 댓글만 수정.
-- 사용자 소유권·그룹 참가 권한·상태 전이·재요청 여부를 검증한다(적용 범위는 API별로 결정).
+- 본인 댓글만 수정. 비작성자 → `403 NOT_AUTHOR`. 없거나 삭제됨 → `404 COMMENT_NOT_FOUND`.
+- `body`만 수정한다. 공백만이면 `422 EMPTY_COMMENT`.
 - 예시는 **명세 구조를 보여주는 가상 값**이며, 확정되지 않은 제한·동기화 주기·AI 호출 주기를 의미하지 않는다.
 
 ### 상태값
 
-- 게시물별 공개 설정 없음. 작성자 계정 정책과 게시물 삭제 상태를 적용한다.
+- 댓글 삭제 상태(`deleted_at`)를 적용한다. 삭제된 댓글은 수정할 수 없다.
 
 ### 미정 사항
 
-- [ ] 요청·응답의 세부 필드 타입, 허용 범위, nullable 규칙 및 실제 JSON 구조 검토
+- [ ] `body` 최대 길이 등 추가 제한
 - [ ] HTTP 성공 코드 및 각 예외의 오류 코드 최종 확정
-- [ ] 접근 권한과 데이터 정합성의 구체적인 처리 조건 확정
+- [ ] 인증 수단을 토큰으로 교체할 때 `X-User-Id` 제거
 
 
 ## CMT09 댓글 삭제
@@ -972,18 +959,19 @@ posts는 author_id와 필수 session_id를 가진다. courseId는 posts 컬럼�
 
 ### 설명
 
-soft delete.
+본인 댓글을 `comments.deleted_at`에 시각을 기록하는 soft delete로 처리한다. 물리 삭제는 하지 않는다. 응답은 `deletedAt`이다.
 
 ### 인증 및 권한
 
 - 로그인 사용자 본인 또는 서비스 리소스 접근 권한 검사.
 - 건강정보·실시간 위치·타인 기록 조회 시 동의 상태 및 공개 범위가 우선한다.
+- 인증 구현 전에는 임시로 `X-User-Id`(BIGINT, `users.id`) 헤더로 호출자를 식별한다.
 
 ### Path Parameters
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `commentId` | integer (int64) | O | ERD 및 화면 요구사항을 기준으로 확정 필요 |
+| `commentId` | integer (int64) | O | `comments.id` |
 
 ### Query Parameters
 
@@ -1008,13 +996,11 @@ soft delete.
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `success` | boolean | X | 저장 컬럼과 직접 대응하지 않는 응답 값. 산출·표시 구조 확인 필요 (ERD만으로 응답 형식을 확정하지 않음.) |
-| `deletedAt` | string (ISO 8601 UTC) / null | O | `comments.deleted_at` (TIMESTAMPTZ). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
-
+| `deletedAt` | string (ISO 8601 UTC) | O | `comments.deleted_at` (TIMESTAMPTZ). soft delete 시각 |
 
 **사용 흐름과 응답 판단**
 
-삭제 완료된 댓글을 식별해 화면에서 제거한다. 재삭제와 부모/대댓글 정책은 별도 결정한다.
+삭제 성공은 `deletedAt`으로 화면에서 행을 제거한다. 재삭제·부모/대댓글 후속 처리는 별도 결정한다.
 
 ### 오류 응답
 
@@ -1022,32 +1008,31 @@ soft delete.
 
 | HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
 |---|---|---|
-| `403 NOT_AUTHOR` | 소유권 | 게시물·댓글 작성자가 아닌 사용자의 수정·삭제 요청 |
-| `404 COMMENT_NOT_FOUND` | 대상 없음 | 댓글이 없거나 삭제됨 |
-| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
+| `403 NOT_AUTHOR` | 소유권 | 댓글 작성자가 아닌 사용자의 삭제 요청 |
+| `404 COMMENT_NOT_FOUND` | 대상 없음 | 댓글이 없거나 이미 `deleted_at`이 설정됨 |
+| `401 UNAUTHORIZED` | 인증 | `X-User-Id`가 없거나 형식이 맞지 않아 호출자를 확인할 수 없음 |
 | `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
 | `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
 
-- **대상 없음·접근 차단 점검:** 경로 대상의 부재/삭제, 본인 소유·역할·참가 자격 불충족을 구분한다. 위 표에 없는 경우 `404` 자원 없음 또는 `403` 접근 거부의 추가 매핑을 확인한다. 존재 은닉을 위한 403/404 선택·검사 순서는 미정이며 새 코드로 단정하지 않는다.
-
+- **대상 없음·접근 차단 점검:** 부재/이미 삭제(`404 COMMENT_NOT_FOUND`)와 비작성자(`403 NOT_AUTHOR`)를 구분한다.
 - 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
-- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
+- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다.
 
 ### 처리 규칙
 
-- soft delete.
-- 사용자 소유권·그룹 참가 권한·상태 전이·재요청 여부를 검증한다(적용 범위는 API별로 결정).
+- 본인 댓글만 soft delete. `comments.deleted_at`에 시각을 기록한다. 비작성자 → `403 NOT_AUTHOR`. 없거나 이미 삭제됨 → `404 COMMENT_NOT_FOUND`.
+- 목록에서는 `deleted_at`이 있는 댓글을 제외한다.
 - 예시는 **명세 구조를 보여주는 가상 값**이며, 확정되지 않은 제한·동기화 주기·AI 호출 주기를 의미하지 않는다.
 
 ### 상태값
 
-- 게시물별 공개 설정 없음. 작성자 계정 정책과 게시물 삭제 상태를 적용한다.
+- 댓글 삭제 상태(`deleted_at`)를 적용한다.
 
 ### 미정 사항
 
-- [ ] 요청·응답의 세부 필드 타입, 허용 범위, nullable 규칙 및 실제 JSON 구조 검토
+- [ ] 재삭제·부모/대댓글 후속 처리 정책
 - [ ] HTTP 성공 코드 및 각 예외의 오류 코드 최종 확정
-- [ ] 접근 권한과 데이터 정합성의 구체적인 처리 조건 확정
+- [ ] 인증 수단을 토큰으로 교체할 때 `X-User-Id` 제거
 
 
 ## CMT10 반응 등록·변경
