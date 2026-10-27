@@ -193,7 +193,8 @@ test('notifications group by day, mark all read and open the related screen', as
     disabled: true,
   });
   await press(screen, '‘토요일 아침, 함께 5km’ 그룹런이 곧 시작해요');
-  expect(texts(screen)).toContain('6.4');
+  await settle();
+  expect(texts(screen)).toContain('예상 공동 페이스');
   await act(async () => screen.unmount());
 });
 

@@ -18,9 +18,24 @@ export type MainTabParamList = {
 
 // Screens that open one item take its id; the rest take no params.
 export type RootStackParamList = Record<
-  Exclude<AuthRouteName | MainRouteName, 'Records' | 'RecordDetail'>,
+  Exclude<
+    AuthRouteName | MainRouteName,
+    | 'Records'
+    | 'RecordDetail'
+    | 'GroupRunDetail'
+    | 'WaitingRoom'
+    | 'GroupRunCreate'
+    | 'GroupRunCancel'
+    | 'GroupRunResult'
+  >,
   undefined
 > & {
+  // 6.x open one group run; 6.8 makes one in a crew. Without an id they fall back to the next run.
+  GroupRunDetail: { groupRunId: string } | undefined;
+  WaitingRoom: { groupRunId: string } | undefined;
+  GroupRunCreate: { crewId: string } | undefined;
+  GroupRunCancel: { groupRunId: string } | undefined;
+  GroupRunResult: { groupRunId: string } | undefined;
   // 5.1 opens on a month (YYYY-MM), this month by default.
   Records: { month: string } | undefined;
   // 5.2 shows one run; without an id it shows the newest run.

@@ -15,8 +15,10 @@ import {
 } from '../../data';
 
 export type RunConfig = {
-  mode: 'FREE' | 'COURSE';
+  mode: 'FREE' | 'COURSE' | 'GROUP';
   plan: CoursePlan | null;
+  // 6.6 그룹런: the group run this record belongs to.
+  groupRunId?: string;
   // Goals are fixed once the run starts (4.3: 목표는 일시정지 중에도 바뀌지 않음).
   goalDistanceM: number | null;
   goalPaceSecPerKm: number | null;
@@ -129,6 +131,7 @@ export function RunSessionProvider({
         const { recordId } = await tracker.saveRecord({
           mode: state.config.mode,
           courseId: state.config.plan?.courseId ?? null,
+          groupRunId: state.config.groupRunId ?? null,
           startedAt: state.startedAt,
           ...summary,
           route: state.trail.length > 1 ? state.trail : null,

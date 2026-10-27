@@ -3,9 +3,11 @@ import type {
   AppNotification,
   CoursePlan,
   CurrentPlace,
+  MeetingPlace,
   MonthlyRunSummary,
   MusicLibrary,
   MusicState,
+  MyCrew,
   Place,
   RecommendedCourse,
   PeriodSummary,
@@ -528,6 +530,8 @@ export type RecordFixture = Omit<
   // Runs without a watch have no heart rate or cadence (5.2 hides those tabs).
   watch: boolean;
   aiAdvice: string | null;
+  // Records of a group run (6.7 reads my own).
+  groupRunId?: string;
 };
 
 const solo = { runType: 'SOLO' as const, group: null };
@@ -780,4 +784,225 @@ export const augustSummary: PeriodSummary = {
   totalDistanceM: 21400,
   totalDurationSec: 7832,
   averagePaceSecPerKm: 366,
+};
+
+// 6.x 그룹런. I am 민준 (me.id); the crews and runs follow prototype v15 6.0.
+export const crews: MyCrew[] = [
+  {
+    id: 'crew-gwangalli',
+    name: '광안리 새벽 크루',
+    area: '광안리',
+    memberCount: 18,
+    membership: 'MEMBER',
+  },
+  {
+    id: 'crew-minrak-night',
+    name: '민락 야경 러너스',
+    area: '민락수변',
+    memberCount: 24,
+    membership: 'MEMBER',
+  },
+  {
+    id: 'crew-namcheon',
+    name: '남천 회복 조깅',
+    area: '남천',
+    memberCount: 11,
+    membership: 'PENDING',
+  },
+];
+
+export const members = {
+  seongyun: { userId: 'user-seongyun', nickname: '성윤' },
+  eunseo: { userId: 'user-eunseo', nickname: '은서' },
+  seoyeon: { userId: 'user-seoyeon', nickname: '서연' },
+  jiwoo: { userId: 'user-jiwoo', nickname: '지우' },
+  me: { userId: 'user-minjun', nickname: '민준' },
+};
+
+export type GroupRunFixture = {
+  id: string;
+  crewId: string;
+  title: string;
+  hostId: string;
+  scheduledAt: string;
+  meetingPlaceName: string;
+  meetingAddress: string;
+  meetingPosition: [number, number];
+  courseId: string | null;
+  courseName: string | null;
+  route: [number, number][] | null;
+  targetDistanceM: number | null;
+  targetDurationSec: number | null;
+  goalPaceSecPerKm: number;
+  // Participants other than me; joined says whether I am in.
+  others: { userId: string; nickname: string }[];
+  joined: boolean;
+};
+
+const gwangalliEntrance: [number, number] = [129.1186, 35.1532];
+
+export const groupRuns: GroupRunFixture[] = [
+  {
+    // Starts 15 minutes after the mock clock (12:45): pinned on 6.0 and used for 6.5–6.7.
+    id: 'gr-today',
+    crewId: 'crew-gwangalli',
+    title: '월요일 점심, 함께 5km',
+    hostId: members.seongyun.userId,
+    scheduledAt: '2026-10-19T13:00:00+09:00',
+    meetingPlaceName: '광안리해수욕장 입구',
+    meetingAddress: '부산 수영구 광안해변로 219',
+    meetingPosition: gwangalliEntrance,
+    courseId: 'course-minrak',
+    courseName: '민락수변공원 출발 5.0km',
+    route: minrakLoop,
+    targetDistanceM: 5000,
+    targetDurationSec: null,
+    goalPaceSecPerKm: 360,
+    others: [members.seongyun, members.eunseo, members.seoyeon, members.jiwoo],
+    joined: true,
+  },
+  {
+    id: 'gr-saturday',
+    crewId: 'crew-gwangalli',
+    title: '토요일 아침, 함께 5km',
+    hostId: members.seongyun.userId,
+    scheduledAt: '2026-10-24T07:00:00+09:00',
+    meetingPlaceName: '광안리해수욕장 입구 · 편의점 앞',
+    meetingAddress: '부산 수영구 광안해변로 219',
+    meetingPosition: gwangalliEntrance,
+    courseId: 'course-minrak',
+    courseName: '민락수변공원 출발 5.0km',
+    route: minrakLoop,
+    targetDistanceM: 5000,
+    targetDurationSec: null,
+    goalPaceSecPerKm: 360,
+    others: [
+      members.seongyun,
+      members.eunseo,
+      members.seoyeon,
+      members.jiwoo,
+      { userId: 'user-hayun', nickname: '하윤' },
+    ],
+    joined: true,
+  },
+  {
+    // My own group run, so 6.4 offers 그룹런 취소 (6.4c–6.4e).
+    id: 'gr-wednesday',
+    crewId: 'crew-gwangalli',
+    title: '수요일 회복 조깅',
+    hostId: members.me.userId,
+    scheduledAt: '2026-10-28T06:30:00+09:00',
+    meetingPlaceName: '민락수변공원 주차장 입구',
+    meetingAddress: '부산 수영구 민락수변로 7',
+    meetingPosition: [129.1318, 35.1543],
+    courseId: null,
+    courseName: null,
+    route: null,
+    targetDistanceM: null,
+    targetDurationSec: 2400,
+    goalPaceSecPerKm: 400,
+    others: [members.eunseo, members.seoyeon],
+    joined: true,
+  },
+  {
+    id: 'gr-night',
+    crewId: 'crew-minrak-night',
+    title: '월요일 야경 7km',
+    hostId: members.jiwoo.userId,
+    scheduledAt: '2026-10-26T20:00:00+09:00',
+    meetingPlaceName: '민락수변공원 계단 앞',
+    meetingAddress: '부산 수영구 광안해변로 361',
+    meetingPosition: [129.1352, 35.1561],
+    courseId: 'course-gwangalli',
+    courseName: '민락수변공원 출발 7.0km',
+    route: minrakLoop,
+    targetDistanceM: 7000,
+    targetDurationSec: null,
+    goalPaceSecPerKm: 370,
+    others: [
+      members.jiwoo,
+      { userId: 'user-dohyun', nickname: '도현' },
+      { userId: 'user-yerin', nickname: '예린' },
+      { userId: 'user-junho', nickname: '준호' },
+      { userId: 'user-sora', nickname: '소라' },
+      { userId: 'user-taeho', nickname: '태호' },
+      { userId: 'user-mina', nickname: '미나' },
+      { userId: 'user-hyun', nickname: '현' },
+      { userId: 'user-nari', nickname: '나리' },
+    ],
+    joined: false,
+  },
+];
+
+// 6.4 내 페이스와 잘 맞아요.
+export const myFit = { recentPaceSecPerKm: 356, readinessScore: 82 };
+
+// 6.5: who is in the waiting room of gr-today (지우 applied but has not entered).
+export const waitingRoomReady: Record<string, boolean> = {
+  [members.seongyun.userId]: true,
+  [members.eunseo.userId]: true,
+  [members.seoyeon.userId]: false,
+};
+
+// 6.6 G10: where the other members run, in metres ahead of me (negative is behind), and their pace.
+export const liveMembers = [
+  { ...members.seongyun, gapM: 60, paceSecPerKm: 338 },
+  { ...members.seoyeon, gapM: -40, paceSecPerKm: 347 },
+  { ...members.eunseo, gapM: -120, paceSecPerKm: 365 },
+];
+
+// 6.7: how the other members finished gr-today.
+export const groupResults = [
+  {
+    ...members.seongyun,
+    state: 'FINISHED' as const,
+    durationSec: 1752,
+    distanceM: 5000,
+  },
+  {
+    ...members.seoyeon,
+    state: 'FINISHED' as const,
+    durationSec: 1805,
+    distanceM: 5000,
+  },
+  {
+    ...members.eunseo,
+    state: 'STOPPED' as const,
+    durationSec: 1420,
+    distanceM: 3800,
+  },
+];
+
+// 6.9 만남 장소 검색 results, nearest first.
+export const meetingPlaces: MeetingPlace[] = [
+  {
+    name: '광안리해수욕장 입구',
+    address: '부산 수영구 광안해변로 219',
+    position: gwangalliEntrance,
+    distanceM: 320,
+  },
+  {
+    name: '민락수변공원 주차장 입구',
+    address: '부산 수영구 민락수변로 7',
+    position: [129.1318, 35.1543],
+    distanceM: 1250,
+  },
+  {
+    name: '민락수변공원 계단 앞',
+    address: '부산 수영구 광안해변로 361',
+    position: [129.1352, 35.1561],
+    distanceM: 1580,
+  },
+  {
+    name: '수영강 APEC나루공원 입구',
+    address: '부산 해운대구 우동 1418',
+    position: [129.1345, 35.1697],
+    distanceM: 2900,
+  },
+];
+
+// 6.0b 내 근처 크루 모집 (within 3km).
+export const nearbyRecruiting = {
+  count: 8,
+  areas: ['광안리', '민락', '남천', '수영강'],
 };

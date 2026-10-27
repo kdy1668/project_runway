@@ -227,8 +227,9 @@ export type RunSample = {
 export type RunGuidance = { instruction: string; detail: string };
 
 export type RunRecordDraft = {
-  mode: 'FREE' | 'COURSE';
+  mode: 'FREE' | 'COURSE' | 'GROUP';
   courseId: string | null;
+  groupRunId: string | null;
   startedAt: string;
   durationSec: number;
   distanceM: number;
@@ -239,6 +240,163 @@ export type RunRecordDraft = {
   route: [number, number][] | null;
   goalDistanceM: number | null;
   goalPaceSecPerKm: number | null;
+};
+
+// G03 status (group_runs.status).
+export type GroupRunStatus =
+  | 'SCHEDULED'
+  | 'RUNNING'
+  | 'COMPLETED'
+  | 'CANCELLED';
+
+// G13 cancelReason (6.4c 취소 이유).
+export type GroupRunCancelReason =
+  | 'WEATHER'
+  | 'PERSONAL'
+  | 'LACK_OF_PARTICIPANTS'
+  | 'LOCATION_ISSUE'
+  | 'OTHER';
+
+// 6.0 내 크루 panel. PENDING is a join request the crew leader has not approved yet.
+export type MyCrew = {
+  id: string;
+  name: string;
+  area: string;
+  memberCount: number;
+  membership: 'MEMBER' | 'PENDING';
+};
+
+// A group run as listed on 6.0 and opened on 6.4 (G02·G03).
+export type GroupRunSummary = {
+  id: string;
+  crewId: string;
+  crewName: string;
+  title: string;
+  hostId: string;
+  hostNickname: string;
+  isHost: boolean;
+  scheduledAt: string;
+  meetingPlaceName: string;
+  meetingAddress: string;
+  // null for a free run without a course.
+  courseId: string | null;
+  courseName: string | null;
+  targetDistanceM: number | null;
+  // A free run's goal is its time (6.4 ‘자유 러닝 · 40분’).
+  targetDurationSec: number | null;
+  participantCount: number;
+  joined: boolean;
+  status: GroupRunStatus;
+};
+
+// 6.0: the run about to start is pinned on top; crews list their upcoming runs.
+export type MyGroupRuns = {
+  upcoming: GroupRunSummary | null;
+  crews: { crew: MyCrew; groupRuns: GroupRunSummary[] }[];
+  // 6.0b: crews recruiting near me, shown when I have none.
+  nearbyRecruiting: { count: number; areas: string[] };
+};
+
+// G07 참가자. Other members' readiness score is not shared (6.5 설계 메모).
+export type GroupRunParticipant = {
+  userId: string;
+  nickname: string;
+  isHost: boolean;
+  isMe: boolean;
+  readyStatus: 'READY' | 'WAITING';
+  readinessScore: number | null;
+};
+
+// 6.4 그룹런 상세 (G03 with G07 participants).
+export type GroupRunDetail = GroupRunSummary & {
+  route: [number, number][] | null;
+  meetingPosition: [number, number];
+  // 예상 공동 페이스: an estimate from the participants so far, not a fixed goal.
+  goalPaceSecPerKm: number;
+  crewMemberCount: number;
+  participants: GroupRunParticipant[];
+  // 내 페이스와 잘 맞아요: my recent 5km pace and today's readiness.
+  myFit: { recentPaceSecPerKm: number; readinessScore: number } | null;
+  // 6.4e 취소 완료.
+  cancellation: {
+    reason: GroupRunCancelReason;
+    message: string | null;
+    byNickname: string;
+    byRole: string;
+  } | null;
+};
+
+// 6.5 출발 준비.
+export type WaitingRoom = {
+  groupRunId: string;
+  goalPaceSecPerKm: number;
+  // 참가자 편한 범위.
+  comfortRange: [number, number];
+  expectedDurationSec: number;
+  appliedCount: number;
+  participants: GroupRunParticipant[];
+};
+
+// G10 실시간 현황, seen from me. gapM is positive for members ahead of me.
+export type GroupRunLive = {
+  members: {
+    userId: string;
+    nickname: string;
+    isMe: boolean;
+    gapM: number;
+    paceSecPerKm: number;
+  }[];
+  // 선두–후미 간격.
+  spreadM: number;
+  inRange: boolean;
+  // 지금 안내 페이스; it differs from the start goal after a load alert.
+  guidePaceSecPerKm: number;
+  // 6.6b 멤버 부담 알림: how many members are strained and the pace the group slows to.
+  loadAlert: { memberCount: number; nextPaceSecPerKm: number } | null;
+};
+
+// 6.7 그룹런 결과 (G14).
+export type GroupRunResult = {
+  groupRunId: string;
+  title: string;
+  status: GroupRunStatus;
+  targetDistanceM: number | null;
+  // 함께 달린 거리 · 그룹 평균 · 최대 간격.
+  distanceM: number;
+  averagePaceSecPerKm: number;
+  maxGapM: number;
+  participants: {
+    userId: string;
+    nickname: string;
+    isMe: boolean;
+    state: 'FINISHED' | 'STOPPED' | 'RUNNING';
+    durationSec: number;
+    distanceM: number;
+    goalAchieved: boolean | null;
+  }[];
+};
+
+// 6.9 만남 장소.
+export type MeetingPlace = {
+  name: string;
+  address: string;
+  position: [number, number];
+  // From my current position.
+  distanceM: number;
+};
+
+// G01 그룹런 생성 (6.8).
+export type GroupRunDraft = {
+  crewId: string;
+  courseId: string | null;
+  meetingPlaceName: string;
+  meetingAddress: string;
+  meetingPosition: [number, number];
+  // 찾아오는 법 (6.9b, optional).
+  meetingNote: string | null;
+  scheduledAt: string;
+  targetDistanceM: number | null;
+  targetDurationSec: number | null;
 };
 
 export type MusicService = 'MELON' | 'SPOTIFY';
@@ -399,6 +557,30 @@ export type Repositories = {
       distanceM: number;
       durationSec: number;
     }) => Promise<{ courseId: string }>;
+  };
+  // 6.x 그룹런 (G01–G16).
+  groupRuns: {
+    listMine: () => Promise<MyGroupRuns>;
+    get: (groupRunId: string) => Promise<GroupRunDetail>;
+    join: (groupRunId: string) => Promise<void>;
+    leave: (groupRunId: string) => Promise<void>;
+    create: (draft: GroupRunDraft) => Promise<{ id: string }>;
+    cancel: (groupRunId: string, reason: GroupRunCancelReason) => Promise<void>;
+    searchPlaces: (query: string) => Promise<MeetingPlace[]>;
+    getWaitingRoom: (groupRunId: string) => Promise<WaitingRoom>;
+    setReady: (groupRunId: string, ready: boolean) => Promise<WaitingRoom>;
+    // Calls onStart when the group leader starts; ready members' records start with it.
+    watchStart: (
+      groupRunId: string,
+      onStart: (startedAt: string) => void,
+    ) => () => void;
+    // Calls onUpdate every second with where the other members are (G10).
+    watchLive: (
+      groupRunId: string,
+      onUpdate: (live: GroupRunLive) => void,
+    ) => () => void;
+    forceFinish: (groupRunId: string) => Promise<void>;
+    getResult: (groupRunId: string) => Promise<GroupRunResult>;
   };
   notifications: {
     list: () => Promise<AppNotification[]>;
