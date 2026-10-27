@@ -13,6 +13,7 @@ import { CourseSearchProvider, courseScreens } from '../screens/course';
 import { homeScreens } from '../screens/home';
 import { onboardingScreens, SignUpDraftProvider } from '../screens/onboarding';
 import { PlaceholderScreen } from '../screens/PlaceholderScreen';
+import { groupScreens, GroupRunDraftProvider } from '../screens/group';
 import { recordScreens } from '../screens/records';
 import { SettingsPreview } from '../screens/previews';
 import { runScreens } from '../screens/run';
@@ -76,6 +77,7 @@ const screens: Record<RouteName, React.ComponentType> = {
   ...runScreens,
   ...courseScreens,
   ...recordScreens,
+  ...groupScreens,
 };
 
 // 2.7·2.8 float over the run screen, which stays visible behind the dimmed backdrop.
@@ -96,6 +98,10 @@ const runRoutes: ReadonlySet<RouteName> = new Set<RouteName>([
   'RunProgress',
   'RunPause',
   'RunResult',
+  'GroupRunProgress',
+  'GroupRunPosition',
+  'GroupRunPause',
+  'GroupRunResult',
 ]);
 
 const noHeader = { headerShown: false } as const;
@@ -167,50 +173,52 @@ export function RootNavigator() {
       <SignUpDraftProvider>
         <CourseSearchProvider>
           <RunSessionProvider>
-            <Root.Navigator screenOptions={noHeader}>
-              {/* 1.7 워치 연결 exists in both groups; the key makes sign-in/out start a fresh stack instead of staying on it. */}
-              {signedIn ? (
-                <Root.Group navigationKey="signed-in">
-                  <Root.Screen name="MainTabs" component={MainTabs} />
-                  {mainRoutes.map(route => (
-                    <Root.Screen
-                      key={route}
-                      name={route}
-                      component={screens[route]}
-                      options={
-                        modalRoutes.has(route)
-                          ? musicSheet
-                          : runRoutes.has(route)
-                          ? runScreen
-                          : undefined
-                      }
-                    />
-                  ))}
-                  {appConfig.developerMenu ? (
-                    <>
+            <GroupRunDraftProvider>
+              <Root.Navigator screenOptions={noHeader}>
+                {/* 1.7 워치 연결 exists in both groups; the key makes sign-in/out start a fresh stack instead of staying on it. */}
+                {signedIn ? (
+                  <Root.Group navigationKey="signed-in">
+                    <Root.Screen name="MainTabs" component={MainTabs} />
+                    {mainRoutes.map(route => (
                       <Root.Screen
-                        name="ComponentGallery"
-                        component={ComponentGalleryScreen}
+                        key={route}
+                        name={route}
+                        component={screens[route]}
+                        options={
+                          modalRoutes.has(route)
+                            ? musicSheet
+                            : runRoutes.has(route)
+                            ? runScreen
+                            : undefined
+                        }
                       />
+                    ))}
+                    {appConfig.developerMenu ? (
+                      <>
+                        <Root.Screen
+                          name="ComponentGallery"
+                          component={ComponentGalleryScreen}
+                        />
+                        <Root.Screen
+                          name="HealthPoc"
+                          getComponent={loadHealthPoc}
+                        />
+                      </>
+                    ) : null}
+                  </Root.Group>
+                ) : (
+                  <Root.Group navigationKey="signed-out">
+                    {authRoutes.map(route => (
                       <Root.Screen
-                        name="HealthPoc"
-                        getComponent={loadHealthPoc}
+                        key={route}
+                        name={route}
+                        component={screens[route]}
                       />
-                    </>
-                  ) : null}
-                </Root.Group>
-              ) : (
-                <Root.Group navigationKey="signed-out">
-                  {authRoutes.map(route => (
-                    <Root.Screen
-                      key={route}
-                      name={route}
-                      component={screens[route]}
-                    />
-                  ))}
-                </Root.Group>
-              )}
-            </Root.Navigator>
+                    ))}
+                  </Root.Group>
+                )}
+              </Root.Navigator>
+            </GroupRunDraftProvider>
           </RunSessionProvider>
         </CourseSearchProvider>
       </SignUpDraftProvider>

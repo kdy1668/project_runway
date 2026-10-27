@@ -147,6 +147,7 @@ export function fromDraft(
   id: string,
   title: string,
   shape: [number, number][],
+  group: RecordFixture['group'] = null,
 ): RecordFixture {
   return {
     id,
@@ -155,8 +156,9 @@ export function fromDraft(
     distanceM: Math.round(draft.distanceM),
     durationSec: draft.durationSec,
     shape,
-    runType: 'SOLO',
-    group: null,
+    runType: group ? 'GROUP' : 'SOLO',
+    group,
+    groupRunId: draft.groupRunId ?? undefined,
     route: draft.route,
     targetDurationSec:
       draft.goalDistanceM && draft.goalPaceSecPerKm

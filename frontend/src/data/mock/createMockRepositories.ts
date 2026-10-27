@@ -14,6 +14,7 @@ import type {
   TodayCondition,
 } from '../types';
 import * as fixtures from './fixtures';
+import { createGroupRunMock } from './groupRuns';
 import {
   fromDraft,
   kstDay,
@@ -46,6 +47,8 @@ export type MockScenario =
   // 3.1 추천 결과 없음 · 추천 실패.
   | 'noCourses'
   | 'courseError'
+  // 6.0b 가입한 크루 없음.
+  | 'noCrews'
   // 4.5 휴대폰에 저장하지 못했어요.
   | 'recordSaveFailed';
 
@@ -494,6 +497,13 @@ export function createMockRepositories(
         return respond(undefined, options);
       },
     },
+    groupRuns: createGroupRunMock({
+      respond: value => respond(value, options),
+      tickMs: options.tickMs ?? 1000,
+      noCrews: options.scenario === 'noCrews',
+      myRecord: groupRunId =>
+        records.find(record => record.groupRunId === groupRunId) ?? null,
+    }),
     notifications: {
       list: () =>
         respond(
@@ -537,7 +547,12 @@ export function createMockRepositories(
         const course =
           saved.find(item => item.id === draft.courseId) ??
           fixtures.recommendedCourses.find(item => item.id === draft.courseId);
-        const title = course
+        const groupRun = fixtures.groupRuns.find(
+          item => item.id === draft.groupRunId,
+        );
+        const title = groupRun
+          ? groupRun.title
+          : course
           ? ('myAlias' in course && course.myAlias) || course.name
           : '자유 러닝';
         records = [
@@ -546,6 +561,14 @@ export function createMockRepositories(
             id,
             title,
             draft.route ? shapeOf(draft.route) : fixtures.shapes.line,
+            groupRun
+              ? {
+                  crewName: fixtures.crews.find(
+                    crew => crew.id === groupRun.crewId,
+                  )!.name,
+                  finisherCount: fixtures.groupResults.length + 1,
+                }
+              : null,
           ),
           ...records,
         ];

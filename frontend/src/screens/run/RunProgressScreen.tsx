@@ -29,7 +29,16 @@ import { useRunSession } from './RunSession';
 const barSpanSec = 20;
 const goalBandSec = 10;
 
-function PaceBar({ pace, goal }: { pace: number | null; goal: number }) {
+export function PaceBar({
+  pace,
+  goal,
+  goalLabel = '목표',
+}: {
+  pace: number | null;
+  goal: number;
+  // 6.6 그룹런 shows 공동 목표.
+  goalLabel?: string;
+}) {
   const { colors } = useTheme();
   const slow = goal + barSpanSec;
   const fast = goal - barSpanSec;
@@ -65,7 +74,7 @@ function PaceBar({ pace, goal }: { pace: number | null; goal: number }) {
           {`느림 ${formatPace(slow)}`}
         </AppText>
         <AppText variant="labelStrong" tone="accentText">
-          {`목표 ${formatPace(goal)} ±${goalBandSec}″`}
+          {`${goalLabel} ${formatPace(goal)} ±${goalBandSec}″`}
         </AppText>
         <AppText variant="label" tone="textTertiary">
           {`빠름 ${formatPace(fast)}`}
@@ -102,7 +111,7 @@ function Stat({
 }
 
 // One-line player at the very bottom so it never covers the numbers (4.2 미니 플레이어).
-function MiniPlayer({ music }: { music: MusicState }) {
+export function MiniPlayer({ music }: { music: MusicState }) {
   const { colors } = useTheme();
   const [playing, setPlaying] = useState(music.nowPlaying?.playing ?? false);
   if (!music.nowPlaying) {

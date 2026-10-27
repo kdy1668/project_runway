@@ -141,8 +141,15 @@ test('recommended courses turn over to their detail and lead to the course run',
   }
   await press(screen, '내 코스에 저장');
   expect(() => labelled(screen, '저장 해제')).not.toThrow();
+  // The first card (민락수변공원 출발) is the one turned over above.
   await act(async () => {
-    labelled(screen, '코스 선택').props.onPress();
+    screen.root
+      .findAll(
+        node =>
+          node.props.accessibilityLabel === '코스 선택' &&
+          typeof node.props.onPress === 'function',
+      )[0]
+      .props.onPress();
   });
   await settle();
   expect(texts(screen)).toContain('민락수변공원 출발 5.0km 5.0km');

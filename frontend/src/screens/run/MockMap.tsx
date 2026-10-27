@@ -129,6 +129,8 @@ export function MockMap({
   positionY = 300,
   formatLabel,
   trail,
+  muted = false,
+  markers,
 }: {
   night?: boolean;
   position?: LngLat;
@@ -142,6 +144,10 @@ export function MockMap({
   formatLabel?: (km: number, pace: number) => string;
   // 4.2: the path run so far. It is drawn solid with the runner at its end, and the course left to run is dashed.
   trail?: LngLat[];
+  // 6.4e 취소된 그룹런: the course in grey instead of mint.
+  muted?: boolean;
+  // 6.6 그룹런: the other members, drawn as dots with name tags.
+  markers?: { position: LngLat; label: string; color: string }[];
 }) {
   const look = looks[night ? 'night' : 'day'];
   const project = projector(
@@ -194,14 +200,16 @@ export function MockMap({
               return `${x},${y}`;
             })
             .join(' ');
-          const color = night
+          const color = muted
+            ? look.label
+            : night
             ? palette.mint
             : segmentPaces
             ? paceColor(segmentPaces[index], fastest, slowest)
             : paceColors[1];
           return (
             <G key={`part-${index}`}>
-              {night ? (
+              {night && !muted ? (
                 <Polyline
                   points={points}
                   stroke={palette.mint}
@@ -256,6 +264,51 @@ export function MockMap({
             />
           </G>
         ) : null}
+        {(markers ?? []).map((marker, index) => {
+          const at = project(marker.position);
+          const width = 14 + marker.label.length * 12;
+          // Members close together get their tags stacked so the names stay readable.
+          const lift = [0, 22, 44][index % 3];
+          return (
+            <G key={marker.label}>
+              <Circle
+                cx={at.x}
+                cy={at.y}
+                r={6}
+                fill={marker.color}
+                stroke={palette.white}
+                strokeWidth={2}
+              />
+              <Rect
+                x={at.x - width / 2}
+                y={at.y - 30 - lift}
+                width={width}
+                height={18}
+                rx={6}
+                fill={night ? palette.card : palette.white}
+                opacity={0.92}
+              />
+              <Rect
+                x={at.x - width / 2 + 5}
+                y={at.y - 26 - lift}
+                width={2.5}
+                height={10}
+                rx={1}
+                fill={marker.color}
+              />
+              <Text
+                x={at.x + 3}
+                y={at.y - 17 - lift}
+                fontSize={11}
+                fontWeight="700"
+                fill={night ? palette.white : palette.ink}
+                textAnchor="middle"
+              >
+                {marker.label}
+              </Text>
+            </G>
+          );
+        })}
         {runner ? (
           <G>
             <Circle

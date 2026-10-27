@@ -19,7 +19,7 @@ const holdMs = 1000;
 const buttonSize = 88;
 
 // 종료 needs a one-second hold instead of a confirm dialog (4.3 설계 메모).
-function StopButton({ onFinish }: { onFinish: () => void }) {
+export function StopButton({ onFinish }: { onFinish: () => void }) {
   const { colors } = useTheme();
   const fill = useRef(new Animated.Value(0)).current;
   const [holding, setHolding] = useState(false);

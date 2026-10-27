@@ -136,9 +136,11 @@ test('tabs and their inner screens follow the prototype flow', async () => {
   await press(screen, '자유 러닝');
   expect(texts(screen)).toContain('코스 없이 기록만 남겨요');
   await press(screen, '그룹');
-  expect(texts(screen)).toContain('그룹 · 내 크루');
-  await press(screen, '6.1 크루 모집');
-  expect(texts(screen)).toContain('크루 모집');
+  // The group list loads after the tab opens.
+  await act(() => new Promise<void>(resolve => setTimeout(resolve, 400)));
+  expect(texts(screen)).toContain('광안리 새벽 크루');
+  await press(screen, '크루 모집');
+  expect(texts(screen)).toContain('S15P31E105-151');
   await press(screen, '커뮤니티');
   await press(screen, '7.2 게시물 상세');
   expect(texts(screen)).toContain('S15P31E105-152');
