@@ -13,10 +13,8 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import {
   AppText,
-  Backdrop,
   Button,
   Icon,
   IconButton,
@@ -39,7 +37,13 @@ import {
 } from '../../format';
 import { navigateTo } from '../../navigation/navigateTo';
 import { radius, size, spacing, useTheme } from '../../theme';
-import { CardTitle, GlassCard, ListRow, PillLink } from './parts';
+import {
+  CardTitle,
+  GlassCard,
+  ListRow,
+  PhotoBackground,
+  PillLink,
+} from './parts';
 import { ReadinessSection } from './ReadinessSection';
 
 const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
@@ -62,59 +66,6 @@ const loadHome = (repositories: Repositories) =>
 
 // How far the hero photo stays sharp before it blurs behind the cards.
 const heroHeight = 200;
-
-function HomeBackground({
-  photo,
-  scrollY,
-}: {
-  photo: string | null;
-  scrollY: Animated.Value;
-}) {
-  const { colors } = useTheme();
-  if (!photo) {
-    return <Backdrop />;
-  }
-  return (
-    <>
-      <Image source={{ uri: photo }} style={styles.photo} />
-      {/* The prototype blurs the profile photo as the cards scroll over it. */}
-      <Animated.Image
-        source={{ uri: photo }}
-        blurRadius={18}
-        style={[
-          styles.photo,
-          {
-            opacity: scrollY.interpolate({
-              inputRange: [0, heroHeight],
-              outputRange: [0, 1],
-              extrapolate: 'clamp',
-            }),
-          },
-        ]}
-      />
-      <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
-        <Defs>
-          <LinearGradient id="photoFade" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={colors.background} stopOpacity={0.35} />
-            <Stop offset="0.22" stopColor={colors.background} stopOpacity={0} />
-            <Stop
-              offset="0.42"
-              stopColor={colors.background}
-              stopOpacity={0.15}
-            />
-            <Stop
-              offset="0.64"
-              stopColor={colors.background}
-              stopOpacity={0.78}
-            />
-            <Stop offset="0.88" stopColor={colors.background} stopOpacity={1} />
-          </LinearGradient>
-        </Defs>
-        <Rect width="100%" height="100%" fill="url(#photoFade)" />
-      </Svg>
-    </>
-  );
-}
 
 function Avatar({
   nickname,
@@ -176,7 +127,9 @@ function RecordsCard() {
               )}km · ${formatDuration(record.durationSec)}`}
               value={formatPace(record.averagePaceSecPerKm)}
               shape={record.shape}
-              onPress={() => navigateTo(navigation, 'RecordDetail')}
+              onPress={() =>
+                navigation.navigate('RecordDetail', { recordId: record.id })
+              }
             />
           ))}
         </View>
@@ -211,7 +164,11 @@ export function HomeScreen() {
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={colors.statusBar} />
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        <HomeBackground photo={backdrop} scrollY={scrollY} />
+        <PhotoBackground
+          photo={backdrop}
+          scrollY={scrollY}
+          sharpFor={heroHeight}
+        />
       </View>
       <Animated.ScrollView
         contentContainerStyle={[
@@ -402,14 +359,6 @@ export function HomeScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  photo: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: '100%',
-    height: '100%',
-    transform: [{ scale: 1.08 }],
-  },
   headerLayer: { position: 'absolute', top: 0, left: 0, right: 0 },
   header: {
     height: size.header,

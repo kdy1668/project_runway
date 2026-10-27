@@ -131,6 +131,9 @@ export function RunSessionProvider({
           courseId: state.config.plan?.courseId ?? null,
           startedAt: state.startedAt,
           ...summary,
+          route: state.trail.length > 1 ? state.trail : null,
+          goalDistanceM: state.config.goalDistanceM,
+          goalPaceSecPerKm: state.config.goalPaceSecPerKm,
         });
         setRun(current =>
           current ? { ...current, saveState: 'saved', recordId } : current,

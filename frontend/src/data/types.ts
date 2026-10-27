@@ -59,6 +59,73 @@ export type RunRecordSummary = {
   averagePaceSecPerKm: number;
   // Shape of the run for the small thumbnail, as [x, y] points in a 0–1 box.
   shape: [number, number][];
+  // H01 runType: group runs show their crew and how many finished (5.1 그룹런 표시).
+  runType: 'SOLO' | 'GROUP';
+  group: { crewName: string; finisherCount: number } | null;
+  // H01 goalAchieved: false shows the run in coral (5.1); null when the run had no goal.
+  goalAchieved: boolean | null;
+};
+
+// 5.1 전체 · 개인 · 그룹런 탭 (H01 runType).
+export type RecordFilter = 'ALL' | 'SOLO' | 'GROUP';
+
+// Totals for a month, week or year (5.1 월 요약, 5.3 요약, H06).
+export type PeriodSummary = {
+  runCount: number;
+  totalDistanceM: number;
+  totalDurationSec: number;
+  averagePaceSecPerKm: number | null;
+};
+
+// 5.1: one month of runs, newest first. The summary covers the whole month whatever the filter.
+export type RecordMonth = {
+  month: string;
+  summary: PeriodSummary;
+  records: RunRecordSummary[];
+};
+
+// H03 구간: one stretch of the run for the 5.2 graphs. Heart rate and cadence are null without a watch.
+export type RunSplit = {
+  startDistanceM: number;
+  endDistanceM: number;
+  paceSecPerKm: number | null;
+  averageHeartRate: number | null;
+  averageCadence: number | null;
+};
+
+// 5.2 기록 상세 (H02 with H03 splits).
+export type RunRecordDetail = RunRecordSummary & {
+  // [longitude, latitude] points; null for a run recorded without location.
+  route: [number, number][] | null;
+  targetDurationSec: number | null;
+  targetPaceSecPerKm: number | null;
+  aiAdvice: string | null;
+  splits: RunSplit[];
+  // The planned course, if the run followed one.
+  courseId: string | null;
+  // My saved course for this run (내 코스에 저장), or null when it is not saved.
+  myCourseId: string | null;
+};
+
+export type AnalysisPeriod = 'WEEK' | 'MONTH' | 'YEAR';
+
+// 5.3 러닝 분석 (H06) for the week, month or year that holds baseDate.
+export type RunStatistics = PeriodSummary & {
+  // Distance by weekday (WEEK, Monday first), week of the month (MONTH) or month (YEAR).
+  breakdown: number[];
+  // Share of time in heart rate zones 1–5; empty without heart rate data.
+  heartRateZones: number[];
+  previousPeriod: PeriodSummary | null;
+};
+
+// 5.3 평균 페이스 추이 (H07), oldest month first.
+export type PaceTrend = {
+  items: {
+    month: string;
+    averagePaceSecPerKm: number | null;
+    runCount: number;
+  }[];
+  changeSecPerKm: number | null;
 };
 
 export type SavedCourse = {
@@ -172,6 +239,10 @@ export type RunRecordDraft = {
   averagePaceSecPerKm: number | null;
   averageHeartRate: number | null;
   averageCadence: number | null;
+  // The GPS track; null when the run had no location.
+  route: [number, number][] | null;
+  goalDistanceM: number | null;
+  goalPaceSecPerKm: number | null;
 };
 
 export type MusicService = 'MELON' | 'SPOTIFY';
@@ -305,7 +376,17 @@ export type Repositories = {
     getBackdrop: () => Promise<HomeBackdrop>;
   };
   records: {
+    // 2.1 과거 러닝 기록: my own runs only; group runs are listed in 5.1.
     getRecent: (sort: RecordSort, limit: number) => Promise<RunRecordSummary[]>;
+    // month is YYYY-MM.
+    getMonth: (month: string, filter: RecordFilter) => Promise<RecordMonth>;
+    getDetail: (recordId: string) => Promise<RunRecordDetail>;
+    // baseDate is any day (YYYY-MM-DD) inside the period.
+    getStatistics: (
+      period: AnalysisPeriod,
+      baseDate: string,
+    ) => Promise<RunStatistics>;
+    getPaceTrend: (months: number) => Promise<PaceTrend>;
   };
   courses: {
     getSaved: () => Promise<SavedCourse[]>;

@@ -16,10 +16,15 @@ export type MainTabParamList = {
   CommunityTab: undefined;
 };
 
+// Screens that open one item take its id; the rest take no params.
 export type RootStackParamList = Record<
-  AuthRouteName | MainRouteName,
+  Exclude<AuthRouteName | MainRouteName, 'Records' | 'RecordDetail'>,
   undefined
 > & {
+  // 5.1 opens on a month (YYYY-MM), this month by default.
+  Records: { month: string } | undefined;
+  // 5.2 shows one run; without an id it shows the newest run.
+  RecordDetail: { recordId: string } | undefined;
   MainTabs: NavigatorScreenParams<MainTabParamList> | undefined;
   HealthPoc: undefined;
   ComponentGallery: undefined;

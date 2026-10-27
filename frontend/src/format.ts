@@ -36,6 +36,12 @@ export function formatDotDate(value: string | Date) {
   return `${month}.${pad(day)}`;
 }
 
+// 10.15 목
+export function formatDotDateWeekday(value: string | Date) {
+  const { weekday } = kst(value);
+  return `${formatDotDate(value)} ${weekdays[weekday]}`;
+}
+
 // 06:42
 export function formatClockTime(value: string | Date) {
   const { hours, minutes } = kst(value);
@@ -67,6 +73,12 @@ export function formatDuration(totalSeconds: number) {
   return hours > 0
     ? `${hours}:${pad(minutes)}:${seconds}`
     : `${minutes}:${seconds}`;
+}
+
+// 3:21 (hours and minutes, for totals)
+export function formatHours(totalSeconds: number) {
+  const minutes = Math.round(totalSeconds / 60);
+  return `${Math.floor(minutes / 60)}:${pad(minutes % 60)}`;
 }
 
 // 7h 12m
