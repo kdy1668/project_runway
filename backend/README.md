@@ -1,7 +1,7 @@
 # RunWay 백엔드
 
-Java 21·Spring MVC 기반의 실행·테스트 초기 구성이다. 업무 API, 인증, Entity와 서비스용
-마이그레이션은 아직 없다. 로컬 개발용이며 운영에 그대로 배포하지 않는다.
+Java 21·Spring MVC 기반의 실행·테스트 초기 구성과 서비스용 Flyway 마이그레이션 V1을 포함한다.
+업무 API·인증·Entity는 아직 없다. 로컬 개발용이며 운영에 그대로 배포하지 않는다.
 
 ## 1. 준비와 버전
 
@@ -141,7 +141,8 @@ DB와 무관한 부분만 개발 중 확인할 때:
 ```
 
 Bash에서는 실행 부분을 `./gradlew`로 바꾼다. 이 부분 테스트 성공을 전체 완료 검증으로
-보고하지 않는다. DB 테스트는 `BackendApplicationIntegrationTest`이며 Testcontainers가
+보고하지 않는다. DB 테스트는 `BackendApplicationIntegrationTest`, `SchemaIntegrityTest`,
+`FlywayMigrationTest`이며 Testcontainers가
 일회성 DB를 만들고 정리한다. 개발 `.env`는 읽지 않고 컨테이너 연결을 테스트에 주입한다.
 
 테스트는 설정 누락·Lombok 생성·MVC JSON 및 입력 검증·DB/PostGIS 연결을 확인한다.
@@ -151,9 +152,19 @@ Bash에서는 실행 부분을 `./gradlew`로 바꾼다. 이 부분 테스트 �
 
 - JPA는 `ddl-auto=validate`로 검사만 하며 OSIV는 비활성화한다.
 - Flyway는 활성화하고 `clean`과 자동 baseline을 허용하지 않는다.
-- 아직 서비스용 SQL·Entity가 없다. PostGIS 자체 관리 테이블과 Flyway 이력 테이블이
-  존재할 수 있으며, 기동 성공이 업무 테이블 매핑 검증을 의미하지 않는다.
-- ERD 확정 후 별도 업무에서 첫 마이그레이션·Entity·실제 데이터 검증을 추가한다.
+- `src/main/resources/db/migration/V1__initial_schema.sql`은 현재 기준 스키마의 26개 업무
+  테이블·타입·제약·트리거를 빈 DB에 설치한다. Entity는 아직 없으며 기동 성공이 업무 Entity
+  매핑 검증을 의미하지 않는다. 기존 워치 테이블 설치가 미확정 워치 API 정책을 확정하지 않는다.
+- Flyway는 서버 기동 시 미적용 버전을 적용한다. 다른 개발자의 로컬 DB도 각자 설정한 접속
+  대상에 적용되며, 개인 `.env`를 공유하지 않는다. IntelliJ에서 `.env` 파일을 실행 설정에
+  지정하면 IDE가 변수를 전달할 수 있다. 파일을 만들기만 하면 자동 적용되는 것은 아니다.
+- 최초 적용 전 접속 대상이 새 빈 개발 DB인지 확인한다. 기존 데이터가 있거나 출처가 불명확한
+  Docker 볼륨이면 중단하고 기존 설정·이행 방법을 확인한다. 볼륨 삭제로 해결하지 않는다.
+- 이미 적용한 V1은 수정하지 않는다. 변경은 `V2__설명.sql` 등 새 버전과 기준 스키마에 반영한다.
+  병렬 번호 충돌·실패·체크섬 불일치 대응은 [DB 규칙](../docs/development/db-schema-convention.md#7-flyway-변경-적용과-복구)을 따른다.
+- 격리 테스트는 첫 적용·이력·재적용 시 데이터 보존·기존 DB 거부·변조 감지·실패 롤백과
+  기준 SQL 대비 실제 설치 구조를 검사한다. PostgreSQL 트랜잭션 DDL 검증이며 임의 SQL의
+  자동 복구나 운영 이행을 보장하지 않는다.
 - 기존·공유·운영 DB를 이 초기 구성에 연결하지 않는다.
 
 ## 관련 기준
