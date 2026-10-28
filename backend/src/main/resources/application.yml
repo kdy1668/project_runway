@@ -24,6 +24,13 @@ server:
     include-exception: false
 
 runway:
+  auth:
+    redis:
+      host: ${BACKEND_REDIS_HOST:}
+      port: ${BACKEND_REDIS_PORT:}
+      username: ${BACKEND_REDIS_USERNAME:}
+      password: ${BACKEND_REDIS_PASSWORD:}
+      ssl-enabled: ${BACKEND_REDIS_SSL_ENABLED:false}
   security:
     jwt-secret-base64: ${BACKEND_JWT_SECRET_BASE64:}
     docs-access-mode: ${BACKEND_DOCS_ACCESS_MODE:password}
