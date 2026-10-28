@@ -2,10 +2,12 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | 채택 |
+| 상태 | 대체 |
 | 결정일 | 2026-10-27 |
 | 결정자 | 작업 요청자(본 대화에서 정책 선택 및 ADR 작성 승인) |
 | 관련 | [S15P31E105-190](https://ssafy.atlassian.net/browse/S15P31E105-190), [인증 API U01~U03](../design/api/users.md), [공통 API 규약](../design/api/README.md), [데이터 모델](../design/db/erd.md) |
+
+대체됨: [ADR-0014](0014-common-api-authentication.md). 아래는 당시 결정 기록이며 현재 공통 인증 정책은 후속 ADR을 따른다.
 
 ## 맥락
 

@@ -10,7 +10,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.runway.backend.global.auth.CurrentUserIdResolver;
+import com.runway.backend.global.security.SecurityTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -103,12 +103,38 @@ class PostApiIntegrationTest {
     }
 
     @Test
+    void 헤더단독과_상충헤더로_게시물작성자를_가장할수없다() throws Exception {
+        mockMvc.perform(
+                        delete("/api/v1/posts/{postId}", viewerPostId)
+                                .header("X-User-Id", viewerId))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(
+                        delete("/api/v1/posts/{postId}", viewerPostId)
+                                .header("Authorization", SecurityTestSupport.bearer(outsiderId))
+                                .header("X-User-Id", viewerId))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("NOT_AUTHOR"));
+        org.assertj.core.api.Assertions.assertThat(
+                        jdbc.queryForObject(
+                                "SELECT deleted_at IS NULL FROM posts WHERE id=?",
+                                Boolean.class,
+                                viewerPostId))
+                .isTrue();
+        mockMvc.perform(
+                        get("/api/v1/posts/{postId}", privatePostId)
+                                .header("Authorization", SecurityTestSupport.bearer(outsiderId))
+                                .header("X-User-Id", viewerId))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCOUNT_ACCESS_DENIED"));
+    }
+
+    @Test
     void 완료된본인세션_게시물작성_201() throws Exception {
         long freshSessionId = insertSession(viewerId, "COMPLETED");
 
         mockMvc.perform(
                         post("/api/v1/posts")
-                                .header(CurrentUserIdResolver.HEADER, viewerId)
+                                .header("Authorization", SecurityTestSupport.bearer(viewerId))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
@@ -127,7 +153,7 @@ class PostApiIntegrationTest {
     void 타인세션_게시물작성_403_RESOURCE_NOT_OWNED() throws Exception {
         mockMvc.perform(
                         post("/api/v1/posts")
-                                .header(CurrentUserIdResolver.HEADER, viewerId)
+                                .header("Authorization", SecurityTestSupport.bearer(viewerId))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
@@ -142,7 +168,7 @@ class PostApiIntegrationTest {
     void 미완료세션_게시물작성_422_INVALID_POST() throws Exception {
         mockMvc.perform(
                         post("/api/v1/posts")
-                                .header(CurrentUserIdResolver.HEADER, viewerId)
+                                .header("Authorization", SecurityTestSupport.bearer(viewerId))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
@@ -155,20 +181,22 @@ class PostApiIntegrationTest {
 
     @Test
     void 공개글목록노출_비공개상세_비팔로워403_팔로워OK() throws Exception {
-        mockMvc.perform(get("/api/v1/posts").header(CurrentUserIdResolver.HEADER, outsiderId))
+        mockMvc.perform(
+                        get("/api/v1/posts")
+                                .header("Authorization", SecurityTestSupport.bearer(outsiderId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[*].id", hasItem((int) publicPostId)))
                 .andExpect(jsonPath("$.items[*].id", not(hasItem((int) privatePostId))));
 
         mockMvc.perform(
                         get("/api/v1/posts/{postId}", privatePostId)
-                                .header(CurrentUserIdResolver.HEADER, outsiderId))
+                                .header("Authorization", SecurityTestSupport.bearer(outsiderId)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCOUNT_ACCESS_DENIED"));
 
         mockMvc.perform(
                         get("/api/v1/posts/{postId}", privatePostId)
-                                .header(CurrentUserIdResolver.HEADER, viewerId))
+                                .header("Authorization", SecurityTestSupport.bearer(viewerId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(privatePostId))
                 .andExpect(jsonPath("$.authorId").value(privateAuthorId))
@@ -179,7 +207,7 @@ class PostApiIntegrationTest {
     void FOLLOWING스코프_팔로위와본인포함() throws Exception {
         mockMvc.perform(
                         get("/api/v1/posts")
-                                .header(CurrentUserIdResolver.HEADER, viewerId)
+                                .header("Authorization", SecurityTestSupport.bearer(viewerId))
                                 .param("scope", "FOLLOWING"))
                 .andExpect(status().isOk())
                 .andExpect(
@@ -193,7 +221,7 @@ class PostApiIntegrationTest {
     void authorId필터_해당작성자만() throws Exception {
         mockMvc.perform(
                         get("/api/v1/posts")
-                                .header(CurrentUserIdResolver.HEADER, viewerId)
+                                .header("Authorization", SecurityTestSupport.bearer(viewerId))
                                 .param("authorId", String.valueOf(publicAuthorId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(1))
@@ -205,7 +233,7 @@ class PostApiIntegrationTest {
     void 본인본문수정_OK_타인수정_403_NOT_AUTHOR() throws Exception {
         mockMvc.perform(
                         patch("/api/v1/posts/{postId}", viewerPostId)
-                                .header(CurrentUserIdResolver.HEADER, viewerId)
+                                .header("Authorization", SecurityTestSupport.bearer(viewerId))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
@@ -218,7 +246,7 @@ class PostApiIntegrationTest {
 
         mockMvc.perform(
                         patch("/api/v1/posts/{postId}", viewerPostId)
-                                .header(CurrentUserIdResolver.HEADER, outsiderId)
+                                .header("Authorization", SecurityTestSupport.bearer(outsiderId))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
@@ -232,13 +260,13 @@ class PostApiIntegrationTest {
     void 소프트삭제후_상세_404_POST_NOT_FOUND() throws Exception {
         mockMvc.perform(
                         delete("/api/v1/posts/{postId}", viewerPostId)
-                                .header(CurrentUserIdResolver.HEADER, viewerId))
+                                .header("Authorization", SecurityTestSupport.bearer(viewerId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.deletedAt").isNotEmpty());
 
         mockMvc.perform(
                         get("/api/v1/posts/{postId}", viewerPostId)
-                                .header(CurrentUserIdResolver.HEADER, viewerId))
+                                .header("Authorization", SecurityTestSupport.bearer(viewerId)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("POST_NOT_FOUND"));
     }

@@ -4,6 +4,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.runway.backend.global.security.SecurityConfig;
+import com.runway.backend.global.security.SecurityTestSupport;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.Test;
@@ -17,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @WebMvcTest(MvcBootstrapTest.FixtureController.class)
-@Import(MvcBootstrapTest.FixtureController.class)
+@Import({MvcBootstrapTest.FixtureController.class, SecurityConfig.class})
 class MvcBootstrapTest {
 
     @Autowired private MockMvc mvc;
@@ -26,6 +28,7 @@ class MvcBootstrapTest {
     void 유효요청_JSON응답_값을보존한다() throws Exception {
         mvc.perform(
                         post("/__test/echo")
+                                .header("Authorization", SecurityTestSupport.bearer(1))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"value\":\"sample\"}"))
                 .andExpect(status().isOk())
@@ -36,6 +39,7 @@ class MvcBootstrapTest {
     void 빈필수문자열_요청_400을반환한다() throws Exception {
         mvc.perform(
                         post("/__test/echo")
+                                .header("Authorization", SecurityTestSupport.bearer(1))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"value\":\"\"}"))
                 .andExpect(status().isBadRequest());

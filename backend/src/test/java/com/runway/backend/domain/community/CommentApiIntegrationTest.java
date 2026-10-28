@@ -10,7 +10,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.runway.backend.global.auth.CurrentUserIdResolver;
+import com.runway.backend.global.security.SecurityTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +31,35 @@ import org.testcontainers.utility.DockerImageName;
 @AutoConfigureMockMvc
 @Testcontainers
 class CommentApiIntegrationTest {
+
+    @Test
+    void 헤더단독과_상충헤더로_댓글작성자를_가장할수없다() throws Exception {
+        long comment = insertComment(publicPostId, viewerId, "keep-body", null);
+        mockMvc.perform(
+                        patch("/api/v1/comments/{commentId}", comment)
+                                .header("X-User-Id", viewerId)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"body\":\"forged\"}"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(
+                        patch("/api/v1/comments/{commentId}", comment)
+                                .header("Authorization", SecurityTestSupport.bearer(outsiderId))
+                                .header("X-User-Id", viewerId)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"body\":\"forged\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("NOT_AUTHOR"));
+        org.assertj.core.api.Assertions.assertThat(
+                        jdbc.queryForObject(
+                                "SELECT body FROM comments WHERE id=?", String.class, comment))
+                .isEqualTo("keep-body");
+        mockMvc.perform(
+                        get("/api/v1/posts/{postId}/comments", privatePostId)
+                                .header("Authorization", SecurityTestSupport.bearer(outsiderId))
+                                .header("X-User-Id", viewerId))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCOUNT_ACCESS_DENIED"));
+    }
 
     @Container
     static final PostgreSQLContainer DATABASE =
@@ -100,7 +129,7 @@ class CommentApiIntegrationTest {
 
         mockMvc.perform(
                         get("/api/v1/posts/{postId}/comments", publicPostId)
-                                .header(CurrentUserIdResolver.HEADER, viewerId))
+                                .header("Authorization", SecurityTestSupport.bearer(viewerId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(2))
                 .andExpect(jsonPath("$.items[0].id").value(rootId))
@@ -121,13 +150,13 @@ class CommentApiIntegrationTest {
 
         mockMvc.perform(
                         get("/api/v1/posts/{postId}/comments", privatePostId)
-                                .header(CurrentUserIdResolver.HEADER, outsiderId))
+                                .header("Authorization", SecurityTestSupport.bearer(outsiderId)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCOUNT_ACCESS_DENIED"));
 
         mockMvc.perform(
                         get("/api/v1/posts/{postId}/comments", privatePostId)
-                                .header(CurrentUserIdResolver.HEADER, viewerId))
+                                .header("Authorization", SecurityTestSupport.bearer(viewerId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(1))
                 .andExpect(jsonPath("$.items[0].body").value("비공개 댓글"));
@@ -138,7 +167,9 @@ class CommentApiIntegrationTest {
         MvcResult created =
                 mockMvc.perform(
                                 post("/api/v1/posts/{postId}/comments", publicPostId)
-                                        .header(CurrentUserIdResolver.HEADER, viewerId)
+                                        .header(
+                                                "Authorization",
+                                                SecurityTestSupport.bearer(viewerId))
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(
                                                 """
@@ -158,7 +189,7 @@ class CommentApiIntegrationTest {
 
         mockMvc.perform(
                         post("/api/v1/posts/{postId}/comments", publicPostId)
-                                .header(CurrentUserIdResolver.HEADER, publicAuthorId)
+                                .header("Authorization", SecurityTestSupport.bearer(publicAuthorId))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
@@ -175,7 +206,7 @@ class CommentApiIntegrationTest {
 
         mockMvc.perform(
                         post("/api/v1/posts/{postId}/comments", publicPostId)
-                                .header(CurrentUserIdResolver.HEADER, viewerId)
+                                .header("Authorization", SecurityTestSupport.bearer(viewerId))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
@@ -194,7 +225,7 @@ class CommentApiIntegrationTest {
 
         mockMvc.perform(
                         post("/api/v1/posts/{postId}/comments", publicPostId)
-                                .header(CurrentUserIdResolver.HEADER, viewerId)
+                                .header("Authorization", SecurityTestSupport.bearer(viewerId))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
@@ -206,7 +237,7 @@ class CommentApiIntegrationTest {
 
         mockMvc.perform(
                         post("/api/v1/posts/{postId}/comments", publicPostId)
-                                .header(CurrentUserIdResolver.HEADER, viewerId)
+                                .header("Authorization", SecurityTestSupport.bearer(viewerId))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
@@ -218,7 +249,7 @@ class CommentApiIntegrationTest {
 
         mockMvc.perform(
                         post("/api/v1/posts/{postId}/comments", 9_999_999L)
-                                .header(CurrentUserIdResolver.HEADER, viewerId)
+                                .header("Authorization", SecurityTestSupport.bearer(viewerId))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
@@ -232,7 +263,7 @@ class CommentApiIntegrationTest {
     void 비공개글_댓글작성_비팔로워403_ACCOUNT_ACCESS_DENIED() throws Exception {
         mockMvc.perform(
                         post("/api/v1/posts/{postId}/comments", privatePostId)
-                                .header(CurrentUserIdResolver.HEADER, outsiderId)
+                                .header("Authorization", SecurityTestSupport.bearer(outsiderId))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
@@ -248,7 +279,7 @@ class CommentApiIntegrationTest {
 
         mockMvc.perform(
                         patch("/api/v1/comments/{commentId}", commentId)
-                                .header(CurrentUserIdResolver.HEADER, viewerId)
+                                .header("Authorization", SecurityTestSupport.bearer(viewerId))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
@@ -261,7 +292,7 @@ class CommentApiIntegrationTest {
 
         mockMvc.perform(
                         patch("/api/v1/comments/{commentId}", commentId)
-                                .header(CurrentUserIdResolver.HEADER, outsiderId)
+                                .header("Authorization", SecurityTestSupport.bearer(outsiderId))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
@@ -272,7 +303,7 @@ class CommentApiIntegrationTest {
 
         mockMvc.perform(
                         patch("/api/v1/comments/{commentId}", commentId)
-                                .header(CurrentUserIdResolver.HEADER, viewerId)
+                                .header("Authorization", SecurityTestSupport.bearer(viewerId))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
@@ -289,26 +320,26 @@ class CommentApiIntegrationTest {
 
         mockMvc.perform(
                         delete("/api/v1/comments/{commentId}", otherCommentId)
-                                .header(CurrentUserIdResolver.HEADER, outsiderId))
+                                .header("Authorization", SecurityTestSupport.bearer(outsiderId)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("NOT_AUTHOR"));
 
         mockMvc.perform(
                         delete("/api/v1/comments/{commentId}", ownCommentId)
-                                .header(CurrentUserIdResolver.HEADER, viewerId))
+                                .header("Authorization", SecurityTestSupport.bearer(viewerId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.deletedAt").isNotEmpty());
 
         mockMvc.perform(
                         get("/api/v1/posts/{postId}/comments", publicPostId)
-                                .header(CurrentUserIdResolver.HEADER, viewerId))
+                                .header("Authorization", SecurityTestSupport.bearer(viewerId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[*].id", not(hasItem((int) ownCommentId))))
                 .andExpect(jsonPath("$.items[*].id", hasItem((int) otherCommentId)));
 
         mockMvc.perform(
                         patch("/api/v1/comments/{commentId}", ownCommentId)
-                                .header(CurrentUserIdResolver.HEADER, viewerId)
+                                .header("Authorization", SecurityTestSupport.bearer(viewerId))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
@@ -319,7 +350,7 @@ class CommentApiIntegrationTest {
 
         mockMvc.perform(
                         delete("/api/v1/comments/{commentId}", ownCommentId)
-                                .header(CurrentUserIdResolver.HEADER, viewerId))
+                                .header("Authorization", SecurityTestSupport.bearer(viewerId)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("COMMENT_NOT_FOUND"));
     }

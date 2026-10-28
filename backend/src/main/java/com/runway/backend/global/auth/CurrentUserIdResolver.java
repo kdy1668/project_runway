@@ -1,22 +1,17 @@
 package com.runway.backend.global.auth;
 
 import com.runway.backend.global.exception.ApiException;
+import com.runway.backend.global.security.AuthenticatedUser;
 import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Component;
 
-@Component
-public class CurrentUserIdResolver {
+public final class CurrentUserIdResolver {
 
-    public static final String HEADER = "X-User-Id";
+    private CurrentUserIdResolver() {}
 
-    public long requireUserId(String rawHeader) {
-        if (rawHeader == null || rawHeader.isBlank()) {
+    public static long requireUserId(AuthenticatedUser user) {
+        if (user == null || user.id() <= 0) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "인증이 필요합니다.");
         }
-        try {
-            return Long.parseLong(rawHeader.trim());
-        } catch (NumberFormatException ex) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "인증이 필요합니다.");
-        }
+        return user.id();
     }
 }

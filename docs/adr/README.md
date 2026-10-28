@@ -78,7 +78,8 @@ ADR에는 선택 이유를 기록하고, 구체적인 계약은 해당 기준 �
 | [ADR-0010](0010-spring-mvc-backend.md) | 백엔드 HTTP API는 Spring MVC로 구현한다 | 채택 | — |
 | [ADR-0011](0011-local-postgresql-postgis.md) | 개발·테스트 DB는 PostgreSQL 17과 PostGIS 3.6을 사용한다 | 채택 | — |
 | [ADR-0012](0012-watch-phone-data-layer.md) | 워치·폰은 MessageClient 배치와 DataItem 상태 공유를 사용한다 | 채택 | — |
-| [ADR-0013](0013-jwt-authentication.md) | JWT 10분과 최대 30일 갱신 권한을 사용하고 로그아웃 시 갱신 권한을 폐기한다 | 채택 | — |
+| [ADR-0013](0013-jwt-authentication.md) | JWT 10분과 최대 30일 갱신 권한을 사용하고 로그아웃 시 갱신 권한을 폐기한다 | 대체 | 대체됨: [ADR-0014](0014-common-api-authentication.md) |
+| [ADR-0014](0014-common-api-authentication.md) | 공통 회원 API의 짧은 Bearer JWT와 별도 문서 인증 | 채택 | 대체함: [ADR-0013](0013-jwt-authentication.md) |
 
 새 ADR을 추가할 때 번호에는 문서 링크를 연결하고, 대체 관계에는 `대체함: ADR-NNNN` 또는 `대체됨: ADR-NNNN`을 문서 링크와 함께 적는다. 관계가 없으면 `—`로 표시한다.
 
