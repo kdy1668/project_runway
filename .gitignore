@@ -65,6 +65,8 @@ build/
 target/
 out/
 *.class
+# Local F01 image volume (default runway.images.volume-path)
+backend/data/
 
 # Infrastructure
 **/.terraform/*
