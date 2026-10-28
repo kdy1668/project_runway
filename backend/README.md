@@ -10,7 +10,6 @@ Java 21·Spring MVC 기반의 실행·테스트 초기 구성과 서비스용 Fl
 | Java | 21. 개발 확인 환경: Eclipse Temurin 21.0.12.1 |
 | Spring Boot | 4.1.1 |
 | Gradle | 9.8.2, 저장소 Wrapper 사용. 별도 설치 불필요 |
-| Spotless / google-java-format | 8.10.4 / 1.28.0 AOSP |
 | 개발·테스트 DB | PostgreSQL 17 + PostGIS 3.6, `postgis/postgis:17-3.6` |
 | 기타 의존성 | Spring Boot BOM이 관리하는 버전. `build.gradle` 참고 |
 
@@ -129,12 +128,11 @@ docker compose --env-file .env up -d --wait db
 | 목적 | PowerShell | Bash |
 | --- | --- | --- |
 | 버전 확인 | `.\gradlew.bat --version` | `./gradlew --version` |
-| 포맷 자동 수정 | `.\gradlew.bat spotlessApply` | `./gradlew spotlessApply` |
-| 포맷 검사(소스 수정 없음) | `.\gradlew.bat spotlessCheck` | `./gradlew spotlessCheck` |
 | 전체 테스트 | `.\gradlew.bat test` | `./gradlew test` |
 | 완료 검증·JAR 생성 | `.\gradlew.bat clean build` | `./gradlew clean build` |
 
-`build`에는 `spotlessCheck`와 **DB 통합 테스트를 포함한 전체 테스트**가 들어간다.
+`build`에는 **DB 통합 테스트를 포함한 전체 테스트**가 들어간다.
+Spotless 플러그인과 포맷 검사·자동 수정 태스크는 제거했다. `check`·`build`에서 코드 서식을 검사하지 않는다.
 테스트 결과는 `build/reports/tests/test/index.html`, JAR은
 `build/libs/runway-backend-0.0.1-SNAPSHOT.jar`에서 확인한다. Docker가 없을 때 DB 테스트를
 자동으로 건너뛰지 않는다. 실패·미실행은 완료가 아니다.
@@ -223,6 +221,5 @@ JWT는 HS256, 최대 600초이며 발급 시 로그인 계열의 최초 로그�
 - [개발·테스트 DB 결정](../docs/adr/0011-local-postgresql-postgis.md)
 
 버전 확인 출처(2026-10-22): [Spring Boot 요구사항](https://docs.spring.io/spring-boot/system-requirements.html),
-[Spring Initializr](https://start.spring.io), [Spotless](https://plugins.gradle.org/plugin/com.diffplug.spotless),
-[google-java-format](https://github.com/google/google-java-format/releases/tag/v1.28.0),
+[Spring Initializr](https://start.spring.io),
 [PostGIS 이미지](https://github.com/postgis/docker-postgis).
