@@ -58,3 +58,7 @@ AI의 Jira·브랜치·MR 작업 규칙은 [AGENTS.md](AGENTS.md)에 정리되�
 
 아키텍처와 핵심 기술 선택의 배경·대안·결과는 [ADR 운영 규칙과 목록](docs/adr/README.md)에 기록한다.
 새 결정은 [공통 템플릿](docs/adr/0000-template.md)을 사용하고, 합의 여부와 변경 이력을 함께 관리한다.
+
+## 인프라
+
+- [인프라 설정·배포 안내](infra/README.md): EC2 구성, Secret 준비, Jenkins CI/CD, 인증서 갱신과 롤백 범위

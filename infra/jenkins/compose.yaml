@@ -1,0 +1,32 @@
+name: runway-ci
+
+services:
+  jenkins:
+    image: jenkins/jenkins:2.580.1-jdk21
+    environment:
+      JENKINS_OPTS: "--prefix=/jenkins"
+      JAVA_OPTS: "-Dorg.apache.commons.jelly.tags.fmt.timeZone=Asia/Seoul"
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+  backend-builder:
+    image: runway-backend-agent:java21
+    init: true
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/opt/start-agent.sh"]
+    group_add:
+      - "988"
+    volumes:
+      - ./agent/start-agent.sh:/opt/start-agent.sh:ro
+      - ./secrets/backend-builder-secret:/run/secrets/backend-builder-secret:ro
+      - backend_agent_work:/home/jenkins/agent
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /home/ubuntu/runway/infra/backend:/home/ubuntu/runway/infra/backend:ro
+
+volumes:
+  jenkins_home:
+    external: true
+    name: runway_jenkins_home
+  backend_agent_work:
