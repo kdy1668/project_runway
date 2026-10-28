@@ -81,10 +81,11 @@ ADR에는 선택 이유를 기록하고, 구체적인 계약은 해당 기준 �
 | [ADR-0013](0013-jwt-authentication.md) | JWT 10분과 최대 30일 갱신 권한을 사용하고 로그아웃 시 갱신 권한을 폐기한다 | 대체 | 대체됨: [ADR-0014](0014-common-api-authentication.md) |
 | [ADR-0014](0014-common-api-authentication.md) | 공통 회원 API의 짧은 Bearer JWT와 별도 문서 인증 | 채택 | 대체함: [ADR-0013](0013-jwt-authentication.md) |
 | [ADR-0015](0015-redis-refresh-token-store.md) | Refresh Token과 로그인 계열 상태는 Redis에 저장한다 | 채택 | — (ADR-0014의 저장소 구체화) |
+| [ADR-0016](0016-image-volume-storage.md) | 이미지 바이너리는 서버 볼륨에 저장한다 | 채택 | — |
 
 새 ADR을 추가할 때 번호에는 문서 링크를 연결하고, 대체 관계에는 `대체함: ADR-NNNN` 또는 `대체됨: ADR-NNNN`을 문서 링크와 함께 적는다. 관계가 없으면 `—`로 표시한다.
 
-AI 모델·학습 프레임워크와 나머지 인프라 기술은 미정이며, 확정 후 별도 ADR로 기록한다. Refresh Token 저장소의 Redis 선택은 ADR-0015를 따르며 구체 실행·복구 설정은 후속 확정 대상이다.
+AI 모델·학습 프레임워크와 나머지 인프라 기술은 미정이며, 확정 후 별도 ADR로 기록한다. Refresh Token 저장소의 Redis 선택은 ADR-0015를 따르며 구체 실행·복구 설정은 후속 확정 대상이다. 이미지 파일 저장은 ADR-0016을 따른다.
 
 정리 업무: [S15P31E105-58](https://ssafy.atlassian.net/browse/S15P31E105-58).
 
