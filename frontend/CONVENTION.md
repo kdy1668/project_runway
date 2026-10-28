@@ -74,6 +74,18 @@
 | `Screen` | 안전 영역, 배경색, 탭 화면의 하단 여백 |
 | `Icon` | 프로토타입이 쓰는 Lucide 선 아이콘 |
 
+### 로고·앱 아이콘 (S15P31E105-189)
+
+- 원본은 벡터다. 워드마크는 `assets/images/runway-logo.svg`, 앱 아이콘의 R 심볼은 `assets/images/runway-symbol.svg`.
+  앱 안에서는 `Logo`가 같은 경로(`logoPath.ts`)를 `react-native-svg`로 그리므로 PNG를 따로 두지 않는다.
+- 색은 배경에 따라 하나만 쓴다. 어두운 배경에는 흰색, 밝은 배경에는 글자색(ink). `Logo`는 `colors.text`를 따른다.
+  그라데이션·외곽선·그림자를 넣지 않고 비율을 바꾸지 않는다.
+- 최소 너비는 워드마크 80px(2.0M 러닝 헤더)이다. 이보다 작으면 R 심볼을 쓴다.
+- 여백은 로고 높이(R 높이)만큼 사방에 비운다.
+- Android 앱 아이콘은 #080813 바탕에 흰 R이다. 적응형 아이콘(`mipmap-anydpi-v26`)은 108dp 캔버스의 안전 영역(지름 66dp) 안에
+  R을 58dp 너비로 두고, Android 13 테마 아이콘용 단색(`monochrome`)도 같은 모양을 쓴다. Android 7 이하는 `mipmap-*` PNG를 쓴다.
+- 홈 화면의 앱 이름은 `RUNWAY`다(`strings.xml`의 `app_name`).
+
 설정 > 개발용 > 공통 컴포넌트 미리보기에서 현재 모드로 모든 컴포넌트를 확인할 수 있다.
 개발용 메뉴는 `src/config.ts`의 `developerMenu`로 켜고 끈다. 출시 전에 끈다.
 
