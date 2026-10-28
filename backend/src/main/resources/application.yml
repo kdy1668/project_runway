@@ -22,3 +22,14 @@ server:
     include-binding-errors: never
     include-stacktrace: never
     include-exception: false
+
+runway:
+  security:
+    jwt-secret-base64: ${BACKEND_JWT_SECRET_BASE64:}
+    docs-access-mode: ${BACKEND_DOCS_ACCESS_MODE:password}
+    docs-username: ${BACKEND_DOCS_USERNAME:}
+    docs-password-hash: ${BACKEND_DOCS_PASSWORD_HASH:}
+
+springdoc:
+  swagger-ui:
+    persist-authorization: false

@@ -37,11 +37,16 @@ Wear OS 앱의 원본 업로드 계약은 [워치 기록 업로드 계약](wear-
 - 키: `camelCase`; 서버 엔티티 식별자: BIGINT에 대응하는 정수(`int64`); URL Path에서는 십진 정수 표기; 시간: ISO 8601 UTC 문자열
 - 거리: m; 구간·경과 시간: sec; 페이스: sec/km; 심박수: bpm; 케이던스: spm
 - 좌표: WGS84, GeoJSON 좌표 순서 `[longitude, latitude]`
-- 로그인은 아이디·비밀번호 방식이다(화면 설계 v10). [ADR-0013](../../adr/0013-jwt-authentication.md)에 따라 JWT Access Token은 10분, 갱신 권한은 최초 로그인부터 최대 30일이다. 로그아웃 시 갱신 권한을 폐기하며 기존 Access Token은 남은 유효기간(최대 약 10분) 동안 유효하다. 요청마다 로그인 상태를 조회하거나 Access Token 차단 목록을 운영하지 않는다. 자원 소유자·동의·공개 범위 검사는 별도로 유지한다. 전달 형식·재사용 처리 등 상세 계약은 [U01~U03](users.md#u01-로그인)을 따른다.
+- 로그인은 아이디·비밀번호 방식이다(화면 설계 v10). [ADR-0014](../../adr/0014-common-api-authentication.md)에 따라 JWT Access Token은 10분, 갱신 권한은 최초 로그인부터 최대 30일이다. 로그아웃 시 갱신 권한을 폐기하며 기존 Access Token은 남은 유효기간(최대 약 10분) 동안 유효하다. 요청마다 로그인 상태를 조회하거나 Access Token 차단 목록을 운영하지 않는다. 자원 소유자·동의·공개 범위 검사는 별도로 유지한다. 전달 형식·재사용 처리 등 상세 계약은 [U01~U03](users.md#u01-로그인)을 따른다.
 
 가입 후에는 초기 설정 페이지로 이동한다. U07 완료 요청으로 러닝 수준과 평소 페이스를 한 번에 저장한 뒤 홈으로 이동한다. U01의 초기 설정 완료 기준·Argon2id 저장·아이디별 5회 실패/10분 제한 정책을 따른다.
 
 ### 인증 요청과 복구
+
+현재 공통 인증 결정은 [ADR-0014](../../adr/0014-common-api-authentication.md)를 따른다. 회원 API는 HS256 JWT의 검증된 sub로 사용자를 식별하고 X-User-Id를 신뢰하지 않는다. 로그인·가입·갱신·로그아웃의 POST와 아이디 확인의 GET만 Access Token 검증을 생략하며, 이 정확한 조합은 오래된 Authorization 값으로 차단하지 않는다. 회원 API는 인증 실패를 입력 검증보다 먼저 처리하고 401 UNAUTHORIZED, message=인증이 필요합니다., details={}를 반환한다. WWW-Authenticate는 Bearer이며 내부 검증 이유나 토큰 원문을 노출하지 않는다. 인증 성공 후 기존 입력·도메인 권한 검사를 수행한다. 공통 권한 거절은 403 FORBIDDEN, message=접근 권한이 없습니다., details={}이며 기존 도메인 코드(NOT_ADMIN 등)는 유지한다.
+
+탈퇴·향후 정지 후 기존 JWT는 원래 만료시각까지 최대 10분 유효하다. 즉시 차단용 요청별 상태 조회·차단 목록은 두지 않으며 기존 자원 권한·동의 검사는 유지한다.
+
 
 토큰은 JSON 본문으로 반환하며 회원 API는 `Authorization: Bearer <accessToken>`을 사용한다. U01 로그인·U15 가입·U16 아이디 확인은 Access Token을 요구하지 않는다. U02 갱신·U03 로그아웃은 JSON 본문의 Refresh Token으로 처리하며 Access Token이 없거나 만료돼도 호출할 수 있다. 이 예외가 회원 데이터 조회 권한을 부여하지는 않는다.
 

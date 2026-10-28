@@ -8,7 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.runway.backend.global.auth.CurrentUserIdResolver;
+import com.runway.backend.global.security.SecurityTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -81,7 +81,7 @@ class CrewApiIntegrationTest {
         MvcResult created =
                 mockMvc.perform(
                                 post("/api/v1/crews")
-                                        .header(CurrentUserIdResolver.HEADER, userId)
+                                        .header("Authorization", SecurityTestSupport.bearer(userId))
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(
                                                 """
@@ -103,14 +103,16 @@ class CrewApiIntegrationTest {
 
         mockMvc.perform(
                         get("/api/v1/crews/{crewId}", crewId)
-                                .header(CurrentUserIdResolver.HEADER, userId))
+                                .header("Authorization", SecurityTestSupport.bearer(userId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(crewId))
                 .andExpect(jsonPath("$.memberCount").value(1))
                 .andExpect(jsonPath("$.myMembershipStatus").value("APPROVED"))
                 .andExpect(jsonPath("$.capacity").value(10));
 
-        mockMvc.perform(get("/api/v1/users/me/crews").header(CurrentUserIdResolver.HEADER, userId))
+        mockMvc.perform(
+                        get("/api/v1/users/me/crews")
+                                .header("Authorization", SecurityTestSupport.bearer(userId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(1))
                 .andExpect(jsonPath("$.items[0].isOwner").value(true))
@@ -118,7 +120,7 @@ class CrewApiIntegrationTest {
 
         mockMvc.perform(
                         get("/api/v1/crews")
-                                .header(CurrentUserIdResolver.HEADER, userId)
+                                .header("Authorization", SecurityTestSupport.bearer(userId))
                                 .param("q", "하천"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(1))
@@ -130,7 +132,7 @@ class CrewApiIntegrationTest {
     void 없는크루_상세는_404() throws Exception {
         mockMvc.perform(
                         get("/api/v1/crews/{crewId}", 999999L)
-                                .header(CurrentUserIdResolver.HEADER, userId))
+                                .header("Authorization", SecurityTestSupport.bearer(userId)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("CREW_NOT_FOUND"));
     }
@@ -144,7 +146,7 @@ class CrewApiIntegrationTest {
 
         mockMvc.perform(
                         post("/api/v1/crews/{crewId}/join-requests", crewId)
-                                .header(CurrentUserIdResolver.HEADER, applicantId))
+                                .header("Authorization", SecurityTestSupport.bearer(applicantId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.crewId").value(crewId))
                 .andExpect(jsonPath("$.userId").value(applicantId))
@@ -153,19 +155,19 @@ class CrewApiIntegrationTest {
 
         mockMvc.perform(
                         post("/api/v1/crews/{crewId}/join-requests", crewId)
-                                .header(CurrentUserIdResolver.HEADER, applicantId))
+                                .header("Authorization", SecurityTestSupport.bearer(applicantId)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("ALREADY_MEMBER_OR_PENDING"));
 
         mockMvc.perform(
                         get("/api/v1/crews/{crewId}/join-requests", crewId)
-                                .header(CurrentUserIdResolver.HEADER, outsiderId))
+                                .header("Authorization", SecurityTestSupport.bearer(outsiderId)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("NOT_ADMIN"));
 
         mockMvc.perform(
                         get("/api/v1/crews/{crewId}/join-requests", crewId)
-                                .header(CurrentUserIdResolver.HEADER, userId))
+                                .header("Authorization", SecurityTestSupport.bearer(userId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(1))
                 .andExpect(jsonPath("$.items[0].userId").value(applicantId))
@@ -175,7 +177,7 @@ class CrewApiIntegrationTest {
 
         mockMvc.perform(
                         patch("/api/v1/crews/{crewId}/join-requests/{userId}", crewId, applicantId)
-                                .header(CurrentUserIdResolver.HEADER, userId)
+                                .header("Authorization", SecurityTestSupport.bearer(userId))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
@@ -186,7 +188,7 @@ class CrewApiIntegrationTest {
 
         mockMvc.perform(
                         patch("/api/v1/crews/{crewId}/join-requests/{userId}", crewId, applicantId)
-                                .header(CurrentUserIdResolver.HEADER, userId)
+                                .header("Authorization", SecurityTestSupport.bearer(userId))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
@@ -197,13 +199,13 @@ class CrewApiIntegrationTest {
 
         mockMvc.perform(
                         post("/api/v1/crews/{crewId}/join-requests", crewId)
-                                .header(CurrentUserIdResolver.HEADER, applicantId))
+                                .header("Authorization", SecurityTestSupport.bearer(applicantId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PENDING"));
 
         mockMvc.perform(
                         patch("/api/v1/crews/{crewId}/join-requests/{userId}", crewId, applicantId)
-                                .header(CurrentUserIdResolver.HEADER, userId)
+                                .header("Authorization", SecurityTestSupport.bearer(userId))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
@@ -216,7 +218,7 @@ class CrewApiIntegrationTest {
 
         mockMvc.perform(
                         get("/api/v1/crews/{crewId}", crewId)
-                                .header(CurrentUserIdResolver.HEADER, applicantId))
+                                .header("Authorization", SecurityTestSupport.bearer(applicantId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.memberCount").value(2))
                 .andExpect(jsonPath("$.myMembershipStatus").value("APPROVED"));
@@ -230,11 +232,11 @@ class CrewApiIntegrationTest {
 
         mockMvc.perform(
                         post("/api/v1/crews/{crewId}/join-requests", crewId)
-                                .header(CurrentUserIdResolver.HEADER, memberId))
+                                .header("Authorization", SecurityTestSupport.bearer(memberId)))
                 .andExpect(status().isOk());
         mockMvc.perform(
                         patch("/api/v1/crews/{crewId}/join-requests/{userId}", crewId, memberId)
-                                .header(CurrentUserIdResolver.HEADER, userId)
+                                .header("Authorization", SecurityTestSupport.bearer(userId))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
@@ -244,7 +246,7 @@ class CrewApiIntegrationTest {
 
         mockMvc.perform(
                         get("/api/v1/crews/{crewId}/members", crewId)
-                                .header(CurrentUserIdResolver.HEADER, userId))
+                                .header("Authorization", SecurityTestSupport.bearer(userId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(2))
                 .andExpect(jsonPath("$.items[?(@.userId==" + userId + ")].isOwner").value(true))
@@ -255,33 +257,33 @@ class CrewApiIntegrationTest {
 
         mockMvc.perform(
                         delete("/api/v1/crews/{crewId}/members/me", crewId)
-                                .header(CurrentUserIdResolver.HEADER, userId))
+                                .header("Authorization", SecurityTestSupport.bearer(userId)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("OWNER_CANNOT_LEAVE"));
 
         mockMvc.perform(
                         delete("/api/v1/crews/{crewId}/members/{userId}", crewId, userId)
-                                .header(CurrentUserIdResolver.HEADER, userId))
+                                .header("Authorization", SecurityTestSupport.bearer(userId)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("CANNOT_REMOVE_OWNER"));
 
         mockMvc.perform(
                         delete("/api/v1/crews/{crewId}/members/{userId}", crewId, memberId)
-                                .header(CurrentUserIdResolver.HEADER, outsiderId))
+                                .header("Authorization", SecurityTestSupport.bearer(outsiderId)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("NOT_ADMIN"));
 
         // re-approve path already done; member still APPROVED — leave as self
         mockMvc.perform(
                         delete("/api/v1/crews/{crewId}/members/me", crewId)
-                                .header(CurrentUserIdResolver.HEADER, memberId))
+                                .header("Authorization", SecurityTestSupport.bearer(memberId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("LEFT"))
                 .andExpect(jsonPath("$.leftAt").isNotEmpty());
 
         mockMvc.perform(
                         get("/api/v1/crews/{crewId}/members", crewId)
-                                .header(CurrentUserIdResolver.HEADER, userId))
+                                .header("Authorization", SecurityTestSupport.bearer(userId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(1))
                 .andExpect(jsonPath("$.items[0].userId").value(userId));
@@ -289,11 +291,11 @@ class CrewApiIntegrationTest {
         // bring member back then OWNER removes
         mockMvc.perform(
                         post("/api/v1/crews/{crewId}/join-requests", crewId)
-                                .header(CurrentUserIdResolver.HEADER, memberId))
+                                .header("Authorization", SecurityTestSupport.bearer(memberId)))
                 .andExpect(status().isOk());
         mockMvc.perform(
                         patch("/api/v1/crews/{crewId}/join-requests/{userId}", crewId, memberId)
-                                .header(CurrentUserIdResolver.HEADER, userId)
+                                .header("Authorization", SecurityTestSupport.bearer(userId))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
@@ -303,7 +305,7 @@ class CrewApiIntegrationTest {
 
         mockMvc.perform(
                         delete("/api/v1/crews/{crewId}/members/{userId}", crewId, memberId)
-                                .header(CurrentUserIdResolver.HEADER, userId))
+                                .header("Authorization", SecurityTestSupport.bearer(userId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("LEFT"))
                 .andExpect(jsonPath("$.leftAt").isNotEmpty());
@@ -316,12 +318,12 @@ class CrewApiIntegrationTest {
 
         mockMvc.perform(
                         post("/api/v1/crews/{crewId}/join-requests", crewId)
-                                .header(CurrentUserIdResolver.HEADER, applicantId))
+                                .header("Authorization", SecurityTestSupport.bearer(applicantId)))
                 .andExpect(status().isOk());
 
         mockMvc.perform(
                         patch("/api/v1/crews/{crewId}/join-requests/{userId}", crewId, applicantId)
-                                .header(CurrentUserIdResolver.HEADER, userId)
+                                .header("Authorization", SecurityTestSupport.bearer(userId))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
@@ -348,7 +350,9 @@ class CrewApiIntegrationTest {
         MvcResult created =
                 mockMvc.perform(
                                 post("/api/v1/crews")
-                                        .header(CurrentUserIdResolver.HEADER, ownerId)
+                                        .header(
+                                                "Authorization",
+                                                SecurityTestSupport.bearer(ownerId))
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(
                                                 """

@@ -8,6 +8,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.runway.backend.global.security.SecurityConfig;
+import com.runway.backend.global.security.SecurityTestSupport;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.util.HashMap;
@@ -33,7 +35,12 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 @WebMvcTest(GlobalExceptionHandlerTest.FixtureController.class)
-@Import({GlobalExceptionHandlerTest.FixtureController.class, GlobalExceptionHandler.class})
+@Import({
+    GlobalExceptionHandlerTest.FixtureController.class,
+    GlobalExceptionHandler.class,
+    SecurityConfig.class,
+    SecurityTestSupport.AuthenticatedRequests.class
+})
 class GlobalExceptionHandlerTest {
 
     @Autowired private MockMvc mvc;
@@ -42,6 +49,7 @@ class GlobalExceptionHandlerTest {
     void 빈필수문자열은_필드오류로_400을반환한다() throws Exception {
         mvc.perform(
                         post("/__test/echo")
+                                .header("Authorization", SecurityTestSupport.bearer(1))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"value\":\"\"}"))
                 .andExpect(status().isBadRequest())
@@ -54,7 +62,11 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void 잘못된_JSON은_입력값없이_400을반환한다() throws Exception {
-        mvc.perform(post("/__test/echo").contentType(MediaType.APPLICATION_JSON).content("{"))
+        mvc.perform(
+                        post("/__test/echo")
+                                .header("Authorization", SecurityTestSupport.bearer(1))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.details.fields").doesNotExist())
@@ -68,7 +80,10 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void 쿼리타입불일치는_값없이_400을반환한다() throws Exception {
-        mvc.perform(get("/__test/numbers").param("count", "abc"))
+        mvc.perform(
+                        get("/__test/numbers")
+                                .header("Authorization", SecurityTestSupport.bearer(1))
+                                .param("count", "abc"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.details.fields[0].name").value("count"))
@@ -82,7 +97,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void 필수쿼리누락은_400을반환한다() throws Exception {
-        mvc.perform(get("/__test/need"))
+        mvc.perform(get("/__test/need").header("Authorization", SecurityTestSupport.bearer(1)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.details.fields[0].name").value("name"))
@@ -91,7 +106,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void 공통예외_상태와_코드를_반환한다() throws Exception {
-        mvc.perform(get("/__test/missing"))
+        mvc.perform(get("/__test/missing").header("Authorization", SecurityTestSupport.bearer(1)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("SESSION_NOT_FOUND"))
                 .andExpect(jsonPath("$.message").value("세션을 찾을 수 없습니다."))
@@ -100,7 +115,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void 예상하지_못한_예외는_고정_500이다() throws Exception {
-        mvc.perform(get("/__test/boom"))
+        mvc.perform(get("/__test/boom").header("Authorization", SecurityTestSupport.bearer(1)))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
                 .andExpect(jsonPath("$.message").value("서버 오류가 발생했습니다."))
@@ -119,14 +134,18 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void 지원하지_않는_콘텐츠형식은_415를반환한다() throws Exception {
-        mvc.perform(post("/__test/echo").contentType(MediaType.TEXT_PLAIN).content("text"))
+        mvc.perform(
+                        post("/__test/echo")
+                                .header("Authorization", SecurityTestSupport.bearer(1))
+                                .contentType(MediaType.TEXT_PLAIN)
+                                .content("text"))
                 .andExpect(status().isUnsupportedMediaType())
                 .andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"));
     }
 
     @Test
     void 업로드크기초과는_413을반환한다() throws Exception {
-        mvc.perform(post("/__test/files"))
+        mvc.perform(post("/__test/files").header("Authorization", SecurityTestSupport.bearer(1)))
                 .andExpect(status().is(413))
                 .andExpect(jsonPath("$.code").value("FILE_TOO_LARGE"))
                 .andExpect(jsonPath("$.message").value("업로드 크기를 초과했습니다."));
@@ -134,14 +153,17 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void 없는경로는_500이_아니다() throws Exception {
-        mvc.perform(get("/__test/absent"))
+        mvc.perform(get("/__test/absent").header("Authorization", SecurityTestSupport.bearer(1)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
 
     @Test
     void 허용되지_않는_메서드는_405다() throws Exception {
-        mvc.perform(post("/__test/numbers").accept(MediaType.APPLICATION_JSON))
+        mvc.perform(
+                        post("/__test/numbers")
+                                .header("Authorization", SecurityTestSupport.bearer(1))
+                                .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isMethodNotAllowed())
                 .andExpect(jsonPath("$.code").value("METHOD_NOT_ALLOWED"))
                 .andExpect(jsonPath("$.message").value("허용되지 않는 메서드입니다."))
@@ -168,7 +190,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void 빠진헤더는_400이다() throws Exception {
-        mvc.perform(get("/__test/header"))
+        mvc.perform(get("/__test/header").header("Authorization", SecurityTestSupport.bearer(1)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.details.fields[0].name").value("X-Request-Id"))
@@ -179,6 +201,7 @@ class GlobalExceptionHandlerTest {
     void 폼타입불일치에는_거절값이_없다() throws Exception {
         mvc.perform(
                         post("/__test/form")
+                                .header("Authorization", SecurityTestSupport.bearer(1))
                                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                                 .content("count=REJECTEDTOKEN"))
                 .andExpect(status().isBadRequest())
@@ -195,7 +218,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void 상태예외는_선언한_상태를_유지하고_사유를_숨긴다() throws Exception {
-        mvc.perform(get("/__test/status"))
+        mvc.perform(get("/__test/status").header("Authorization", SecurityTestSupport.bearer(1)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"))
                 .andExpect(
@@ -208,7 +231,9 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void 이미_503인_예외는_500이_아니다() throws Exception {
-        mvc.perform(get("/__test/unavailable"))
+        mvc.perform(
+                        get("/__test/unavailable")
+                                .header("Authorization", SecurityTestSupport.bearer(1)))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.code").value("SERVICE_UNAVAILABLE"))
                 .andExpect(jsonPath("$.message").value("일시적으로 처리할 수 없습니다."))
@@ -221,7 +246,9 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void 없는_detail값은_빼고_상태와_코드를_유지한다() throws Exception {
-        mvc.perform(get("/__test/null-detail"))
+        mvc.perform(
+                        get("/__test/null-detail")
+                                .header("Authorization", SecurityTestSupport.bearer(1)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("SESSION_NOT_FOUND"))
                 .andExpect(jsonPath("$.message").value("세션을 찾을 수 없습니다."))
@@ -231,7 +258,9 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void 메시지가_없으면_고정문구를_넣는다() throws Exception {
-        mvc.perform(get("/__test/null-message"))
+        mvc.perform(
+                        get("/__test/null-message")
+                                .header("Authorization", SecurityTestSupport.bearer(1)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("SESSION_NOT_FOUND"))
                 .andExpect(jsonPath("$.message").value("요청을 처리할 수 없습니다."));
@@ -239,7 +268,10 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void 수락할_수_없는_형식은_500이_아니다() throws Exception {
-        mvc.perform(get("/__test/echo-get").accept(MediaType.TEXT_PLAIN))
+        mvc.perform(
+                        get("/__test/echo-get")
+                                .header("Authorization", SecurityTestSupport.bearer(1))
+                                .accept(MediaType.TEXT_PLAIN))
                 .andExpect(status().isNotAcceptable())
                 .andExpect(
                         content()

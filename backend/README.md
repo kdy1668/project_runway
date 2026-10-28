@@ -1,7 +1,7 @@
 # RunWay 백엔드
 
 Java 21·Spring MVC 기반의 실행·테스트 초기 구성과 서비스용 Flyway 마이그레이션 V1을 포함한다.
-업무 API·인증·Entity는 아직 없다. 로컬 개발용이며 운영에 그대로 배포하지 않는다.
+크루·게시글·댓글 API는 공통 JWT 인증을 사용한다. 문서 접속 인증과 회원 API 인증은 구분한다.
 
 ## 1. 준비와 버전
 
@@ -104,7 +104,7 @@ unset BACKEND_DB_PASSWORD
 ```
 
 URL·사용자 이름은 개인 `.env`의 설정과 맞춘다. 정상 기동은 `Started BackendApplication`으로
-확인한다. 아직 업무 API가 없어 루트 경로 요청의 404는 예상된 결과다. 테스트 전용
+확인한다. 루트 경로는 업무 API에 매핑하지 않으므로 무인증 요청의 404는 예상된 결과다. 테스트 전용
 `/__test/echo`는 실행 JAR에 포함되지 않는다. 서버는 IntelliJ 종료 버튼 또는 Ctrl+C로 종료한다.
 
 OpenAPI·Swagger UI는 springdoc-openapi로 제공한다. 서버 기동 후 로컬에서
@@ -158,7 +158,7 @@ Bash에서는 실행 부분을 `./gradlew`로 바꾼다. 이 부분 테스트 �
 - JPA는 `ddl-auto=validate`로 검사만 하며 OSIV는 비활성화한다.
 - Flyway는 활성화하고 `clean`과 자동 baseline을 허용하지 않는다.
 - `src/main/resources/db/migration/V1__initial_schema.sql`은 현재 기준 스키마의 26개 업무
-  테이블·타입·제약·트리거를 빈 DB에 설치한다. Entity는 아직 없으며 기동 성공이 업무 Entity
+  테이블·타입·제약·트리거를 빈 DB에 설치한다. 현재 크루·커뮤니티 Entity를 포함하며 기동 성공만으로 모든 업무 Entity
   매핑 검증을 의미하지 않는다. 기존 워치 테이블 설치가 미확정 워치 API 정책을 확정하지 않는다.
 - Flyway는 서버 기동 시 미적용 버전을 적용한다. 다른 개발자의 로컬 DB도 각자 설정한 접속
   대상에 적용되며, 개인 `.env`를 공유하지 않는다. IntelliJ에서 `.env` 파일을 실행 설정에
@@ -171,6 +171,49 @@ Bash에서는 실행 부분을 `./gradlew`로 바꾼다. 이 부분 테스트 �
   기준 SQL 대비 실제 설치 구조를 검사한다. PostgreSQL 트랜잭션 DDL 검증이며 임의 SQL의
   자동 복구나 운영 이행을 보장하지 않는다.
 - 기존·공유·운영 DB를 이 초기 구성에 연결하지 않는다.
+
+## 7. 공통 인증과 Swagger
+
+회원 API는 `Authorization: Bearer <accessToken>`을 사용한다. `X-User-Id`는 인증수단이 아니다.
+검증되지 않거나 만료된 토큰은 `401 UNAUTHORIZED`다. 크루 관리자·작성자·공개 범위 등 기존 권한 검사도 유지한다.
+로그인·회원가입·갱신·로그아웃 API 자체는 후속 업무이며, 이 작업은 내부 Access Token 발급기와 검증을 제공한다.
+토큰을 받기 위한 임시 공개 발급 API는 제공하지 않는다.
+
+| 변수 | 필수·용도 |
+| --- | --- |
+| `BACKEND_JWT_SECRET_BASE64` | 모든 환경 필수. 암호학적 난수 최소 32바이트를 Base64로 인코딩한 키. 기본값 없음 |
+| `BACKEND_DOCS_ACCESS_MODE` | `local` 또는 `password`. 생략 시 `password`. local은 server.address가 `127.0.0.1` 또는 `::1`일 때만 허용 |
+| `BACKEND_DOCS_USERNAME` | password 모드 필수 팀 문서 계정. 회원 계정과 별개 |
+| `BACKEND_DOCS_PASSWORD_HASH` | password 모드 필수. `{bcrypt}` 접두사가 붙은 BCrypt 해시. 실제 값은 개인/서버 Secret 저장소에서 주입 |
+
+로컬은 기존 DB 설정과 JWT 키를 환경변수로 주입하고 `BACKEND_DOCS_ACCESS_MODE=local`로 실행한다.
+브라우저에서 `http://127.0.0.1:8080/swagger-ui/index.html`로 접속한다. 로컬 문서는 별도 비밀번호가 필요 없다.
+로컬 예시 파일의 Secret은 비어 있으므로 `.env.example`만 복사해서는 서버가 시작되지 않는다.
+Spring Boot는 `.env`를 자동으로 읽지 않으므로 IntelliJ 실행 환경 또는 터미널 환경으로 주입한다.
+
+공유 서버는 `password` 모드와 문서 계정/해시를 먼저 등록하고 컨테이너 환경으로 전달한다.
+HTTPS의 `/swagger-ui/index.html`에 접속해 브라우저의 문서 전용 인증창에 팀 계정과 원래 비밀번호를 입력한다.
+`/swagger-ui.html`, 문서 CSS/JS, `/v3/api-docs`, `/v3/api-docs.yaml`, `/v3/api-docs/swagger-config`도 보호된다.
+문서에서는 GET/HEAD만 허용하며 실제 회원 API 시험에는 별도로 Swagger **Authorize**에 Access Token을 입력한다.
+문서 계정으로 회원 API를 호출할 수 없고 JWT만으로 공유 문서를 열 수 없다. 토큰 영속 저장은 꺼져 있다.
+
+문서 해시는 Spring의 BCrypt 인코더 등 신뢰할 수 있는 로컬 도구로 사용자가 생성한다. 접두사를 포함한 해시만 주입하며
+실제 비밀번호·키·해시는 채팅·Git·로그에 넣지 않는다. 비밀번호를 코드·셸 기록에 직접 적지 않는다.
+필수 Secret 누락·형식 오류 또는 공유 서버 설정 오타는 값이 아닌 변수 이름을 안내하고 기동을 거부한다.
+키는 재시작할 때 새로 생성하지 않고 환경별로 분리한다. 키를 바꾸면 이전 Access Token은 검증에 실패하므로
+재인증 영향을 확인하고 운영자가 교체한다. 복수 키를 통한 무중단 회전은 현재 제공하지 않는다.
+
+로컬 모드를 공유 서버나 프록시 뒤에서 사용하지 않는다. 루프백 바인딩만으로 프록시의 외부 공개가 방지되는 것은 아니다.
+새 버전 배포 전에 서버 관리자가 환경변수 4개의 적용과 HTTPS를 확인해야 한다. 서버의 별도 Compose에서 컨테이너로
+변수를 전달하는 매핑도 필요하며, 이 저장소의 배포 코드만으로 Secret이 자동 등록되지는 않는다.
+배포 점검의 무인증 `GET /`는 기존 404를 유지한다. 이를 readiness 성공 API로 해석하지 않는다.
+
+JWT는 HS256, 최대 600초이며 발급 시 로그인 계열의 최초 로그인부터 30일 상한도 넘지 않는다.
+서버 시각이 exp 이상이면 거절하고 토큰 검증을 위해 요청마다 계정/로그인 상태를 조회하지 않는다.
+탈퇴 후 기존 토큰의 잔여 인증은 최대 10분 허용하지만 기존 자원 존재·소유권·동의 검사를 우회하지 않는다.
+새 발급·갱신을 허용한다는 뜻은 아니다. 자세한 결정은 [ADR-0014](../docs/adr/0014-common-api-authentication.md)를 따른다.
+
+테스트 설정의 키와 문서 계정은 합성 데이터이며 실행 JAR에 포함되지 않는다. 실제 서비스에 재사용하지 않는다.
 
 ## 관련 기준
 
