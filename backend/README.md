@@ -40,7 +40,7 @@ PowerShell:
 
 ```powershell
 if (!(Test-Path .env)) { Copy-Item .env.example .env }
-docker compose --env-file .env up -d --wait db
+docker compose --env-file .env up -d --wait db redis
 docker compose --env-file .env ps
 ```
 
@@ -48,7 +48,7 @@ Bash:
 
 ```bash
 test -e .env || cp .env.example .env
-docker compose --env-file .env up -d --wait db
+docker compose --env-file .env up -d --wait db redis
 docker compose --env-file .env ps
 ```
 
@@ -174,8 +174,10 @@ Bash에서는 실행 부분을 `./gradlew`로 바꾼다. 이 부분 테스트 �
 
 회원 API는 `Authorization: Bearer <accessToken>`을 사용한다. `X-User-Id`는 인증수단이 아니다.
 검증되지 않거나 만료된 토큰은 `401 UNAUTHORIZED`다. 크루 관리자·작성자·공개 범위 등 기존 권한 검사도 유지한다.
-로그인·회원가입·갱신·로그아웃 API 자체는 후속 업무이며, 이 작업은 내부 Access Token 발급기와 검증을 제공한다.
+아이디·비밀번호 로그인 U01은 아래 8장의 Redis 최초 계열 저장을 사용한다. 회원가입·갱신·로그아웃 API와 193번 로그인 실패 제한은 후속 업무다.
 토큰을 받기 위한 임시 공개 발급 API는 제공하지 않는다.
+
+Refresh Token과 로그인 계열은 [ADR-0015](../docs/adr/0015-redis-refresh-token-store.md)에 따라 Redis를 사용한다. 사용자·비밀번호 해시·러닝 프로필은 PostgreSQL에 유지한다. Redis 준비·설정·복구 절차는 아래 8장을 따른다.
 
 | 변수 | 필수·용도 |
 | --- | --- |
@@ -193,7 +195,7 @@ Spring Boot는 `.env`를 자동으로 읽지 않으므로 IntelliJ 실행 환경
 HTTPS의 `/swagger-ui/index.html`에 접속해 브라우저의 문서 전용 인증창에 팀 계정과 원래 비밀번호를 입력한다.
 `/swagger-ui.html`, 문서 CSS/JS, `/v3/api-docs`, `/v3/api-docs.yaml`, `/v3/api-docs/swagger-config`도 보호된다.
 문서에서는 GET/HEAD만 허용하며 실제 회원 API 시험에는 별도로 Swagger **Authorize**에 Access Token을 입력한다.
-문서 계정으로 회원 API를 호출할 수 없고 JWT만으로 공유 문서를 열 수 없다. 토큰 영속 저장은 꺼져 있다.
+문서 계정으로 회원 API를 호출할 수 없고 JWT만으로 공유 문서를 열 수 없다. Swagger 브라우저의 토큰 영속 저장은 꺼져 있다.
 
 문서 해시는 Spring의 BCrypt 인코더 등 신뢰할 수 있는 로컬 도구로 사용자가 생성한다. 접두사를 포함한 해시만 주입하며
 실제 비밀번호·키·해시는 채팅·Git·로그에 넣지 않는다. 비밀번호를 코드·셸 기록에 직접 적지 않는다.
@@ -212,6 +214,47 @@ JWT는 HS256, 최대 600초이며 발급 시 로그인 계열의 최초 로그�
 새 발급·갱신을 허용한다는 뜻은 아니다. 자세한 결정은 [ADR-0014](../docs/adr/0014-common-api-authentication.md)를 따른다.
 
 테스트 설정의 키와 문서 계정은 합성 데이터이며 실행 JAR에 포함되지 않는다. 실제 서비스에 재사용하지 않는다.
+
+## 8. 로그인과 Redis
+
+U01 `POST /api/v1/auth/login`은 8~20 Unicode 코드 포인트·공백 불가·특수문자 허용 정책을 적용한다. 비밀번호를 trim·정규화하지 않으며 Argon2id(64MiB·3회·병렬도 1, salt 16바이트·hash 32바이트)로 검증한다. users.password는 `$argon2id$v=19$m=65536,t=3,p=1$...` 형식이며 로그인에서 자동 재해싱하지 않는다. 손상·미지원 저장 해시는 비밀값 없는 503으로 처리한다. 회원가입 구현도 같은 `MemberPasswordHasher`와 입력 정책을 사용해야 한다. 별도 가입·계정 생성 API를 이 작업에서 제공하지 않는다.
+
+없는 아이디·잘못된 비밀번호·탈퇴 계정은 같은 `401 INVALID_CREDENTIALS`로 응답한다. 인증 후에는 사용자 행 잠금 아래 계정 ACTIVE·검증한 해시 불변을 재확인하고 Redis 계열 저장 및 PostgreSQL 트랜잭션 종료 후 토큰을 반환한다. 초기 설정은 프로필의 수준·유효 페이스 저장 여부로 계산한다. 성공 응답은 `Cache-Control: no-store`다. 계약과 교차 저장소 실패 처리는 [인증 API](../docs/design/api/users.md#갱신-권한-저장소)를 따른다.
+
+### 로컬 준비와 변수
+
+기존 `.env`가 있으면 덮어쓰지 않고 사용자가 아래 누락된 변수만 로컬에서 추가한다. `.env.example`의 Redis 비밀번호는 빈 값이며 실제 값은 채팅·Git·로그에 넣지 않는다. Compose는 `.env`를 내부적으로 읽지만 Spring Boot·IntelliJ에는 환경변수를 별도로 주입해야 한다. 아래 변수는 로컬 Compose뿐 아니라 로그인 서버에도 필요하다.
+
+| 변수 | 필수 여부·용도 |
+| --- | --- |
+| `BACKEND_REDIS_HOST` | 필수, 호스트만 지정. 로컬 `127.0.0.1`. 인증정보나 URI를 넣지 않음 |
+| `BACKEND_REDIS_PORT` | 필수, 1~65535. 로컬 Compose 공개 포트는 6379 |
+| `BACKEND_REDIS_USERNAME` | 필수, 영문으로 시작하는 영문·숫자·밑줄·하이픈 1~32자. 로컬 예시는 `runway_app` |
+| `BACKEND_REDIS_PASSWORD` | 필수 Secret. 사용자가 정한 비밀번호를 서버·Compose에 동일하게 주입 |
+| `BACKEND_REDIS_SSL_ENABLED` | `true`/`false`, 기본 false. 로컬 루프백·동일 신뢰 내부망에서만 false. 신뢰 경계를 통과하는 연결은 인증서 검증 TLS와 true 사용 |
+
+백엔드 폴더에서 `docker compose --env-file .env up -d --wait db redis` 후 `docker compose --env-file .env ps`로 상태만 확인한다. 실제 `.env` 또는 생성된 ACL 파일을 출력하지 않는다. IntelliJ·서버 환경변수에는 DB·JWT 설정과 위 Redis 설정을 함께 주입한다. 기존 공유 서버의 배포 환경에도 이 변수 매핑·Redis 준비가 필요하며 저장소 코드만으로 Secret이 자동 등록되지 않는다. 로컬 확인이 배포 서버의 준비 완료를 뜻하지 않는다.
+
+### 저장·접근 설정
+
+- Redis 8.2.11 공식 이미지의 digest를 compose.yaml과 테스트에 고정한다. Spring Data Redis 4.1.1·Lettuce 7.5.2.RELEASE는 Boot 4.1.1 BOM을 따르고 Argon2용 Bouncy Castle 1.86은 명시한다.
+- 로컬 Redis 포트는 127.0.0.1:6379에만 공개하고 `redis-auth-data` 영속 볼륨을 사용한다. AOF always, rewrite 중 디스크 반영 유지, 손상 AOF 기동 거부, maxmemory 256MiB·noeviction, 컨테이너 메모리 상한 1GiB다. 운영 용량은 동시 계열·30일 교체 이력을 포함해 따로 산정한다.
+- entrypoint가 환경변수의 비밀번호를 내부적으로 해시해 권한을 제한한 임시 ACL 파일을 만든다. 기본 계정은 비활성화하고 앱 계정에는 `runway:auth:*` 및 인증 스크립트에 필요한 명령만 허용한다. 앱 계정은 FLUSHALL·CONFIG 같은 관리 명령을 사용할 수 없다. 운영 관리 계정·접근은 별도 Secret/운영 절차로 관리한다.
+- 연결 1초·명령 2초 timeout, 단절 중 명령 거절과 자동 명령 재전송 방지를 적용한다. 저장·판정 장애는 503이다. Redis는 매 회원 API의 JWT 검증을 위한 조회 대상이 아니므로 기존 JWT 검증은 Redis를 호출하지 않는다.
+- 계열 Hash에는 해시·사용자·최초/절대 만료시각·상태를 저장하고 사용자 ZSET 인덱스로 계열을 찾는다. Lua의 첫 쓰기는 메모리를 할당하는 ZADD로 해 Redis의 OOM 검사 우회를 피한다. PENDING 구성·절대 만료 설정 뒤 마지막 HSET으로 ACTIVE를 확정한다. Lua가 실패하면 자동 롤백되지 않으며 미완성 계열은 인증 근거가 아니다.
+- 후속 갱신·탈퇴는 같은 사용자 행 잠금 → Redis 변경 순서를 지켜야 한다. U18 전체 구현과 194번 회전·재사용·로그아웃 검증은 별도 업무다. 193번 제한이 없으므로 U01 구현만으로 외부 공개 가능한 로그인 전체가 완료됐다고 판단하지 않는다.
+
+### 재시작과 장애 복구
+
+정상 최신 볼륨에서 Redis를 재시작하면 저장 상태를 유지한다. 단일 primary 구성으로 자동 replica/Cluster 장애 전환은 없다. AOF always는 디스크 기록을 기다리므로 everysec보다 쓰기 지연이 커질 수 있다. 성공 응답 뒤의 상태 보존은 정상적인 디스크 fsync 보장 범위에서 확인하며 하드웨어 유실까지 무손실이라고 주장하지 않는다.
+
+메모리 부족 시 기존 인증 데이터를 퇴출하지 않고 저장이 필요한 요청이 503으로 실패한다. 임의로 캐시 삭제·토큰 이력 조기 정리로 해결하지 않는다. 운영자가 계열/이력 사용량과 자원을 확인하고 용량을 조정한다.
+
+볼륨 유실·AOF 손상·과거 백업만 남은 경우에는 인증 경로를 중단한다. 운영자가 원인·대상·영향을 확인한 뒤 새 빈 인증 저장소로 재개하고 사용자에게 재로그인을 안내한다. 과거 상태를 그대로 되살리거나 손상 AOF를 자동 잘라 기동하지 않는다. 앱은 데이터 삭제·볼륨 교체·자동 초기화를 실행하지 않는다. 기존 Refresh Token은 전부 무효이고 기존 JWT는 원래 만료까지 최대 10분 남을 수 있다. 명령 실행·데이터 삭제는 그 시점의 별도 승인 범위다.
+
+### 검증
+
+`./gradlew clean build`(PowerShell: `.\gradlew.bat clean build`)는 포맷과 전체 테스트를 실행한다. 로그인 테스트는 격리 PostgreSQL·Redis를 사용하고 비밀번호·토큰은 합성 값이다. `RefreshTokenStoreIntegrationTest`는 자체 컨테이너의 강제 종료·손상 AOF·새 빈 복구·메모리 부족·실제 entrypoint ACL을 검사한다. 운영 볼륨·계정에 장애를 주입하지 않는다. 제품 인수 테스트와 로컬 Argon2 비용 측정을 실제 배포 부하 검증으로 대신하지 않는다.
 
 ## 관련 기준
 
