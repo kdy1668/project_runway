@@ -52,11 +52,16 @@ class BackendApplicationIntegrationTest {
         assertThat(entityManagerFactory.isOpen()).isTrue();
         assertThat(entityManagerFactory.getMetamodel().getEntities()).isNotEmpty();
         assertThat(flyway.info().pending()).isEmpty();
-        assertThat(flyway.info().applied()).hasSize(1);
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("1");
+        assertThat(flyway.info().applied()).hasSize(2);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("2");
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT count(*) FROM flyway_schema_history WHERE version = '1' AND success",
+                                Integer.class))
+                .isEqualTo(1);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM flyway_schema_history WHERE version = '2' AND success",
                                 Integer.class))
                 .isEqualTo(1);
         assertThat(environment.getProperty("spring.jpa.hibernate.ddl-auto")).isEqualTo("validate");

@@ -76,7 +76,7 @@ class FlywayMigrationTest {
 
     @Test
     void firstMigrationAndReapplicationPreserveData() throws Exception {
-        assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isEqualTo(2);
         execute(
                 """
                 INSERT INTO users(login_id,password,nickname,birth_date,gender,phone_number,health_data_access)
@@ -86,11 +86,16 @@ class FlywayMigrationTest {
         assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isZero();
         assertThat(number("SELECT count(*) FROM users WHERE login_id='migration_runner'"))
                 .isEqualTo(1);
-        assertThat(number("SELECT count(*) FROM flyway_schema_history")).isEqualTo(1);
+        assertThat(number("SELECT count(*) FROM flyway_schema_history")).isEqualTo(2);
         assertThat(
                         number(
                                 "SELECT count(*) FROM flyway_schema_history WHERE version='1' AND success"))
                 .isEqualTo(1);
+        assertThat(
+                        number(
+                                "SELECT count(*) FROM flyway_schema_history WHERE version='2' AND success"))
+                .isEqualTo(1);
+        assertThat(number("SELECT count(*) FROM regions")).isGreaterThan(0);
     }
 
     @Test
