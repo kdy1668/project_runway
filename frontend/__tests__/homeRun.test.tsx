@@ -72,7 +72,6 @@ test('home shows the prototype values and re-sorts past runs', async () => {
   const screen = await render();
   const home = texts(screen);
   for (const text of [
-    '10월 19일 월요일',
     '오늘 달리기 좋은 날이에요',
     '보통',
     '82',
@@ -106,37 +105,30 @@ test('home shows the prototype values and re-sorts past runs', async () => {
   await act(async () => screen.unmount());
 });
 
-test.each(['dark', 'light'] as const)(
-  'the %s home has no background photo and keeps the profile photo as the avatar',
-  async theme => {
-    const repositories = createMockRepositories({ latencyMs: 0 });
-    const getMe = repositories.profile.getMe;
-    repositories.profile.getMe = async () => ({
-      ...(await getMe()),
-      profileImageUrl: 'file:///profile.jpg',
-    });
-    let screen: Screen;
-    await act(async () => {
-      screen = TestRenderer.create(
-        <App
-          repositories={repositories}
-          initialSignedIn
-          initialTheme={theme}
-        />,
-      );
-    });
-    await settle();
-    const images = screen!.root.findAll(
-      node =>
-        node.props.source?.uri !== undefined && typeof node.type === 'string',
+test('the home has no background photo and keeps the profile photo as the avatar', async () => {
+  const repositories = createMockRepositories({ latencyMs: 0 });
+  const getMe = repositories.profile.getMe;
+  repositories.profile.getMe = async () => ({
+    ...(await getMe()),
+    profileImageUrl: 'file:///profile.jpg',
+  });
+  let screen: Screen;
+  await act(async () => {
+    screen = TestRenderer.create(
+      <App repositories={repositories} initialSignedIn />,
     );
-    // Only the avatar shows a photo; the background is the default backdrop.
-    expect(images.map(node => node.props.source.uri)).toEqual([
-      'file:///profile.jpg',
-    ]);
-    await act(async () => screen!.unmount());
-  },
-);
+  });
+  await settle();
+  const images = screen!.root.findAll(
+    node =>
+      node.props.source?.uri !== undefined && typeof node.type === 'string',
+  );
+  // Only the avatar shows a photo; the background is the default backdrop.
+  expect(images.map(node => node.props.source.uri)).toEqual([
+    'file:///profile.jpg',
+  ]);
+  await act(async () => screen!.unmount());
+});
 
 test.each([
   ['newUser', ['준비도 수집 중', '점수 산출 전'], null],

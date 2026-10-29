@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import App from '../App';
 import { createMockRepositories } from '../src/data';
@@ -13,7 +13,6 @@ import {
   isSessionAction,
   type RouteName,
 } from '../src/navigation/routes';
-import { darkTheme, lightTheme } from '../src/theme';
 
 jest.mock(
   'react-native-safe-area-context',
@@ -80,7 +79,7 @@ test('every prototype link points at a registered screen', () => {
 
 test('signed-out users move from start through login into the home tab', async () => {
   const screen = await render();
-  expect(texts(screen)).toContain('나만의 길을 달려요');
+  expect(texts(screen)).toContain('RUN YOUR WAY');
   expect(
     screen.root.findAll(node => node.props.accessibilityRole === 'tablist'),
   ).toHaveLength(0);
@@ -147,21 +146,12 @@ test('tabs and their inner screens follow the prototype flow', async () => {
   await act(async () => screen.unmount());
 });
 
-test('settings switches light and dark themes and signs out', async () => {
-  const screen = await render({ initialSignedIn: true, initialTheme: 'dark' });
-  const backgrounds = () =>
-    screen.root
-      .findAll(node => node.props.edges !== undefined)
-      .map(node => StyleSheet.flatten(node.props.style)?.backgroundColor);
+test('settings signs out', async () => {
+  const screen = await render({ initialSignedIn: true });
   await press(screen, '설정');
-  expect(backgrounds()).toContain(darkTheme.colors.background);
-  await press(screen, '라이트');
-  expect(backgrounds()).toContain(lightTheme.colors.background);
-  expect(backgrounds()).not.toContain(darkTheme.colors.background);
-  await press(screen, '다크');
-  expect(backgrounds()).not.toContain(lightTheme.colors.background);
+  expect(texts(screen)).not.toContain('화면 모드');
   await press(screen, '로그아웃 → 1.1 시작');
-  expect(texts(screen)).toContain('나만의 길을 달려요');
+  expect(texts(screen)).toContain('RUN YOUR WAY');
   await act(async () => screen.unmount());
 });
 
