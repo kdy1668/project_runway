@@ -16,18 +16,20 @@ import Svg, {
 import { k1, radius, spacing, ThemeProvider, useTheme } from '../theme';
 
 // Kit boxes (DESIGN.md 2-7). glass: white see-through card, solid: plain card, muted: chip-colored box,
-// outline: pinned card (6.0 곧 출발), deep: dark glass, vignette: dark center brightening to the edge.
+// outline: pinned card (6.0 곧 출발), deep: dark glass, vignette: dark center brightening to the edge,
+// course: the course card behind a white course line (3.1c 저장한 코스, 3.1b 추천 코스, 4.5 경로).
 export type CardVariant =
   | 'glass'
   | 'solid'
   | 'muted'
   | 'outline'
   | 'deep'
-  | 'vignette';
+  | 'vignette'
+  | 'course';
 
-type DarkVariant = Extract<CardVariant, 'deep' | 'vignette'>;
+type DarkVariant = Extract<CardVariant, 'deep' | 'vignette' | 'course'>;
 
-// The two dark boxes are drawn with SVG, since React Native views have no gradient fill.
+// The dark boxes are drawn with SVG, since React Native views have no gradient fill.
 function DarkFill({ variant }: { variant: DarkVariant }) {
   return (
     <Svg style={StyleSheet.absoluteFill}>
@@ -37,6 +39,12 @@ function DarkFill({ variant }: { variant: DarkVariant }) {
             <Stop offset="0" stopColor={k1.mid} stopOpacity={0.66} />
             <Stop offset="1" stopColor={k1.night} stopOpacity={0.9} />
           </LinearGradient>
+        ) : variant === 'course' ? (
+          <RadialGradient id="fill" cx="0.5" cy="0.45" r="0.75">
+            <Stop offset="0.4" stopColor={k1.night} />
+            <Stop offset="0.8" stopColor={k1.deep} />
+            <Stop offset="1" stopColor={k1.mid} />
+          </RadialGradient>
         ) : (
           <RadialGradient id="fill" cx="0.5" cy="0.55" r="0.62">
             <Stop offset="0.32" stopColor={k1.black} stopOpacity={0.96} />
@@ -67,13 +75,18 @@ export function Card({
   const { colors } = useTheme();
   const look = {
     glass: { backgroundColor: colors.surface, borderColor: 'transparent' },
-    solid: { backgroundColor: colors.surfaceRaised, borderColor: 'transparent' },
+    solid: {
+      backgroundColor: colors.surfaceRaised,
+      borderColor: 'transparent',
+    },
     muted: { backgroundColor: colors.surfaceMuted, borderColor: 'transparent' },
     outline: { backgroundColor: colors.surface, borderColor: colors.accent },
     deep: { backgroundColor: 'transparent', borderColor: darkEdge },
     vignette: { backgroundColor: 'transparent', borderColor: darkEdge },
+    course: { backgroundColor: 'transparent', borderColor: darkEdge },
   }[variant];
-  const dark = variant === 'deep' || variant === 'vignette';
+  const dark =
+    variant === 'deep' || variant === 'vignette' || variant === 'course';
   // Content in a dark box reads the dark tone, so its text and buttons turn light by themselves.
   const content = dark ? (
     <>
