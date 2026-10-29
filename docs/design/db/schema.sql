@@ -1093,3 +1093,6 @@ CREATE TABLE session_control_events (
 CREATE UNIQUE INDEX uq_control_pending ON session_control_events(session_id,device_id)
     WHERE result IN ('PENDING','UNKNOWN');
 CREATE INDEX ix_control_session_time ON session_control_events(session_id,created_at);
+
+-- S15P31E105-222 nickname uniqueness (V4).
+ALTER TABLE "users" ADD CONSTRAINT "uq_users_nickname" UNIQUE ("nickname");

@@ -171,12 +171,12 @@ class RefreshTokenStoreIntegrationTest {
                             "sh",
                             "-c",
                             "for f in /data/appendonlydir/*.incr.aof; do printf '*3\\r"
-                                + "\\n"
-                                + "$3\\r"
-                                + "\\n"
-                                + "SET\\r"
-                                + "\\n"
-                                + "' >> \"$f\"; done");
+                                    + "\\n"
+                                    + "$3\\r"
+                                    + "\\n"
+                                    + "SET\\r"
+                                    + "\\n"
+                                    + "' >> \"$f\"; done");
             assertThat(corrupted.getExitCode()).isZero();
             server.getDockerClient()
                     .killContainerCmd(server.getContainerId())
@@ -238,6 +238,15 @@ class RefreshTokenStoreIntegrationTest {
                 assertThat(attempts.recordFailure("runner01")).isEqualTo(1);
                 attempts.ensureAllowed("runner01");
                 store.createForLogin(token, "runner01");
+                var limiter =
+                        new com.runway.backend.domain.auth.service.LoginIdAvailabilityLimiter(
+                                redis);
+                for (int request = 0; request < 60; request++) limiter.check("198.51.100.30");
+                assertThatThrownBy(() -> limiter.check("198.51.100.30"))
+                        .isInstanceOfSatisfying(
+                                ApiException.class,
+                                error -> assertThat(error.code()).isEqualTo("TOO_MANY_REQUESTS"));
+
                 assertThat(
                                 redis.opsForValue()
                                         .get(

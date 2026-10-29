@@ -29,6 +29,7 @@ server:
 
 runway:
   auth:
+    trusted-proxies: ${BACKEND_AUTH_TRUSTED_PROXIES:}
     redis:
       host: ${BACKEND_REDIS_HOST:}
       port: ${BACKEND_REDIS_PORT:}
