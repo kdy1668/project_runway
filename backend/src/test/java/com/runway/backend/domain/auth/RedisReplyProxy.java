@@ -84,13 +84,15 @@ final class RedisReplyProxy implements AutoCloseable {
                 if (frame == null) return;
                 List<String> args = frame.args();
                 boolean creation =
-                        args.size() > 9
+                        args.size() > 3
                                 && args.get(0).equalsIgnoreCase("EVALSHA")
                                 && args.get(1).equals(createSha);
                 if (creation && armed.get()) {
                     createRequests.incrementAndGet();
                     familyKey.compareAndSet(null, args.get(3));
-                    expiresAt.compareAndSet(null, args.get(9));
+                    int keyCount = Integer.parseInt(args.get(2));
+                    if (args.size() > 7 + keyCount)
+                        expiresAt.compareAndSet(null, args.get(7 + keyCount));
                     Fault current = fault.getAndSet(Fault.NONE);
                     if (current == Fault.DISCONNECT_BEFORE_WRITE) {
                         client.close();

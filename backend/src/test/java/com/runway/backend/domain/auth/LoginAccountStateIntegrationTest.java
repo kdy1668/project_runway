@@ -8,14 +8,16 @@ import com.runway.backend.domain.auth.repository.RefreshTokenStore;
 import com.runway.backend.domain.auth.service.LoginService;
 import com.runway.backend.domain.auth.service.MemberPasswordHasher;
 import com.runway.backend.global.exception.ApiException;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 class LoginAccountStateIntegrationTest extends AuthIntegrationSupport {
     @MockitoSpyBean MemberPasswordHasher hasher;
@@ -51,7 +53,8 @@ class LoginAccountStateIntegrationTest extends AuthIntegrationSupport {
                 assertThat(verified.await(10, TimeUnit.SECONDS)).isTrue();
                 if (withdraw)
                     jdbc.update(
-                            "UPDATE users SET account_status='WITHDRAWN', withdrawn_at=now() WHERE id=?",
+                            "UPDATE users SET account_status='WITHDRAWN', withdrawn_at=now() WHERE"
+                                + " id=?",
                             user);
                 else
                     jdbc.update(
@@ -78,7 +81,7 @@ class LoginAccountStateIntegrationTest extends AuthIntegrationSupport {
                             return call.callRealMethod();
                         })
                 .when(store)
-                .create(org.mockito.ArgumentMatchers.any());
+                .createForLogin(org.mockito.ArgumentMatchers.any(), anyString());
         try (var pool = Executors.newFixedThreadPool(2)) {
             var signingIn = pool.submit(() -> login.login("runner01", "Runner9!"));
             assertThat(writing.await(10, TimeUnit.SECONDS)).isTrue();
@@ -90,12 +93,16 @@ class LoginAccountStateIntegrationTest extends AuthIntegrationSupport {
                                                     status -> {
                                                         withdrawalStarted.countDown();
                                                         jdbc.queryForObject(
-                                                                "SELECT id FROM users WHERE id=? FOR UPDATE",
+                                                                "SELECT id FROM users WHERE id=?"
+                                                                    + " FOR UPDATE",
                                                                 Long.class,
                                                                 user);
                                                         withdrawalLocked.countDown();
                                                         jdbc.update(
-                                                                "UPDATE users SET account_status='WITHDRAWN', withdrawn_at=now() WHERE id=?",
+                                                                "UPDATE users SET"
+                                                                    + " account_status='WITHDRAWN',"
+                                                                    + " withdrawn_at=now() WHERE"
+                                                                    + " id=?",
                                                                 user);
                                                         for (String family :
                                                                 redis.opsForZSet()
@@ -144,7 +151,8 @@ class LoginAccountStateIntegrationTest extends AuthIntegrationSupport {
                                             .execute(
                                                     status -> {
                                                         jdbc.queryForObject(
-                                                                "SELECT id FROM users WHERE id=? FOR UPDATE",
+                                                                "SELECT id FROM users WHERE id=?"
+                                                                    + " FOR UPDATE",
                                                                 Long.class,
                                                                 user);
                                                         locked.countDown();

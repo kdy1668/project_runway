@@ -7,8 +7,7 @@ import com.runway.backend.domain.auth.repository.RefreshTokenStore;
 import com.runway.backend.domain.auth.service.RefreshTokenFactory;
 import com.runway.backend.domain.auth.service.RefreshTokenFactory.IssuedRefreshToken;
 import com.runway.backend.global.exception.ApiException;
-import java.time.Instant;
-import java.util.concurrent.TimeUnit;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
@@ -17,6 +16,9 @@ import org.springframework.mock.env.MockEnvironment;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.utility.DockerImageName;
 import org.testcontainers.utility.MountableFile;
+
+import java.time.Instant;
+import java.util.concurrent.TimeUnit;
 
 class RefreshTokenStoreIntegrationTest {
     static final String IMAGE =
@@ -168,7 +170,13 @@ class RefreshTokenStoreIntegrationTest {
                     server.execInContainer(
                             "sh",
                             "-c",
-                            "for f in /data/appendonlydir/*.incr.aof; do printf '*3\\r\\n$3\\r\\nSET\\r\\n' >> \"$f\"; done");
+                            "for f in /data/appendonlydir/*.incr.aof; do printf '*3\\r"
+                                + "\\n"
+                                + "$3\\r"
+                                + "\\n"
+                                + "SET\\r"
+                                + "\\n"
+                                + "' >> \"$f\"; done");
             assertThat(corrupted.getExitCode()).isZero();
             server.getDockerClient()
                     .killContainerCmd(server.getContainerId())
@@ -225,7 +233,17 @@ class RefreshTokenStoreIntegrationTest {
                 var redis = context.getBean(StringRedisTemplate.class);
                 var store = new RefreshTokenStore(redis);
                 var token = new RefreshTokenFactory().create(1, Instant.now());
-                store.create(token);
+                var attempts =
+                        new com.runway.backend.domain.auth.repository.LoginAttemptStore(redis);
+                assertThat(attempts.recordFailure("runner01")).isEqualTo(1);
+                attempts.ensureAllowed("runner01");
+                store.createForLogin(token, "runner01");
+                assertThat(
+                                redis.opsForValue()
+                                        .get(
+                                                com.runway.backend.domain.auth.repository
+                                                        .LoginAttemptStore.key("runner01")))
+                        .isNull();
                 assertThat(
                                 redis.opsForHash()
                                         .get(
@@ -233,6 +251,8 @@ class RefreshTokenStoreIntegrationTest {
                                                 "state"))
                         .isEqualTo("ACTIVE");
                 assertThat(store.revokeUndelivered(token)).isTrue();
+                assertThatThrownBy(() -> redis.opsForValue().set("outside:auth:scope", "synthetic"))
+                        .isInstanceOf(RuntimeException.class);
                 assertThatThrownBy(
                                 () -> {
                                     try (var connection =

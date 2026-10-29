@@ -9,6 +9,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.MediaType;
+
 import tools.jackson.databind.json.JsonMapper;
 
 @ExtendWith(OutputCaptureExtension.class)
@@ -42,10 +43,29 @@ class LoginSensitiveDataTest extends AuthIntegrationSupport {
                             .getContentAsString();
             assertThat(failure).doesNotContain("SyntheticSecret9!", encoded);
         }
+        for (int i = 0; i < 5; i++) {
+            String locked =
+                    mvc.perform(
+                                    post("/api/v1/auth/login")
+                                            .contentType(MediaType.APPLICATION_JSON)
+                                            .content(
+                                                    "{\"loginId\":\"runner01\",\"password\":\"SyntheticSecret9!\"}"))
+                            .andReturn()
+                            .getResponse()
+                            .getContentAsString();
+            assertThat(locked)
+                    .doesNotContain(
+                            "runner01",
+                            "SyntheticSecret9!",
+                            encoded,
+                            body.get("accessToken").asString(),
+                            body.get("refreshToken").asString());
+        }
         assertThat(output.getAll())
                 .doesNotContain(
                         "Runner9!",
                         "SyntheticSecret9!",
+                        "runway:auth:attempt:runner01",
                         TEST_PASSWORD,
                         encoded,
                         body.get("accessToken").asString(),
