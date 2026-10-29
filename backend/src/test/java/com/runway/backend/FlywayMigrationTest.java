@@ -77,7 +77,7 @@ class FlywayMigrationTest {
 
     @Test
     void firstMigrationAndReapplicationPreserveData() throws Exception {
-        assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isEqualTo(4);
+        assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isEqualTo(5);
         execute(
                 """
                 INSERT INTO users(login_id,password,nickname,birth_date,gender,phone_number,health_data_access)
@@ -87,7 +87,7 @@ class FlywayMigrationTest {
         assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isZero();
         assertThat(number("SELECT count(*) FROM users WHERE login_id='migration_runner'"))
                 .isEqualTo(1);
-        assertThat(number("SELECT count(*) FROM flyway_schema_history")).isEqualTo(4);
+        assertThat(number("SELECT count(*) FROM flyway_schema_history")).isEqualTo(5);
         assertThat(
                         number(
                                 "SELECT count(*) FROM flyway_schema_history WHERE version='1' AND"
@@ -193,7 +193,7 @@ class FlywayMigrationTest {
     @Test
     void v3ConvertsExistingBatchUuidWithoutLosingData() throws Exception {
         installV1WithBatch("ABCDEFAB-0000-4000-8000-000000000101");
-        assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isEqualTo(3);
+        assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isEqualTo(4);
         assertThat(
                         number(
                                 "SELECT count(*) FROM information_schema.columns WHERE"
@@ -290,7 +290,7 @@ class FlywayMigrationTest {
                 INSERT INTO coaching_decisions(session_id,elapsed_duration,recommended_pace,cue_bpm)
                 SELECT id,10,300,160 FROM running_sessions;
                 """);
-        assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isEqualTo(3);
+        assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isEqualTo(4);
         assertThat(
                         number(
                                 "SELECT count(*) FROM coaching_decisions WHERE cue_bpm=160 AND"
@@ -374,7 +374,7 @@ class FlywayMigrationTest {
                     + " users(login_id,password,nickname,birth_date,gender,phone_number,health_data_access)"
                     + " VALUES"
                     + " ('before_signup','hash','before','2000-01-01','MALE','01012345678','DISAGREE')");
-        assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isEqualTo(2);
         assertThat(number("SELECT count(*) FROM users WHERE login_id='before_signup'"))
                 .isEqualTo(1);
         assertThat(
@@ -415,6 +415,53 @@ class FlywayMigrationTest {
                                 "SELECT count(*) FROM flyway_schema_history WHERE version='4' AND"
                                         + " success"))
                 .isZero();
+    }
+
+    @Test
+    void v5AllowsOneLinkedDevicePerUserAndType() throws Exception {
+        flyway("classpath:db/migration").migrate();
+        execute(
+                """
+                INSERT INTO users(login_id,password,nickname,birth_date,gender,phone_number,health_data_access)
+                VALUES ('device_runner','synthetic','runner','2000-01-01','MALE','00000000000','AGREEE');
+                INSERT INTO user_devices(user_id,device_type,linked_at,unlinked_at)
+                SELECT id,'WATCH',now(),now() FROM users;
+                INSERT INTO user_devices(user_id,device_type,linked_at,unlinked_at)
+                SELECT id,'WATCH',now(),now() FROM users;
+                INSERT INTO user_devices(user_id,device_type,linked_at) SELECT id,'WATCH',now() FROM users;
+                INSERT INTO user_devices(user_id,device_type,linked_at) SELECT id,'PHONE',now() FROM users;
+                """);
+        assertThatThrownBy(
+                        () ->
+                                execute(
+                                        "INSERT INTO user_devices(user_id,device_type,linked_at) SELECT id,'WATCH',now() FROM users"))
+                .isInstanceOf(java.sql.SQLException.class)
+                .hasMessageContaining("uq_user_devices_active");
+        assertThat(number("SELECT count(*) FROM user_devices")).isEqualTo(4);
+    }
+
+    @Test
+    void v5RejectsDuplicateLinkedDevicesWithoutChangingThem() throws Exception {
+        Flyway.configure()
+                .dataSource(databaseUrl, DATABASE.getUsername(), DATABASE.getPassword())
+                .locations("classpath:db/migration")
+                .target("4")
+                .load()
+                .migrate();
+        execute(
+                """
+                INSERT INTO users(login_id,password,nickname,birth_date,gender,phone_number,health_data_access)
+                VALUES ('duplicate_runner','synthetic','runner','2000-01-01','MALE','00000000000','AGREEE');
+                INSERT INTO user_devices(user_id,device_type,linked_at) SELECT id,'WATCH',now() FROM users;
+                INSERT INTO user_devices(user_id,device_type,linked_at) SELECT id,'WATCH',now() FROM users;
+                """);
+        assertThatThrownBy(() -> flyway("classpath:db/migration").migrate())
+                .isInstanceOf(FlywayException.class);
+        assertThat(number("SELECT count(*) FROM user_devices WHERE unlinked_at IS NULL"))
+                .isEqualTo(2);
+        assertThat(number("SELECT count(*) FROM pg_indexes WHERE indexname='uq_user_devices_active'"))
+                .isZero();
+        assertThat(number("SELECT count(*) FROM flyway_schema_history WHERE version='5'")).isZero();
     }
 
     private List<String> snapshot(String url) throws Exception {

@@ -1096,3 +1096,7 @@ CREATE INDEX ix_control_session_time ON session_control_events(session_id,create
 
 -- S15P31E105-222 nickname uniqueness (V4).
 ALTER TABLE "users" ADD CONSTRAINT "uq_users_nickname" UNIQUE ("nickname");
+
+-- S15P31E105-251 (V5): 회원별·유형별 연결 중(unlinked_at IS NULL) 기기는 하나만 허용한다.
+CREATE UNIQUE INDEX uq_user_devices_active ON user_devices(user_id,device_type)
+    WHERE unlinked_at IS NULL;
