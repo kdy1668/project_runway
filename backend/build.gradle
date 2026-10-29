@@ -47,7 +47,20 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 tasks.named('test') {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags 'password-performance'
+    }
+    maxHeapSize = '1536m'
+}
+
+tasks.register('passwordPerformanceTest', Test) {
+    group = 'verification'
+    description = 'Runs password cost measurements explicitly on a controlled host.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform {
+        includeTags 'password-performance'
+    }
     maxHeapSize = '1536m'
 }
 

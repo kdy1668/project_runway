@@ -254,7 +254,11 @@ U01 `POST /api/v1/auth/login`은 8~20 Unicode 코드 포인트·공백 불가·�
 
 ### 검증
 
-`./gradlew clean build`(PowerShell: `.\gradlew.bat clean build`)는 포맷과 전체 테스트를 실행한다. 로그인 테스트는 격리 PostgreSQL·Redis를 사용하고 비밀번호·토큰은 합성 값이다. `RefreshTokenStoreIntegrationTest`는 자체 컨테이너의 강제 종료·손상 AOF·새 빈 복구·메모리 부족·실제 entrypoint ACL을 검사한다. 운영 볼륨·계정에 장애를 주입하지 않는다. 제품 인수 테스트와 로컬 Argon2 비용 측정을 실제 배포 부하 검증으로 대신하지 않는다.
+`./gradlew clean build`(PowerShell: `.\gradlew.bat clean build`)는 비밀번호 성능 측정을 제외한 전체 기능·통합 테스트를 실행한다. 로그인 테스트는 격리 PostgreSQL·Redis를 사용하고 비밀번호·토큰은 합성 값이다. `RefreshTokenStoreIntegrationTest`는 자체 컨테이너의 강제 종료·손상 AOF·새 빈 복구·메모리 부족·실제 entrypoint ACL을 검사한다. 운영 볼륨·계정에 장애를 주입하지 않는다.
+
+Argon2id의 합의된 비용(64MiB·반복 3회·병렬도 1)은 유지한다. 비밀번호 일치·오답·해시 형식과 비용 값 방어는 일반 CI에서 계속 검사한다. 단일/동시 검증의 p95 실행 시간 검사는 `password-performance` 태그로 분리하며, 공유 CI 자원에 따른 시간 초과를 일반 빌드 실패 조건으로 사용하지 않는다.
+
+비용을 다시 측정할 필요가 있을 때만 자원 조건을 정한 환경에서 `./gradlew passwordPerformanceTest`(PowerShell: `.\gradlew.bat passwordPerformanceTest`)를 명시적으로 실행한다. 이 태스크는 일반 `build`에 연결하지 않는다. 기존 단일 30회 p95 1초 이하·8개 동시 40건 p95 2초 미만 조건은 유지하며 결과는 `build/reports/tests/passwordPerformanceTest/index.html`에 생성한다. 로컬 비용 측정을 실제 배포 부하 검증으로 대신하지 않는다.
 
 ## 관련 기준
 
