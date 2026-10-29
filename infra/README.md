@@ -11,6 +11,8 @@
 | `compose.yaml`, `nginx/default.conf` | Nginx·HTTPS·백엔드/Jenkins 라우팅 |
 | `jenkins/compose.yaml`, `jenkins/backend-agent/` | Jenkins 컨트롤러·Java 21 빌드 에이전트 |
 | `jenkins/mobile-agent/` | Node·Java·Android 도구를 갖춘 모바일 빌드 에이전트 |
+| `jenkins/Jenkinsfile.ci` | 변경 영역별 백엔드·모바일 병렬 검사와 단일 MR 상태 |
+| `jenkins/Jenkinsfile.mobile-apk`, `jenkins/build-mobile-apk.sh` | master 테스트용 ARM64 APK 생성·보관과 공통 빌드 명령 |
 | `jenkins/Jenkinsfile.mobile` | dev·master 대상 MR의 모바일 타입·린트·테스트 검사 |
 | `jenkins/Jenkinsfile.backend` | dev·master 대상 MR의 임시 병합 검사·테스트·JAR 생성 |
 | `jenkins/Jenkinsfile.backend-cd` | master 병합 후 검사·이미지 생성·자동 배포 |
@@ -59,17 +61,22 @@
 
 ## Jenkins 설정
 
-| 항목 | 기준 |
-| --- | --- |
-| 접속 주소 | https://k15e105.p.ssafy.io/jenkins/ |
-| 빌드 노드 | `backend-builder`(라벨 `backend`)·`mobile-builder`(라벨 `mobile`), 각각 executor 1 / Built-In Node executor 0 |
-| 모바일 도구 | Jenkins 접속 Java 21·앱 빌드 Java 17, Node 22·pnpm 11.28.9. 메모리 6GiB·CPU 2개 상한 |
-| GitLab 연결 | `runway-gitlab`, 저장소 Credentials ID `runway-gitlab-repo` |
-| 백엔드 CI | `runway-backend-ci`, SCM `*/dev`, Script Path `infra/jenkins/Jenkinsfile.backend` |
-| 모바일 CI | `infra/jenkins/Jenkinsfile.mobile` 작성 완료. Jenkins Job·Webhook 연결 및 실제 실행 검증 예정 |
-| CD | `runway-backend-cd`, SCM `*/dev`, Script Path `infra/jenkins/Jenkinsfile.backend-cd` |
-| 트리거 | CI는 dev·master 대상 MR 갱신, CD는 master Push만 사용 |
-| 권한 | 관리자와 조회 권한 분리. 익명 접근·자가 가입 제외 |
+| 항목 | 기준                                                                                                                             |
+| --- |--------------------------------------------------------------------------------------------------------------------------------|
+| 접속 주소 | https://k15e105.p.ssafy.io/jenkins/                                                                                            |
+| 빌드 노드 | `backend-builder`(라벨 `backend`)·`mobile-builder`(라벨 `mobile`), 각각 executor 1 / Built-In Node executor 0                        |
+| 모바일 도구 | Jenkins 접속 Java 21·앱 빌드 Java 17, Node 22·pnpm 11.28.9. 메모리 6GiB·CPU 2개 상한                                                      |
+| GitLab 연결 | `runway-gitlab`, 저장소 Credentials ID `runway-gitlab-repo`                                                                       |
+| 백엔드 CI | `runway-backend-ci`, SCM `*/dev`, Script Path `infra/jenkins/Jenkinsfile.backend`                                              |
+| 모바일 APK | `infra/jenkins/Jenkinsfile.mobile-apk` 준비 중. master Push 후 ARM64 디버그 APK를 생성하며 APK 보관 개수는 최근 빌드 5개를 기준으로 제한한다. 정식 출시용 서명·스토어 배포는 제외한다. |
+| 통합 CI | `infra/jenkins/Jenkinsfile.ci`, backend/frontend 변경 영역만 검사·빌드하고 공통 Jenkins 설정 변경·수동 실행은 둘 다 검사한다. Job·Webhook 전환 전에는 기존 CI를 유지한다. |
+| 기존 모바일 CI | `infra/jenkins/Jenkinsfile.mobile`은 단독 검사 초안이다. 신규 연결은 통합 CI를 사용한다. |
+| CD | `runway-backend-cd`, SCM `*/dev`, Script Path `infra/jenkins/Jenkinsfile.backend-cd`                                           |
+| 트리거 | CI는 dev·master 대상 MR 갱신, CD는 master Push만 사용                                                                                   |
+| 권한 | 관리자와 조회 권한 분리. 익명 접근·자가 가입 제외                                                                                                  |
+
+MR·master 모두 팀 테스트용 ARM64 APK를 빌드하며 x86 에뮬레이터·32비트 기기는 대상에서 제외한다. Gradle 작업 결과 캐시는 전용 볼륨에 유지한다.
+모바일 APK 빌드 소요 시간은 콘솔과 `build-time.txt`, 작업별 시간은 보관된 Gradle profile 보고서에서 확인한다.
 
 Webhook 경로는 `/jenkins/project/<작업명>`이며 Job별 Secret token을 별도 등록한다.
 Jenkins 계정·Credentials·Job 설정은 영속 볼륨에서 관리하며 이 저장소가 자동 생성하지 않는다.
