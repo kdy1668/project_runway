@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText, Icon, type IconName } from '../components';
 import { k1, radius, size, typography, useTheme } from '../theme';
@@ -14,11 +15,25 @@ const tabs: Record<keyof MainTabParamList, { label: string; icon: IconName }> =
     CommunityTab: { label: '커뮤니티', icon: 'community' },
   };
 
+// Screens whose map fills the screen get the black pill instead (DESIGN.md 2-6 하단 탭바).
+const mapScreens = ['FreeRun', 'CourseRun'];
+
+const darkColors = {
+  tabBar: k1.night,
+  tabBarBorder: 'rgba(232,238,244,0.08)',
+  tabActive: k1.ice,
+  tabIconActive: k1.night,
+  tabInactive: 'rgba(232,238,244,0.55)',
+};
+
 // 2.1 홈 하단: a floating light pill with four tabs (DESIGN.md 2-3). The selected tab fills only its icon circle.
 // The 2.P arc drag is not built; 2.P was out of scope for S15P31E105-146.
 export function PillTabBar({ state, navigation }: BottomTabBarProps) {
-  const { colors } = useTheme();
+  const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const shown = getFocusedRouteNameFromRoute(state.routes[state.index]);
+  const colors =
+    shown && mapScreens.includes(shown) ? darkColors : theme.colors;
   return (
     <View
       pointerEvents="box-none"

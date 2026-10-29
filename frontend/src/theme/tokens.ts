@@ -11,6 +11,8 @@ export const k1 = {
   coral: '#E2876F',
   // Coral text on light backgrounds and white cards.
   coralText: '#C4644B',
+  // Grey fields and round buttons inside the white map sheets (DESIGN.md 2-6).
+  field: '#EDF1F5',
 } as const;
 
 // 2.1 홈 widget palettes (DESIGN.md 1-2): steel blue for the main and healthy states, graphite for the rest.

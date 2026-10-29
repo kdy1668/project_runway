@@ -42,6 +42,13 @@ const icons = {
   ),
   back: <Path d="m15 18-6-6 6-6" />,
   forward: <Path d="m9 18 6-6-6-6" />,
+  // ↗ on the round button of 2.x cards (DESIGN.md 2-6 원 버튼).
+  arrowUpRight: (
+    <>
+      <Path d="M7 7h10v10" />
+      <Path d="M7 17 17 7" />
+    </>
+  ),
   close: (
     <>
       <Path d="M18 6 6 18" />
