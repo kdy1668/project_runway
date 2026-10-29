@@ -18,11 +18,11 @@ RunWay 서비스의 **클라이언트 공개 API 설계 초안**이다. 저장�
 | [AI 페이스·실시간 분석·BPM](./pace-coaching.md) | AI 페이스·실시간 분석·BPM | 1 |
 | [러닝 기록·분석](./running-records.md) | 러닝 기록·분석 | 5 |
 | [그룹런](./group-runs.md) | 그룹런 | 13 |
-| [크루](./crews.md) | 크루 | 10 |
+| [크루](./crews.md) | 크루 | 11 |
 | [커뮤니티](./community.md) | 커뮤니티 | 13 |
 | [공통 파일](./files.md) | 이미지 업로드 | 1 |
 
-총 **91개 공개 API 후보**. 크루 멤버 내보내기(M09)는 선택 기능이다. 내부 자동 처리와 실시간 이벤트는 이 수에 포함하지 않는다.
+총 **92개 공개 API 후보**. 크루 멤버 내보내기(M09)는 선택 기능이다. 내부 자동 처리와 실시간 이벤트는 이 수에 포함하지 않는다.
 
 Wear OS 앱의 원본 업로드 계약은 [워치 기록 업로드 계약](wear-upload-api.md)에서 별도로 관리한다. 서비스 API 구현 시 `W07`의 배치 동기화 계약과 함께 검토해야 한다.
 
@@ -222,6 +222,7 @@ U02는 Refresh Token을 교체하고 이전 토큰 재사용 시 해당 로그�
 | M08 | [크루 탈퇴](./crews.md#m08-크루-탈퇴) | DELETE | `/crews/{crewId}/members/me` | [crews.md](./crews.md) |
 | M09 | [크루 멤버 내보내기](./crews.md#m09-크루-멤버-내보내기) | DELETE | `/crews/{crewId}/members/{userId}` | [crews.md](./crews.md) |
 | M10 | [내 크루 목록](./crews.md#m10-내-크루-목록) | GET | `/users/me/crews` | [crews.md](./crews.md) |
+| M11 | [크루 해산](./crews.md#m11-크루-해산) | DELETE | `/crews/{crewId}` | [crews.md](./crews.md) |
 | CMT01 | [게시물 작성](./community.md#cmt01-게시물-작성) | POST | `/posts` | [community.md](./community.md) |
 | CMT02 | [게시물 목록](./community.md#cmt02-게시물-목록) | GET | `/posts` | [community.md](./community.md) |
 | CMT03 | [게시물 상세](./community.md#cmt03-게시물-상세) | GET | `/posts/{postId}` | [community.md](./community.md) |
@@ -298,7 +299,7 @@ P07은 세션 BPM 조절, G12는 그룹장 전용 전체 강제 종료로 변경
 | C02 | 별도 공용 이름 검색 제외. C01 추천 조건 필터로 통합 |
 | C04 | 수동 등록 API 제거. 러닝 경로 확정 후 자동 코스 반영 |
 | C07·C09 | 공용 코스 이름 없이 본인 저장 관계의 별명 설정·변경·조회 |
-| M11 | 크루 자주 만난 장소 기능 제거 |
+| M11 | 크루 자주 만난 장소 기능 제거 후, 동일 ID를 크루 해산(DELETE `/crews/{crewId}`)으로 재사용 |
 | W06·W07 | 앱 서비스의 자동 업로드 API. 서버 내부 계산과 구분. W07은 실시간 소량 배치·오프라인 재전송 통합 |
 | P02·P03·P04 | 별도 REST 요청 제외. 전략·코칭은 세션 준비·갱신·복구로 제공, 측정값은 W07 자동 전송 |
 | H04 | 원본 GPS 별도 조회 제거. H02·공유 게시물에 표시용 경로 그림 제공 |
