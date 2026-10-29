@@ -76,7 +76,7 @@ class FlywayMigrationTest {
 
     @Test
     void firstMigrationAndReapplicationPreserveData() throws Exception {
-        assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isEqualTo(2);
+        assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isEqualTo(3);
         execute(
                 """
                 INSERT INTO users(login_id,password,nickname,birth_date,gender,phone_number,health_data_access)
@@ -86,7 +86,7 @@ class FlywayMigrationTest {
         assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isZero();
         assertThat(number("SELECT count(*) FROM users WHERE login_id='migration_runner'"))
                 .isEqualTo(1);
-        assertThat(number("SELECT count(*) FROM flyway_schema_history")).isEqualTo(2);
+        assertThat(number("SELECT count(*) FROM flyway_schema_history")).isEqualTo(3);
         assertThat(
                         number(
                                 "SELECT count(*) FROM flyway_schema_history WHERE version='1' AND success"))
@@ -163,6 +163,80 @@ class FlywayMigrationTest {
         assertThat(number("SELECT count(*) FROM flyway_schema_history WHERE success")).isZero();
     }
 
+    private void installV1WithBatch(String batchId) throws Exception {
+        Flyway.configure()
+                .dataSource(databaseUrl, DATABASE.getUsername(), DATABASE.getPassword())
+                .locations("classpath:db/migration")
+                .target("1")
+                .load()
+                .migrate();
+        execute(
+                """
+                INSERT INTO users(login_id,password,nickname,birth_date,gender,phone_number,health_data_access)
+                VALUES ('uuid_runner','synthetic','runner','2000-01-01','MALE','00000000000','AGREEE');
+                INSERT INTO user_devices(user_id,device_type,linked_at) SELECT id,'WATCH',now() FROM users;
+                INSERT INTO sync_batches(client_batch_id,device_id,payload_version,payload_hash,status,committed_at)
+                SELECT '%s',id,'1','synthetic-hash','COMMITTED',now() FROM user_devices;
+                """
+                        .formatted(batchId));
+    }
+
+    @Test
+    void v3ConvertsExistingBatchUuidWithoutLosingData() throws Exception {
+        installV1WithBatch("ABCDEFAB-0000-4000-8000-000000000101");
+        assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isEqualTo(2);
+        assertThat(
+                        number(
+                                "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='sync_batches' AND column_name='client_batch_id' AND data_type='uuid'"))
+                .isEqualTo(1);
+        assertThat(
+                        number(
+                                "SELECT count(*) FROM sync_batches WHERE client_batch_id='abcdefab-0000-4000-8000-000000000101'::uuid AND payload_hash='synthetic-hash' AND status='COMMITTED' AND committed_at IS NOT NULL"))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void equivalentLegacyUuidSpellingsAbortWithoutDeletingBatches() throws Exception {
+        installV1WithBatch("ABCDEFAB-0000-4000-8000-000000000101");
+        execute(
+                """
+                INSERT INTO sync_batches(client_batch_id,device_id,payload_version,payload_hash)
+                SELECT 'abcdefab-0000-4000-8000-000000000101',id,'1','another-synthetic-hash' FROM user_devices
+                """);
+        assertThatThrownBy(() -> flyway("classpath:db/migration").migrate())
+                .isInstanceOf(FlywayException.class);
+        assertThat(number("SELECT count(*) FROM sync_batches")).isEqualTo(2);
+        assertThat(
+                        number(
+                                "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='sync_batches' AND column_name='client_batch_id' AND data_type='character varying'"))
+                .isEqualTo(1);
+        assertThat(number("SELECT count(*) FROM flyway_schema_history WHERE version='3'")).isZero();
+    }
+
+    @Test
+    void invalidLegacyBatchUuidRollsBackEntireV3() throws Exception {
+        installV1WithBatch("legacy-not-a-uuid");
+        assertThatThrownBy(() -> flyway("classpath:db/migration").migrate())
+                .isInstanceOf(FlywayException.class);
+        assertThat(
+                        number(
+                                "SELECT count(*) FROM sync_batches WHERE client_batch_id='legacy-not-a-uuid' AND status='COMMITTED'"))
+                .isEqualTo(1);
+        assertThat(
+                        number(
+                                "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='sync_batches' AND column_name='client_batch_id' AND data_type='character varying'"))
+                .isEqualTo(1);
+        assertThat(
+                        number(
+                                "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='running_sessions' AND column_name='state_version'"))
+                .isZero();
+        assertThat(
+                        number(
+                                "SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tablename='session_control_events'"))
+                .isZero();
+        assertThat(number("SELECT count(*) FROM flyway_schema_history WHERE version='3'")).isZero();
+    }
+
     @Test
     void installedSchemaMatchesReferenceIncludingConstraintsAndTriggers() throws Exception {
         flyway("classpath:db/migration").migrate();
@@ -173,6 +247,77 @@ class FlywayMigrationTest {
             statement.execute(sql.startsWith("\uFEFF") ? sql.substring(1) : sql);
         }
         assertThat(snapshot(databaseUrl)).containsExactlyElementsOf(snapshot(referenceUrl));
+    }
+
+    @Test
+    void v3UpgradesPopulatedV1WithoutChangingLegacyCoaching() throws Exception {
+        Flyway.configure()
+                .dataSource(databaseUrl, DATABASE.getUsername(), DATABASE.getPassword())
+                .locations("classpath:db/migration")
+                .target("1")
+                .load()
+                .migrate();
+        execute(
+                """
+                INSERT INTO users(login_id,password,nickname,birth_date,gender,phone_number,health_data_access)
+                VALUES ('v1_runner','synthetic','runner','2000-01-01','MALE','00000000000','AGREEE');
+                INSERT INTO running_sessions(user_id,status,started_at,ended_at,total_distance,elapsed_duration,moving_duration) SELECT id,'COMPLETED','2026-10-28T01:00:00Z','2026-10-28T01:10:00Z',2000,600,600 FROM users WHERE login_id='v1_runner';
+                INSERT INTO coaching_decisions(session_id,elapsed_duration,recommended_pace,cue_bpm)
+                SELECT id,10,300,160 FROM running_sessions;
+                """);
+        assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isEqualTo(2);
+        assertThat(
+                        number(
+                                "SELECT count(*) FROM coaching_decisions WHERE cue_bpm=160 AND based_on_state_version IS NULL AND expires_at IS NULL"))
+                .isEqualTo(1);
+        assertThat(
+                        number(
+                                "SELECT count(*) FROM running_sessions WHERE state_version=0 AND current_bpm IS NULL AND analysis_status='LEGACY' AND status='COMPLETED' AND total_distance=2000 AND elapsed_duration=600"))
+                .isEqualTo(1);
+        assertThat(
+                        number(
+                                "SELECT count(*) FROM flyway_schema_history WHERE version IN ('1','2','3') AND success"))
+                .isEqualTo(3);
+        assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isZero();
+        assertThatThrownBy(
+                        () ->
+                                execute(
+                                        "UPDATE running_sessions SET status='RUNNING' WHERE state_version=0"))
+                .isInstanceOf(java.sql.SQLException.class);
+        execute(
+                "INSERT INTO running_sessions(user_id,status) SELECT id,'RUNNING' FROM users WHERE login_id='v1_runner'");
+        assertThat(
+                        number(
+                                "SELECT count(*) FROM running_sessions WHERE status='RUNNING' AND state_version=1 AND analysis_status='PENDING'"))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void v3RejectsActiveV1WorkoutWithoutChangingItsStateOrTimestamp() throws Exception {
+        Flyway.configure()
+                .dataSource(databaseUrl, DATABASE.getUsername(), DATABASE.getPassword())
+                .locations("classpath:db/migration")
+                .target("1")
+                .load()
+                .migrate();
+        execute(
+                """
+                INSERT INTO users(login_id,password,nickname,birth_date,gender,phone_number,health_data_access)
+                VALUES ('active_v1','synthetic','runner','2000-01-01','MALE','00000000000','AGREEE');
+                INSERT INTO running_sessions(user_id,status,started_at)
+                SELECT id,'RUNNING','2026-10-28T01:00:00Z' FROM users WHERE login_id='active_v1';
+                """);
+        assertThatThrownBy(() -> flyway("classpath:db/migration").migrate())
+                .isInstanceOf(FlywayException.class)
+                .hasMessageContaining("active V1 sessions");
+        assertThat(
+                        number(
+                                "SELECT count(*) FROM running_sessions WHERE status='RUNNING' AND started_at='2026-10-28T01:00:00Z' AND ended_at IS NULL"))
+                .isEqualTo(1);
+        assertThat(
+                        number(
+                                "SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tablename='session_control_events'"))
+                .isZero();
     }
 
     private List<String> snapshot(String url) throws Exception {

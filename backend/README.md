@@ -155,7 +155,7 @@ Bash에서는 실행 부분을 `./gradlew`로 바꾼다. 이 부분 테스트 �
 
 - JPA는 `ddl-auto=validate`로 검사만 하며 OSIV는 비활성화한다.
 - Flyway는 활성화하고 `clean`과 자동 baseline을 허용하지 않는다.
-- `src/main/resources/db/migration/V1__initial_schema.sql`은 현재 기준 스키마의 26개 업무
+- `src/main/resources/db/migration/V1__initial_schema.sql`은 초기 기준 스키마의 26개 업무
   테이블·타입·제약·트리거를 빈 DB에 설치한다. 현재 크루·커뮤니티 Entity를 포함하며 기동 성공만으로 모든 업무 Entity
   매핑 검증을 의미하지 않는다. 기존 워치 테이블 설치가 미확정 워치 API 정책을 확정하지 않는다.
 - Flyway는 서버 기동 시 미적용 버전을 적용한다. 다른 개발자의 로컬 DB도 각자 설정한 접속
@@ -163,7 +163,7 @@ Bash에서는 실행 부분을 `./gradlew`로 바꾼다. 이 부분 테스트 �
   지정하면 IDE가 변수를 전달할 수 있다. 파일을 만들기만 하면 자동 적용되는 것은 아니다.
 - 최초 적용 전 접속 대상이 새 빈 개발 DB인지 확인한다. 기존 데이터가 있거나 출처가 불명확한
   Docker 볼륨이면 중단하고 기존 설정·이행 방법을 확인한다. 볼륨 삭제로 해결하지 않는다.
-- 이미 적용한 V1은 수정하지 않는다. 변경은 `V2__설명.sql` 등 새 버전과 기준 스키마에 반영한다.
+- 이미 적용한 V1은 수정하지 않는다. 변경은 `V3__설명.sql` 등 새 버전과 기준 스키마에 반영한다.
   병렬 번호 충돌·실패·체크섬 불일치 대응은 [DB 규칙](../docs/development/db-schema-convention.md#7-flyway-변경-적용과-복구)을 따른다.
 - 격리 테스트는 첫 적용·이력·재적용 시 데이터 보존·기존 DB 거부·변조 감지·실패 롤백과
   기준 SQL 대비 실제 설치 구조를 검사한다. PostgreSQL 트랜잭션 DDL 검증이며 임의 SQL의
@@ -270,3 +270,13 @@ Argon2id의 합의된 비용(64MiB·반복 3회·병렬도 1)은 유지한다. �
 버전 확인 출처(2026-10-22): [Spring Boot 요구사항](https://docs.spring.io/spring-boot/system-requirements.html),
 [Spring Initializr](https://start.spring.io),
 [PostGIS 이미지](https://github.com/postgis/docker-postgis).
+
+### 세션 제어 스키마 (V3)
+
+V3는 세션의 현재 상태, 실제 제어 결과, 코칭 유효성을 저장하는 컬럼과 `session_control_events` 테이블을 추가한다. 컬럼과 제약은 [ERD 설명서](../docs/design/db/erd.md), 처리 규칙은 [세션 계약](../docs/design/api/sessions.md#준비코칭종료-후-분석-상태)을 따른다.
+
+적용 전 진행 중이거나 일시정지 중인 운동을 종료하고 구버전 서버의 쓰기를 중지해야 한다. 기존 세션은 `state_version=0`, `analysis_status=LEGACY`로 보존하며, 신규 세션은 `state_version=1`로 생성한다.
+
+V1과 V2 지역 초기 데이터는 수정하지 않는다. V3는 `running_sessions`를 잠근 뒤 `RUNNING`/`PAUSED` 세션이 있으면 전체 적용을 롤백한다. 이 작업에서는 공유·운영 DB에 적용하지 않는다. 이미 V3가 적용된 DB에 수정된 V3를 덮어쓰지 않으며, 로컬 임시 DB는 재생성한다.
+
+`sync_batches.client_batch_id`는 기존 문자열에서 UUID로 변환한다. 변환 불가능한 값이 있으면 전체 마이그레이션을 롤백하며, 값을 임의 변경하거나 삭제하지 않는다. 기존 `payload_hash`는 유지한다.
