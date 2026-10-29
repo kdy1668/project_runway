@@ -1,6 +1,6 @@
 # RunWay ERD 설명서
 
-기준: 2026-10-28 · ERD ver.3 · **27개 테이블 / 248개 컬럼 / 50개 FK**
+기준: 2026-10-29 · ERD ver.3 · **28개 테이블 / 256개 컬럼 / 51개 FK**
 
 회원이 러닝을 준비하고 기록한 결과를 코스·크루·게시글로 연결하는 데이터 구조다. 이 문서는 팀원이 구조와 정책을 빠르게 파악하기 위한 요약이다. 전체 컬럼·타입·NULL 정의는 SQL을 기준으로 확인한다.
 
@@ -39,11 +39,26 @@
 | `running_sessions` | 한 회원의 한 번의 러닝. 초기 목표·상태·실제 결과. course_id가 없으면 자유러닝 |
 | `running_metric_samples` | 세션별 측정 시점의 심박·케이던스·속도·누적 거리 등 |
 | `running_route_points` | 세션별 측정 시각과 GPS 위치·정확도·고도 |
+| `running_session_splits` | 종료 후 1km 단위 실측 구간 집계(H03). 원본 샘플에서 한 번 계산해 덮어써 저장 |
 | `sync_batches` | 기기에서 받은 배치의 식별·해시·수신/반영 상태 |
 | `session_control_events` | 시작·일시정지·재개·종료·수동/AI BPM 명령과 실제 결과, 명령 중복 판정 |
 | `pace_plans` | 세션의 초기 권장 페이스·BPM |
 | `pace_plan_segments` | 초기 페이스 계획의 거리 구간별 권장 페이스 |
 | `coaching_decisions` | 러닝 도중의 권장 페이스·BPM·미래 심박 예측 |
+
+#### running_session_splits — 종료 후 구간 집계
+
+| 컬럼 | 타입·NULL | 용도 |
+| --- | --- | --- |
+| id | BIGINT IDENTITY PK | 러닝 구간 ID. 세션 내 조회는 `running_session_id`와 함께 사용 |
+| running_session_id | BIGINT NOT NULL FK | `running_sessions.id` |
+| start_distance | NUMERIC(12,2) NOT NULL | 구간 시작거리(m). 세션마다 `(running_session_id, start_distance)` UNIQUE |
+| end_distance | NUMERIC(12,2) NOT NULL | 구간 종료거리(m). 시작보다 커야 함 |
+| pace | NUMERIC(10,2) NULL | 구간 페이스(초/km). H03 `paceSecPerKm`. 불가 시 NULL |
+| average_heart_rate | NUMERIC(7,2) NULL | 구간 평균 심박(bpm). 미측정 NULL |
+| average_cadence | NUMERIC(8,2) NULL | 구간 평균 케이던스(spm). 미측정 NULL |
+
+계획 구간(`pace_plan_segments`)과 분리한다. 조회(H03)는 이 테이블만 읽고, 원본 재계산은 하지 않는다. 분석 완료 시 해당 세션 행을 삭제한 뒤 다시 넣는 방식으로 덮어쓴다.
 
 #### running_sessions — 현재 상태와 제어기기
 
@@ -115,7 +130,7 @@
 
 ## 3. 핵심 관계와 데이터 흐름
 
-- **개인 러닝:** 회원 → 러닝 세션 → 측정값·GPS 경로·초기 계획·코칭 판단. 최초 목표와 AI가 조정하는 안내 페이스를 구분한다.
+- **개인 러닝:** 회원 → 러닝 세션 → 측정값·GPS 경로·초기 계획·코칭 판단·종료 후 구간 집계(`running_session_splits`). 최초 목표와 AI가 조정하는 안내 페이스를 구분한다.
 - **세션 제어:** 세션의 현재 제어기기와 중계 폰은 각각 `user_devices`를 참조한다. 제어 기록은 세션·실행기기에 연결되며, 코칭 명령은 `(session_id, coaching_id)` 복합 FK로 같은 세션의 코칭만 참조한다.
 - **코스 등록:** 완료된 본인 세션의 경로를 코스로 등록하고, 이후 여러 세션과 북마크가 같은 코스를 참조한다. 코스 원본과 회원별 북마크는 별개다.
 - **그룹런:** 크루 → 그룹런 → 참가 관계 → 각 참가자의 개인 세션. 그룹 전체 종료와 개인 러닝 종료는 별개다. 참가 시점에는 개인 세션이 없어도 된다.
@@ -207,6 +222,7 @@ V3 이전 세션은 `state_version=0`, `analysis_status=LEGACY`로 구분한다.
 | course_environment_tags | course_id, environment_type |
 | group_run_participants | group_run_id, user_id |
 | pace_plan_segments | pace_plan_id, segment_sequence |
+| running_session_splits | running_session_id, start_distance |
 | crew_memberships | crew_id, user_id |
 | sync_batches | device_id, client_batch_id |
 | coaching_decisions | session_id, id (코칭 복합 FK의 참조 키) |
