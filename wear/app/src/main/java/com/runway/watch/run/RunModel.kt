@@ -23,6 +23,7 @@ data class RunMetrics(
     val rhythm: RhythmBpm? = null,
     /** Distance progress toward the goal, 0..1, or null when there is no distance goal. */
     val goalProgress: Float? = null,
+    val feeds: MetricFeeds = MetricFeeds(),
 )
 
 data class RunSnapshot(
