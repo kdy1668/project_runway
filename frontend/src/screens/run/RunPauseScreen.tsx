@@ -93,7 +93,7 @@ export function StopButton({ onFinish }: { onFinish: () => void }) {
 
 // 재개: the light circle with a black ▶. It reads the dark tone of the glass card it sits on,
 // and takes the same box as the stop ring so both labels line up.
-function ResumeButton({ onPress }: { onPress: () => void }) {
+export function ResumeButton({ onPress }: { onPress: () => void }) {
   const { colors } = useTheme();
   return (
     <View style={styles.ring}>
