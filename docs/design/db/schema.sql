@@ -14,6 +14,9 @@ CREATE TYPE "course_environment_tags_environment_type_enum" AS ENUM('PARK', 'RIV
 CREATE TYPE "user_profiles_running_level_enum" AS ENUM('BEGINNER', 'INTERMEDIATE', 'ADVANCED');
 CREATE TYPE "crews_status_enum" AS ENUM('ACTIVE', 'INACTIVE');
 CREATE TYPE "running_sessions_status_enum" AS ENUM('READY', 'RUNNING', 'PAUSED', 'COMPLETED', 'CANCELLED', 'INTERRUPTED');
+CREATE TYPE "running_sessions_analysis_status_enum" AS ENUM('PENDING', 'PROCESSING', 'READY', 'FAILED', 'LEGACY');
+CREATE TYPE "session_control_events_action_enum" AS ENUM('START', 'PAUSE', 'RESUME', 'END', 'SET_BPM', 'COACHING');
+CREATE TYPE "session_control_events_result_enum" AS ENUM('PENDING', 'APPLIED', 'REJECTED', 'IGNORED', 'UNKNOWN');
 CREATE TYPE "user_devices_device_type_enum" AS ENUM('PHONE', 'WATCH');
 CREATE TYPE "user_settings_location_collection_mode_enum" AS ENUM('ALWAYS', 'RUNNING_ONLY', 'OFF');
 CREATE TYPE "user_settings_account_visibility_enum" AS ENUM('PUBLIC', 'PRIVATE');
@@ -21,7 +24,7 @@ CREATE TYPE "notifications_delivery_status_enum" AS ENUM('PENDING', 'SENT', 'FAI
 
 CREATE TABLE "sync_batches" (
 	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
-	"client_batch_id"	VARCHAR(200)		NOT NULL,
+	"client_batch_id"	UUID		NOT NULL,
 	"device_id"	BIGINT		NOT NULL,
 	"session_id"	BIGINT		NULL,
 	"payload_version"	VARCHAR(50)		NOT NULL,
@@ -269,7 +272,9 @@ CREATE TABLE "coaching_decisions" (
 	"predicted_hr_60_bpm"	NUMERIC(7,2)		NULL,
 	"predicted_hr_120_bpm"	NUMERIC(7,2)		NULL,
 	"route_progress"	NUMERIC(12,2)		NULL,
-	"created_at"	TIMESTAMPTZ	DEFAULT now()	NOT NULL
+	"created_at"	TIMESTAMPTZ	DEFAULT now()	NOT NULL,
+    "based_on_state_version" BIGINT NULL,
+    "expires_at" TIMESTAMPTZ NULL
 );
 
 COMMENT ON COLUMN "coaching_decisions"."elapsed_duration" IS '러닝 경과시간(초)';
@@ -323,7 +328,12 @@ CREATE TABLE "running_sessions" (
 	"deleted_at"	TIMESTAMPTZ		NULL,
 	"max_heart_rate"	NUMERIC(7,2)		NULL,
 	"created_at"	TIMESTAMPTZ	DEFAULT now()	NOT NULL,
-	"updated_at"	TIMESTAMPTZ	DEFAULT now()	NOT NULL
+	"updated_at"	TIMESTAMPTZ	DEFAULT now()	NOT NULL,
+    "control_device_id" BIGINT NULL,
+    "relay_device_id" BIGINT NULL,
+    "state_version" BIGINT DEFAULT 1 NOT NULL CHECK (state_version >= 0),
+    "current_bpm" INTEGER NULL CHECK (current_bpm BETWEEN 60 AND 220),
+    "analysis_status" "running_sessions_analysis_status_enum" DEFAULT 'PENDING' NOT NULL
 );
 
 COMMENT ON COLUMN "running_sessions"."max_heart_rate" IS '최대 심박수(bpm)';
@@ -1044,3 +1054,42 @@ CREATE TRIGGER "trg_course_bookmarks_updated_at"
 CREATE TRIGGER "trg_user_settings_updated_at"
     BEFORE UPDATE ON "user_settings"
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+
+-- 173 온라인 MVP: 현재 상태 저장, 최소한의 명령 결과 기록, 오래된 코칭 적용 방지.
+ALTER TABLE running_sessions ADD CONSTRAINT fk_session_control_device
+    FOREIGN KEY (control_device_id) REFERENCES user_devices(id);
+ALTER TABLE running_sessions ADD CONSTRAINT fk_session_relay_device
+    FOREIGN KEY (relay_device_id) REFERENCES user_devices(id);
+ALTER TABLE running_sessions ADD CONSTRAINT ck_session_protocol_active
+    CHECK (state_version > 0 OR status NOT IN ('RUNNING','PAUSED'));
+ALTER TABLE coaching_decisions ADD CONSTRAINT ck_coaching_context CHECK (
+    (based_on_state_version IS NULL AND expires_at IS NULL)
+    OR (based_on_state_version IS NOT NULL AND based_on_state_version >= 1
+        AND expires_at IS NOT NULL AND created_at < expires_at
+        AND expires_at <= created_at + INTERVAL '20 seconds'));
+ALTER TABLE coaching_decisions ADD CONSTRAINT uq_coaching_session_id UNIQUE (session_id,id);
+
+CREATE TABLE session_control_events (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    session_id BIGINT NOT NULL REFERENCES running_sessions(id),
+    device_id BIGINT NOT NULL REFERENCES user_devices(id),
+    action "session_control_events_action_enum" NOT NULL,
+    target_bpm INTEGER NULL CHECK (target_bpm BETWEEN 60 AND 220),
+    expected_version BIGINT NOT NULL CHECK (expected_version >= 1),
+    coaching_id BIGINT NULL,
+    result "session_control_events_result_enum" DEFAULT 'PENDING' NOT NULL,
+    applied_at TIMESTAMPTZ NULL,
+    reason_code VARCHAR(64) NULL,
+    created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    CONSTRAINT uq_control_version UNIQUE (session_id,expected_version),
+    CONSTRAINT uq_control_coaching UNIQUE (session_id,coaching_id),
+    CONSTRAINT fk_control_coaching FOREIGN KEY (session_id,coaching_id) REFERENCES coaching_decisions(session_id,id),
+    CONSTRAINT ck_control_coaching CHECK ((action = 'COACHING') = (coaching_id IS NOT NULL)),
+    CONSTRAINT ck_control_target CHECK ((action IN ('SET_BPM','COACHING')) = (target_bpm IS NOT NULL)),
+    CONSTRAINT ck_control_result CHECK ((result = 'APPLIED') = (applied_at IS NOT NULL)),
+    CONSTRAINT ck_control_ignored CHECK (result <> 'IGNORED' OR action = 'COACHING')
+);
+CREATE UNIQUE INDEX uq_control_pending ON session_control_events(session_id,device_id)
+    WHERE result IN ('PENDING','UNKNOWN');
+CREATE INDEX ix_control_session_time ON session_control_events(session_id,created_at);
