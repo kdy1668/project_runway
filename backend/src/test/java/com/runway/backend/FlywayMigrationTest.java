@@ -77,7 +77,7 @@ class FlywayMigrationTest {
 
     @Test
     void firstMigrationAndReapplicationPreserveData() throws Exception {
-        assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isEqualTo(5);
+        assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isEqualTo(6);
         execute(
                 """
                 INSERT INTO users(login_id,password,nickname,birth_date,gender,phone_number,health_data_access)
@@ -87,7 +87,7 @@ class FlywayMigrationTest {
         assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isZero();
         assertThat(number("SELECT count(*) FROM users WHERE login_id='migration_runner'"))
                 .isEqualTo(1);
-        assertThat(number("SELECT count(*) FROM flyway_schema_history")).isEqualTo(5);
+        assertThat(number("SELECT count(*) FROM flyway_schema_history")).isEqualTo(6);
         assertThat(
                         number(
                                 "SELECT count(*) FROM flyway_schema_history WHERE version='1' AND"
@@ -97,6 +97,26 @@ class FlywayMigrationTest {
                         number(
                                 "SELECT count(*) FROM flyway_schema_history WHERE version='2' AND"
                                     + " success"))
+                .isEqualTo(1);
+        assertThat(
+                        number(
+                                "SELECT count(*) FROM flyway_schema_history WHERE version='4' AND"
+                                    + " success"))
+                .isEqualTo(1);
+        assertThat(
+                        number(
+                                "SELECT count(*) FROM flyway_schema_history WHERE version='5' AND"
+                                    + " success"))
+                .isEqualTo(1);
+        assertThat(
+                        number(
+                                "SELECT count(*) FROM flyway_schema_history WHERE version='6' AND"
+                                    + " success"))
+                .isEqualTo(1);
+        assertThat(
+                        number(
+                                "SELECT count(*) FROM pg_tables WHERE schemaname='public' AND"
+                                    + " tablename='running_session_splits'"))
                 .isEqualTo(1);
         assertThat(number("SELECT count(*) FROM regions")).isGreaterThan(0);
     }
@@ -193,7 +213,7 @@ class FlywayMigrationTest {
     @Test
     void v3ConvertsExistingBatchUuidWithoutLosingData() throws Exception {
         installV1WithBatch("ABCDEFAB-0000-4000-8000-000000000101");
-        assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isEqualTo(4);
+        assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isEqualTo(5);
         assertThat(
                         number(
                                 "SELECT count(*) FROM information_schema.columns WHERE"
@@ -206,6 +226,10 @@ class FlywayMigrationTest {
                                     + " client_batch_id='abcdefab-0000-4000-8000-000000000101'::uuid"
                                     + " AND payload_hash='synthetic-hash' AND status='COMMITTED'"
                                     + " AND committed_at IS NOT NULL"))
+                .isEqualTo(1);
+        assertThat(
+                        number(
+                                "SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tablename='running_session_splits'"))
                 .isEqualTo(1);
     }
 
@@ -290,7 +314,7 @@ class FlywayMigrationTest {
                 INSERT INTO coaching_decisions(session_id,elapsed_duration,recommended_pace,cue_bpm)
                 SELECT id,10,300,160 FROM running_sessions;
                 """);
-        assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isEqualTo(4);
+        assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isEqualTo(5);
         assertThat(
                         number(
                                 "SELECT count(*) FROM coaching_decisions WHERE cue_bpm=160 AND"
@@ -306,8 +330,8 @@ class FlywayMigrationTest {
         assertThat(
                         number(
                                 "SELECT count(*) FROM flyway_schema_history WHERE version IN"
-                                    + " ('1','2','3') AND success"))
-                .isEqualTo(3);
+                                    + " ('1','2','3','4','5','6') AND success"))
+                .isEqualTo(6);
         assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isZero();
         assertThatThrownBy(
                         () ->
@@ -374,7 +398,7 @@ class FlywayMigrationTest {
                     + " users(login_id,password,nickname,birth_date,gender,phone_number,health_data_access)"
                     + " VALUES"
                     + " ('before_signup','hash','before','2000-01-01','MALE','01012345678','DISAGREE')");
-        assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isEqualTo(2);
+        assertThat(flyway("classpath:db/migration").migrate().migrationsExecuted).isEqualTo(3);
         assertThat(number("SELECT count(*) FROM users WHERE login_id='before_signup'"))
                 .isEqualTo(1);
         assertThat(

@@ -334,7 +334,7 @@
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `splits` | array | O | 저장 컬럼과 직접 대응하지 않는 응답 값. 산출·표시 구조 확인 필요 (ERD만으로 응답 형식을 확정하지 않음.) |
+| `splits` | array | O | `running_session_splits` 행 목록. `start_distance` 오름차순. 분석 미완료면 빈 배열 또는 분석 객체 null(173절) |
 
 
 **사용 흐름과 응답 판단**
@@ -345,11 +345,11 @@
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `splits[].startDistanceM` | number | O | 해당 구간 시작 거리. |
-| `splits[].endDistanceM` | number | O | 해당 구간 종료 거리. |
-| `splits[].paceSecPerKm` | number / null | O | 구간 페이스. 구간 분할·미완주 구간 처리 계약 확인 필요. |
-| `splits[].averageHeartRate` | number / null | O | 구간 심박. 미측정은 null. |
-| `splits[].averageCadence` | number / null | O | 구간 케이던스. 미측정은 null. |
+| `splits[].startDistanceM` | number | O | `running_session_splits.start_distance` (m). 1km 단위 구간의 시작. |
+| `splits[].endDistanceM` | number | O | `running_session_splits.end_distance` (m). 마지막 구간은 1km 미만일 수 있음. |
+| `splits[].paceSecPerKm` | number / null | O | `running_session_splits.pace`. 구간 페이스(초/km). 불가 시 null. |
+| `splits[].averageHeartRate` | number / null | O | `running_session_splits.average_heart_rate`. 미측정은 null. |
+| `splits[].averageCadence` | number / null | O | `running_session_splits.average_cadence`. 미측정은 null. |
 
 ### 오류 응답
 

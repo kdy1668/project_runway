@@ -53,8 +53,8 @@ class BackendApplicationIntegrationTest {
         assertThat(entityManagerFactory.isOpen()).isTrue();
         assertThat(entityManagerFactory.getMetamodel().getEntities()).isNotEmpty();
         assertThat(flyway.info().pending()).isEmpty();
-        assertThat(flyway.info().applied()).hasSize(5);
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("5");
+        assertThat(flyway.info().applied()).hasSize(6);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("6");
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT count(*) FROM flyway_schema_history WHERE version = '1' AND"
@@ -76,6 +76,18 @@ class BackendApplicationIntegrationTest {
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT count(*) FROM flyway_schema_history WHERE version='4' AND"
+                                    + " success",
+                                Integer.class))
+                .isEqualTo(1);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM flyway_schema_history WHERE version='5' AND"
+                                    + " success",
+                                Integer.class))
+                .isEqualTo(1);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM flyway_schema_history WHERE version='6' AND"
                                     + " success",
                                 Integer.class))
                 .isEqualTo(1);
@@ -116,7 +128,8 @@ class BackendApplicationIntegrationTest {
                         "user_settings",
                         "user_follows",
                         "notifications",
-                        "running_metric_samples");
+                        "running_metric_samples",
+                        "running_session_splits");
     }
 
     @Test
