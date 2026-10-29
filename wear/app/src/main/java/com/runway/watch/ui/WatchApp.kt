@@ -2,13 +2,11 @@ package com.runway.watch.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.BasicSwipeToDismissBox
@@ -89,40 +87,9 @@ private fun RunPager(snapshot: RunSnapshot, page: Int, onPage: (Int) -> Unit, on
     HorizontalPager(pager, Modifier.fillMaxSize()) { index ->
         val visible = pager.currentPage == index
         when (pages[index]) {
-            RunPage.STATUS -> StatusPage(snapshot, pages.size, index, visible, onPause)
+            RunPage.STATUS -> RunStatusPage(snapshot, pages.size, index, visible, onPause)
             else -> PendingPage(pages[index], pages.size, index, visible)
         }
-    }
-}
-
-/** 9.2: the edge ring is distance progress; tapping the face asks to pause. */
-@Composable
-private fun StatusPage(snapshot: RunSnapshot, count: Int, index: Int, visible: Boolean, onPause: () -> Unit) {
-    val m = snapshot.metrics
-    RoundScreen(
-        Modifier.clickable(enabled = !snapshot.pendingCommand, onClickLabel = "일시정지", role = Role.Button, onClick = onPause),
-        background = { ProgressRing(m.goalProgress) }, spacing = 1.dp, focused = visible,
-    ) {
-        StatusLine("폰" to if (snapshot.phoneConnected) StatusTone.NORMAL else StatusTone.WARNING)
-        Text("실제 페이스", style = RunwayType.Caption, color = RunwayColors.ContentSecondary)
-        MetricValue(MetricFormat.pace(m.paceSecondsPerKm), 34)
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("안내", style = RunwayType.Caption, color = RunwayColors.ContentSecondary)
-            MetricValue(MetricFormat.pace(m.guidePaceSecondsPerKm), 11, emphasized = false)
-        }
-        Row(Modifier.padding(vertical = 2.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                MetricValue(MetricFormat.distance(m.distanceMeters), 13)
-                MetricValue(MetricFormat.heartRate(m.heartRate), 13)
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                MetricValue(MetricFormat.duration(m.elapsedMs), 13)
-                MetricValue(MetricFormat.cadence(m.cadenceSpm), 13)
-            }
-        }
-        val rhythm = MetricFormat.rhythm(m.rhythm)
-        Chip("${rhythm.symbol}︎ ${rhythm.value} ${rhythm.unit}", description = rhythm.description)
-        PageIndicator(count, index)
     }
 }
 
