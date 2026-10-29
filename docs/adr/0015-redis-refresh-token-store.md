@@ -8,6 +8,8 @@
 | 관련 | [S15P31E105-192](https://ssafy.atlassian.net/browse/S15P31E105-192), [S15P31E105-194](https://ssafy.atlassian.net/browse/S15P31E105-194), [ADR-0014](0014-common-api-authentication.md), [인증 계약](../design/api/users.md#갱신-권한-저장소), [데이터 모델](../design/db/erd.md#인증-저장소-경계) |
 | 대체 관계 | —. ADR-0014의 미정 저장소를 구체화하며 기존 JWT 정책을 유지한다. |
 
+후속 결정: [ADR-0017](0017-redis-login-attempt-store.md)에서 193번 로그인 실패 횟수·잠금 상태도 기존 인증용 Redis에 저장하도록 별도로 확정했다. 아래 결정 당시의 범위와 맥락은 보존하며, 이 문서의 Refresh Token 결정은 계속 유효하다.
+
 ## 맥락
 
 RunWay는 러닝 중 앱 접속을 유지하며 운동 데이터를 저장·조회한다. Access Token은 최대 10분이고 갱신 권한은 최초 로그인부터 최대 30일이다. 활동 중인 로그인은 토큰 갱신을 반복하므로, 동시 러닝 사용자 증가에 따른 갱신 상태 처리와 운동 데이터 처리를 분리할 필요가 있다.

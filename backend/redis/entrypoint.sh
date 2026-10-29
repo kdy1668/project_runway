@@ -19,7 +19,7 @@ fi
 umask 077
 acl_file=/tmp/runway-auth.acl
 password_digest=$(printf '%s' "$BACKEND_REDIS_PASSWORD" | sha256sum | cut -d ' ' -f 1)
-printf 'user default off\nuser %s on #%s ~runway:auth:* -@all +ping +hello +auth +quit +select +client|setname +client|setinfo +type +exists +hget +hmget +hset +pttl +ttl +expireat +zadd +zremrangebyscore +zrange +eval +evalsha +time\n' \
+printf 'user default off\nuser %s on #%s ~runway:auth:* -@all +ping +hello +auth +quit +select +client|setname +client|setinfo +type +exists +get +set +del +hget +hmget +hset +pttl +ttl +expireat +zadd +zremrangebyscore +zrange +eval +evalsha +time\n' \
     "$BACKEND_REDIS_USERNAME" "$password_digest" > "$acl_file"
 unset password_digest
 chown redis:redis "$acl_file"

@@ -1,6 +1,7 @@
 package com.runway.backend.domain.auth.service;
 
 import com.runway.backend.global.exception.ApiException;
+
 import org.springframework.http.HttpStatus;
 
 public final class AuthErrors {
@@ -14,5 +15,14 @@ public final class AuthErrors {
     public static ApiException unavailable() {
         return new ApiException(
                 HttpStatus.SERVICE_UNAVAILABLE, "SERVICE_UNAVAILABLE", "일시적으로 처리할 수 없습니다.");
+    }
+
+    public static ApiException locked() {
+        return new ApiException(
+                HttpStatus.TOO_MANY_REQUESTS, "LOGIN_LOCKED", "로그인 시도가 제한되었습니다. 잠시 후 다시 시도해 주세요.");
+    }
+
+    public static ApiException credentialFailure(int failureCount) {
+        return failureCount == 5 ? locked() : invalidCredentials();
     }
 }

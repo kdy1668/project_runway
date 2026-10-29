@@ -8,17 +8,23 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.runway.backend.domain.auth.repository.RefreshTokenStore;
 import com.runway.backend.domain.auth.service.RefreshTokenFactory.IssuedRefreshToken;
-import java.sql.DriverManager;
-import java.util.concurrent.atomic.AtomicReference;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+
+import java.sql.DriverManager;
+import java.util.concurrent.atomic.AtomicReference;
 
 class LoginPersistenceIntegrationTest extends AuthIntegrationSupport {
     @MockitoSpyBean RefreshTokenStore store;
 
     @Test
     void storageAndResponseFailure() throws Exception {
+        String counterKey =
+                com.runway.backend.domain.auth.repository.LoginAttemptStore.key("runner01");
+        new com.runway.backend.domain.auth.repository.LoginAttemptStore(redis)
+                .recordFailure("runner01");
         var saved = new AtomicReference<IssuedRefreshToken>();
         doAnswer(
                         call -> {
@@ -29,13 +35,14 @@ class LoginPersistenceIntegrationTest extends AuthIntegrationSupport {
                                     "synthetic lost response");
                         })
                 .when(store)
-                .create(any());
+                .createForLogin(any(), org.mockito.ArgumentMatchers.anyString());
         unavailable();
+        assertThat(redis.hasKey(counterKey)).isFalse();
         assertThat(
                         redis.opsForHash()
                                 .get(RefreshTokenStore.familyKey(saved.get().familyId()), "state"))
                 .isEqualTo("REVOKED");
-        verify(store, times(1)).create(any());
+        verify(store, times(1)).createForLogin(any(), org.mockito.ArgumentMatchers.anyString());
     }
 
     @Test
@@ -59,7 +66,7 @@ class LoginPersistenceIntegrationTest extends AuthIntegrationSupport {
                                     "synthetic partial write");
                         })
                 .when(store)
-                .create(any());
+                .createForLogin(any(), org.mockito.ArgumentMatchers.anyString());
         unavailable();
         assertThat(
                         redis.opsForHash()
@@ -69,6 +76,10 @@ class LoginPersistenceIntegrationTest extends AuthIntegrationSupport {
 
     @Test
     void databaseCommitFailureAfterRedisWriteIsCompensated() throws Exception {
+        String counterKey =
+                com.runway.backend.domain.auth.repository.LoginAttemptStore.key("runner01");
+        new com.runway.backend.domain.auth.repository.LoginAttemptStore(redis)
+                .recordFailure("runner01");
         var saved = new AtomicReference<IssuedRefreshToken>();
         doAnswer(
                         call -> {
@@ -93,8 +104,9 @@ class LoginPersistenceIntegrationTest extends AuthIntegrationSupport {
                             return null;
                         })
                 .when(store)
-                .create(any());
+                .createForLogin(any(), org.mockito.ArgumentMatchers.anyString());
         unavailable();
+        assertThat(redis.hasKey(counterKey)).isFalse();
         assertThat(
                         redis.opsForHash()
                                 .get(RefreshTokenStore.familyKey(saved.get().familyId()), "state"))
@@ -129,7 +141,7 @@ class LoginPersistenceIntegrationTest extends AuthIntegrationSupport {
                             return null;
                         })
                 .when(store)
-                .create(any());
+                .createForLogin(any(), org.mockito.ArgumentMatchers.anyString());
         unavailable();
         var token = saved.get();
         String key = RefreshTokenStore.familyKey(token.familyId());
@@ -144,12 +156,18 @@ class LoginPersistenceIntegrationTest extends AuthIntegrationSupport {
 
     @Test
     void failureBeforeRedisWriteDoesNotCreateGrant() throws Exception {
+        var attempts = new com.runway.backend.domain.auth.repository.LoginAttemptStore(redis);
+        attempts.recordFailure("runner01");
+        String counterKey =
+                com.runway.backend.domain.auth.repository.LoginAttemptStore.key("runner01");
+        String before = redis.opsForValue().get(counterKey);
         doThrow(
                         new org.springframework.dao.DataAccessResourceFailureException(
                                 "synthetic unavailable"))
                 .when(store)
-                .create(any());
+                .createForLogin(any(), org.mockito.ArgumentMatchers.anyString());
         unavailable();
+        assertThat(redis.opsForValue().get(counterKey)).isEqualTo(before);
         assertThat(redis.keys("runway:auth:family:*")).isEmpty();
     }
 

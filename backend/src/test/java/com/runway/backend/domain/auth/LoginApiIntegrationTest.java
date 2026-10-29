@@ -5,15 +5,18 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.runway.backend.domain.auth.repository.RefreshTokenStore;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.time.Instant;
-import java.util.HexFormat;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+
 import tools.jackson.databind.json.JsonMapper;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.Instant;
+import java.util.HexFormat;
 
 class LoginApiIntegrationTest extends AuthIntegrationSupport {
     @Autowired JsonMapper mapper;
@@ -94,7 +97,8 @@ class LoginApiIntegrationTest extends AuthIntegrationSupport {
                 }) {
             if (input[1].equals("Runner9!") && input[0].equals("runner01"))
                 jdbc.update(
-                        "UPDATE users SET account_status='WITHDRAWN', withdrawn_at=now() WHERE id=?",
+                        "UPDATE users SET account_status='WITHDRAWN', withdrawn_at=now() WHERE"
+                            + " id=?",
                         user);
             String response =
                     mvc.perform(
@@ -116,7 +120,8 @@ class LoginApiIntegrationTest extends AuthIntegrationSupport {
             if (expected == null) expected = response;
             else assertThat(response).isEqualTo(expected);
         }
-        assertThat(redis.keys("runway:auth:*")).isEmpty();
+        assertThat(redis.keys("runway:auth:family:*")).isEmpty();
+        assertThat(redis.keys("runway:auth:attempt:*")).hasSize(2);
     }
 
     @Test
@@ -124,7 +129,8 @@ class LoginApiIntegrationTest extends AuthIntegrationSupport {
         for (String level : new String[] {"BEGINNER", "INTERMEDIATE", "ADVANCED"}) {
             jdbc.update("DELETE FROM user_profiles");
             jdbc.update(
-                    "INSERT INTO user_profiles(user_id,running_level,average_pace) VALUES (?,?::user_profiles_running_level_enum,360)",
+                    "INSERT INTO user_profiles(user_id,running_level,average_pace) VALUES"
+                        + " (?,?::user_profiles_running_level_enum,360)",
                     user,
                     level);
             assertThat(

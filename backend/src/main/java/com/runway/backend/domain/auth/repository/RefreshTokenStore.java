@@ -2,12 +2,14 @@ package com.runway.backend.domain.auth.repository;
 
 import com.runway.backend.domain.auth.service.AuthErrors;
 import com.runway.backend.domain.auth.service.RefreshTokenFactory.IssuedRefreshToken;
-import java.util.List;
+
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Repository;
+
+import java.util.List;
 
 @Repository
 public class RefreshTokenStore {
@@ -20,20 +22,36 @@ public class RefreshTokenStore {
     }
 
     public void create(IssuedRefreshToken token) {
+        create(token, List.of(familyKey(token.familyId()), userKey(token.userId())));
+    }
+
+    public void createForLogin(IssuedRefreshToken token, String loginId) {
+        create(
+                token,
+                List.of(
+                        familyKey(token.familyId()),
+                        userKey(token.userId()),
+                        LoginAttemptStore.key(loginId)));
+    }
+
+    // 로그인할 때 토큰 정보를 레디스에 저장
+    private void create(IssuedRefreshToken token, List<String> keys) {
+        Long result;
         try {
-            Long result =
+            result =
                     redis.execute(
                             create,
-                            List.of(familyKey(token.familyId()), userKey(token.userId())),
+                            keys,
                             token.familyId(),
                             Long.toString(token.userId()),
                             token.hash(),
                             Long.toString(token.createdAt().getEpochSecond()),
                             Long.toString(token.expiresAt().getEpochSecond()));
-            if (!Long.valueOf(1).equals(result)) throw AuthErrors.unavailable();
         } catch (RuntimeException exception) {
             throw AuthErrors.unavailable();
         }
+        if (Long.valueOf(5).equals(result)) throw AuthErrors.locked();
+        if (!Long.valueOf(1).equals(result)) throw AuthErrors.unavailable();
     }
 
     /** Best effort compensation: no token material or driver exception enters logs. */

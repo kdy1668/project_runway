@@ -2,13 +2,16 @@ package com.runway.backend.domain.auth.service;
 
 import com.runway.backend.domain.auth.dto.LoginResponse;
 import com.runway.backend.domain.auth.repository.AuthUserRepository;
+import com.runway.backend.domain.auth.repository.LoginAttemptStore;
 import com.runway.backend.domain.auth.repository.RefreshTokenStore;
 import com.runway.backend.global.exception.ApiException;
-import java.time.Clock;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
+
+import java.time.Clock;
 
 @Service
 public class LoginService {
@@ -19,6 +22,7 @@ public class LoginService {
     private final LoginIssuanceService issuance;
     private final RefreshTokenStore store;
     private final Clock clock;
+    private final LoginAttemptStore attempts;
 
     public LoginService(
             AuthUserRepository users,
@@ -26,25 +30,28 @@ public class LoginService {
             RefreshTokenFactory tokens,
             LoginIssuanceService issuance,
             RefreshTokenStore store,
-            Clock clock) {
+            Clock clock,
+            LoginAttemptStore attempts) {
         this.users = users;
         this.passwords = passwords;
         this.tokens = tokens;
         this.issuance = issuance;
         this.store = store;
         this.clock = clock;
+        this.attempts = attempts;
     }
 
     public LoginResponse login(String loginId, String password) {
         try {
+            attempts.ensureAllowed(loginId);
             var found = users.findByLoginId(loginId);
             if (found.isEmpty() || !found.get().active()) {
                 passwords.verifyDummy(password);
-                throw AuthErrors.invalidCredentials();
+                throw AuthErrors.credentialFailure(attempts.recordFailure(loginId));
             }
             var account = found.get();
             if (!passwords.matches(password, account.passwordHash()))
-                throw AuthErrors.invalidCredentials();
+                throw AuthErrors.credentialFailure(attempts.recordFailure(loginId));
             var refresh = tokens.create(account.id(), clock.instant());
             try {
                 return issuance.issue(account, refresh);

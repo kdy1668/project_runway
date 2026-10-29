@@ -3,9 +3,11 @@ package com.runway.backend.domain.auth.service;
 import com.runway.backend.domain.auth.dto.LoginResponse;
 import com.runway.backend.domain.auth.repository.AuthUserRepository;
 import com.runway.backend.domain.auth.repository.AuthUserRepository.Account;
+import com.runway.backend.domain.auth.repository.LoginAttemptStore;
 import com.runway.backend.domain.auth.repository.RefreshTokenStore;
 import com.runway.backend.domain.auth.service.RefreshTokenFactory.IssuedRefreshToken;
 import com.runway.backend.global.security.JwtAccessTokenService;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,22 +16,29 @@ public class LoginIssuanceService {
     private final AuthUserRepository users;
     private final RefreshTokenStore store;
     private final JwtAccessTokenService accessTokens;
+    private final LoginAttemptStore attempts;
 
     public LoginIssuanceService(
-            AuthUserRepository users, RefreshTokenStore store, JwtAccessTokenService accessTokens) {
+            AuthUserRepository users,
+            RefreshTokenStore store,
+            JwtAccessTokenService accessTokens,
+            LoginAttemptStore attempts) {
         this.users = users;
         this.store = store;
         this.accessTokens = accessTokens;
+        this.attempts = attempts;
     }
 
     @Transactional
     public LoginResponse issue(Account verified, IssuedRefreshToken refresh) {
-        Account current = users.lock(verified.id()).orElseThrow(AuthErrors::invalidCredentials);
-        if (!current.active() || !current.passwordHash().equals(verified.passwordHash()))
-            throw AuthErrors.invalidCredentials();
+        Account current = users.lock(verified.id()).orElse(null);
+        if (current == null
+                || !current.active()
+                || !current.passwordHash().equals(verified.passwordHash()))
+            throw AuthErrors.credentialFailure(attempts.recordFailure(verified.loginId()));
         boolean onboarding = users.onboardingCompleted(current.id());
         var access = accessTokens.issue(current.id(), refresh.expiresAt());
-        store.create(refresh);
+        store.createForLogin(refresh, current.loginId());
         return new LoginResponse(
                 new LoginResponse.User(current.id(), current.loginId()),
                 access.accessToken(),
