@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 class PasswordVerificationTest {
@@ -89,6 +90,7 @@ class PasswordVerificationTest {
     }
 
     @Test
+    @Tag("password-performance")
     void boundedConcurrentVerification() throws Exception {
         String encoded = HASHER.encode("Runner9!");
         for (int i = 0; i < 3; i++) HASHER.matches("Runner9!", encoded);
