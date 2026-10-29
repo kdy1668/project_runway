@@ -212,10 +212,11 @@ V3 이전 세션은 `state_version=0`, `analysis_status=LEGACY`로 구분한다.
 | coaching_decisions | session_id, id (코칭 복합 FK의 참조 키) |
 | session_control_events | session_id, expected_version / session_id, coaching_id |
 | session_control_events | session_id, device_id — result가 PENDING 또는 UNKNOWN일 때만 |
+| user_devices | user_id, device_type — unlinked_at이 NULL(연결 중)일 때만 |
 | regions | region_code |
 | comments | post_id, id (부모 복합 FK의 참조 키) |
 
-크루 재가입은 같은 `(crew_id,user_id)` 행을 갱신한다. 상태 전이 시 요청·가입·탈퇴 시각을 새 상태에 맞게 정리하는 책임은 서비스에 있다. 가입 이력 전체를 별도 행으로 누적하는 모델은 이번 범위가 아니다. 로그인 아이디의 대소문자 정규화·탈퇴 후 재사용 정책은 이 UNIQUE만으로 결정되지 않는다.
+기기는 회원별·유형별로 연결 중인 행을 하나만 둔다. 해제 후 재등록은 새 행을 만들어 연결·해제 이력을 보존하며, 설치 식별자는 저장하지 않는다(기기 API W01~W03). 크루 재가입은 같은 `(crew_id,user_id)` 행을 갱신한다. 상태 전이 시 요청·가입·탈퇴 시각을 새 상태에 맞게 정리하는 책임은 서비스에 있다. 가입 이력 전체를 별도 행으로 누적하는 모델은 이번 범위가 아니다. 로그인 아이디의 대소문자 정규화·탈퇴 후 재사용 정책은 이 UNIQUE만으로 결정되지 않는다.
 
 ### 세션 제어·코칭 제약
 

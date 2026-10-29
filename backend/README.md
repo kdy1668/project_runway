@@ -285,6 +285,12 @@ V1과 V2 지역 초기 데이터는 수정하지 않는다. V3는 `running_sessi
 
 `sync_batches.client_batch_id`는 기존 문자열에서 UUID로 변환한다. 변환 불가능한 값이 있으면 전체 마이그레이션을 롤백하며, 값을 임의 변경하거나 삭제하지 않는다. 기존 `payload_hash`는 유지한다.
 
+### 기기 연결 유일성 (V5)
+
+V5는 `user_devices`에 회원별·유형별 연결 중(`unlinked_at IS NULL`) 기기를 하나만 허용하는 부분 유니크 인덱스 `uq_user_devices_active`를 추가한다. 처리 규칙은 [기기 API W01~W03](../docs/design/api/devices-health.md#w01-기기-등록)을 따른다.
+
+같은 회원·유형으로 연결 중인 행이 이미 두 개 이상 있으면 V5는 실패하고 데이터는 바뀌지 않는다. 적용 전에 해당 행을 확인해 남길 기기를 정하고 나머지에 `unlinked_at`을 기록해야 한다. 이 작업에서는 공유·운영 DB에 적용하지 않는다.
+
 ## 회원가입과 아이디 확인 (S15P31E105-222)
 
 - U15는 네 종류 동의 배열, 필수 회원정보를 검증해 users·user_settings를 같은 트랜잭션으로 생성한다. 필수3종 동의는 true를 검증만 하며 건강 동의만 기존 users.health_data_access에 저장한다. 초기 공개 범위 PRIVATE, 위치 수집 OFF, 음성·BPM·그룹/커뮤니티알림은 false다. 임시 러닝 프로필을 만들지 않는다. 전화번호는 010+숫자8자리, 닉네임은 공백 없는 Unicode2~10자·중복 불가다.
