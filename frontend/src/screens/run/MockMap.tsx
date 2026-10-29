@@ -269,8 +269,10 @@ export function MockMap({
         {trail && route ? (
           <Polyline
             points={toPoints(route)}
-            stroke={night ? palette.mint : paceColors[1]}
-            strokeOpacity={night ? 0.45 : 0.7}
+            stroke={
+              k1Night ? palette.white : night ? palette.mint : paceColors[1]
+            }
+            strokeOpacity={k1Night ? 0.45 : night ? 0.45 : 0.7}
             strokeWidth={5}
             strokeDasharray="2 9"
             fill="none"
@@ -282,8 +284,8 @@ export function MockMap({
           <G>
             <Polyline
               points={toPoints(trail)}
-              stroke={palette.mint}
-              strokeOpacity={0.3}
+              stroke={k1Night ? palette.white : palette.mint}
+              strokeOpacity={k1Night ? 0.18 : 0.3}
               strokeWidth={16}
               fill="none"
               strokeLinejoin="round"
@@ -291,7 +293,9 @@ export function MockMap({
             />
             <Polyline
               points={toPoints(trail)}
-              stroke={night ? palette.mint : paceColors[0]}
+              stroke={
+                k1Night ? palette.white : night ? palette.mint : paceColors[0]
+              }
               strokeWidth={6}
               fill="none"
               strokeLinejoin="round"
@@ -350,14 +354,15 @@ export function MockMap({
               cx={runner.x}
               cy={runner.y}
               r={18}
-              fill={palette.mint}
-              opacity={0.3}
+              fill={k1Night ? palette.white : palette.mint}
+              opacity={k1Night ? 0.12 : 0.3}
             />
+            {/* On the K1 dark map the runner is a black dot in a white ring. */}
             <Circle
               cx={runner.x}
               cy={runner.y}
               r={8}
-              fill={palette.mintDeep}
+              fill={k1Night ? k1.night : palette.mintDeep}
               stroke={palette.white}
               strokeWidth={3}
             />
