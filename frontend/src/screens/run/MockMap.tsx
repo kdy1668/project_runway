@@ -324,8 +324,8 @@ export function MockMap({
                 width={width}
                 height={18}
                 rx={6}
-                fill={night ? palette.card : palette.white}
-                opacity={0.92}
+                fill={k1Night ? k1.night : night ? palette.card : palette.white}
+                opacity={k1Night ? 0.62 : 0.92}
               />
               <Rect
                 x={at.x - width / 2 + 5}
@@ -340,7 +340,7 @@ export function MockMap({
                 y={at.y - 17 - lift}
                 fontSize={11}
                 fontWeight="700"
-                fill={night ? palette.white : palette.ink}
+                fill={k1Night ? k1.ice : night ? palette.white : palette.ink}
                 textAnchor="middle"
               >
                 {marker.label}

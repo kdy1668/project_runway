@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Pressable,
   StyleSheet,
   View,
+  type LayoutChangeEvent,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
@@ -30,9 +31,32 @@ export type CardVariant =
 type DarkVariant = Extract<CardVariant, 'deep' | 'vignette' | 'course'>;
 
 // The dark boxes are drawn with SVG, since React Native views have no gradient fill.
+// The fill measures its box and redraws when the card grows: an Svg sized in percent keeps its
+// first size on Android, so a card that gains a line would show an unfilled band.
 function DarkFill({ variant }: { variant: DarkVariant }) {
+  const [box, setBox] = useState<{ width: number; height: number } | null>(
+    null,
+  );
+  const measure = (event: LayoutChangeEvent) =>
+    setBox(event.nativeEvent.layout);
   return (
-    <Svg style={StyleSheet.absoluteFill}>
+    <View style={StyleSheet.absoluteFill} onLayout={measure}>
+      {box ? <DarkFillSvg variant={variant} {...box} /> : null}
+    </View>
+  );
+}
+
+function DarkFillSvg({
+  variant,
+  width,
+  height,
+}: {
+  variant: DarkVariant;
+  width: number;
+  height: number;
+}) {
+  return (
+    <Svg width={width} height={height}>
       <Defs>
         {variant === 'deep' ? (
           <LinearGradient id="fill" x1="0.4" y1="0" x2="0.6" y2="1">
@@ -54,7 +78,7 @@ function DarkFill({ variant }: { variant: DarkVariant }) {
           </RadialGradient>
         )}
       </Defs>
-      <Rect width="100%" height="100%" fill="url(#fill)" />
+      <Rect width={width} height={height} fill="url(#fill)" />
     </Svg>
   );
 }

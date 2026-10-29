@@ -19,6 +19,7 @@ import {
   Card,
   Icon,
   Segmented,
+  type IconName,
 } from '../../components';
 import {
   useRepositories,
@@ -91,20 +92,22 @@ function Chip({
   );
 }
 
-// 코스 추천 받기: a navy pill with a white glow on the left and a white round + on the right
-// (DESIGN.md 2-7 주 버튼). Its size is fixed, so the glow is drawn at numbers.
+// 코스 추천 받기 and 6.5 준비 완료: a navy pill with a white glow on the left and a white round icon
+// on the right (DESIGN.md 2-7 주 버튼). Its size is fixed, so the glow is drawn at numbers.
 const glowWidth = 360;
 const glowHeight = 58;
 
-function GlowButton({
+export function GlowButton({
   title,
-  loading,
-  disabled,
+  loading = false,
+  disabled = false,
+  icon = 'plus',
   onPress,
 }: {
   title: string;
-  loading: boolean;
-  disabled: boolean;
+  loading?: boolean;
+  disabled?: boolean;
+  icon?: IconName;
   onPress: () => void;
 }) {
   return (
@@ -146,7 +149,7 @@ function GlowButton({
         {loading ? (
           <ActivityIndicator color={k1.night} />
         ) : (
-          <Icon name="plus" color={k1.night} size={18} />
+          <Icon name={icon} color={k1.night} size={18} />
         )}
       </View>
     </Pressable>
