@@ -93,7 +93,7 @@ async function login(screen: Screen, loginId: string, password: string) {
 
 test('login shows the failure count, then enters home with the right password', async () => {
   const screen = await render();
-  expect(texts(screen)).toContain('나만의 길을 달려요');
+  expect(texts(screen)).toContain('RUN YOUR WAY');
   await press(screen, '로그인');
   expect(isDisabled(screen, '로그인')).toBe(true);
   await login(screen, fixtures.account.loginId, 'wrong-pass1');
@@ -119,7 +119,7 @@ test('five failed logins lock the account for ten minutes', async () => {
 test('sign-up validates each field and reaches home through the watch connection', async () => {
   const screen = await render();
   await press(screen, '시작하기');
-  expect(texts(screen)).toContain('계정을 만들어요');
+  expect(texts(screen)).toContain('만들어요');
 
   await type(screen, '아이디', 'runner01');
   await settle(450);

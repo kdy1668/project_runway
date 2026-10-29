@@ -1,12 +1,19 @@
 import React from 'react';
 import Svg, { Path } from 'react-native-svg';
 import { useTheme } from '../theme';
-import { logoPath, logoViewBox } from './logoPath';
+import { logoPath, logoViewBox, symbolPath, symbolViewBox } from './logoPath';
 
 // The RUNWAY wordmark in the text color: white on dark screens, ink on light ones.
-export function Logo({ width }: { width: number }) {
+// `symbol` draws the R mark alone, as in the middle of the 1.x header.
+export function Logo({
+  width,
+  symbol = false,
+}: {
+  width: number;
+  symbol?: boolean;
+}) {
   const { colors } = useTheme();
-  const { width: w, height: h } = logoViewBox;
+  const { width: w, height: h } = symbol ? symbolViewBox : logoViewBox;
   return (
     <Svg
       width={width}
@@ -15,7 +22,11 @@ export function Logo({ width }: { width: number }) {
       accessibilityRole="image"
       accessibilityLabel="RUNWAY"
     >
-      <Path d={logoPath} fill={colors.text} fillRule="evenodd" />
+      <Path
+        d={symbol ? symbolPath : logoPath}
+        fill={colors.text}
+        fillRule="evenodd"
+      />
     </Svg>
   );
 }

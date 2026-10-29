@@ -2,7 +2,7 @@ import React from 'react';
 import { useRepositories } from '../../data';
 import { isNight } from '../../format';
 import type { RouteName } from '../../navigation/routes';
-import { ThemeProvider, type ThemePreference } from '../../theme';
+import { ThemeProvider, type ThemeName } from '../../theme';
 import { CourseRunScreen } from './CourseRunScreen';
 import { FreeRunScreen } from './FreeRunScreen';
 import { MusicCardScreen } from './MusicCardScreen';
@@ -15,12 +15,12 @@ import { RunResultScreen } from './RunResultScreen';
 export function themed(
   Screen: React.ComponentType,
   name: string,
-  pick: (night: boolean) => ThemePreference,
+  pick: (night: boolean) => ThemeName,
 ) {
   function Themed() {
     const { clock } = useRepositories();
     return (
-      <ThemeProvider initialPreference={pick(isNight(clock.now()))}>
+      <ThemeProvider tone={pick(isNight(clock.now()))}>
         <Screen />
       </ThemeProvider>
     );
@@ -29,11 +29,11 @@ export function themed(
   return Themed;
 }
 
-// The map screens are light by day (2.0·2.0F) and dark after sunset (2.0N), whatever the screen mode.
-export const dayNight = (night: boolean): ThemePreference =>
+// The map screens are light by day (2.0·2.0F) and dark after sunset (2.0N).
+export const dayNight = (night: boolean): ThemeName =>
   night ? 'dark' : 'light';
 // The music card, 4.3 일시정지 and 4.5 결과 are dark in every prototype screen.
-export const dark = (): ThemePreference => 'dark';
+export const dark = (): ThemeName => 'dark';
 
 export const runScreens: Partial<Record<RouteName, React.ComponentType>> = {
   RunMode: RunModeScreen,
