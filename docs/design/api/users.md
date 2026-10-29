@@ -512,8 +512,8 @@ Path·Query Parameters 없음. 클라이언트가 userId·기기 ID로 폐기 �
 
 ### 처리 규칙
 
-- 닉네임은 2–10자(화면 1.5). 그룹런·커뮤니티에 표시되므로 중복 허용 여부를 확정해야 한다.
-- 닉네임과 프로필 데이터만 수정. 유효 값·중복 검사 정책 미정.
+- 닉네임은 U15의 확정 정책을 공유한다: Unicode 코드포인트2~10자·공백 불가·중복 불가. DB UNIQUE는 가입과 수정에 공통 적용된다.
+- 닉네임과 프로필 데이터만 수정한다. 닉네임 외 프로필 값과 U05 세부 오류 계약은 기존 미정 상태를 유지한다.
 - 사용자 소유권·그룹 참가 권한·상태 전이·재요청 여부를 검증한다(적용 범위는 API별로 결정).
 - 예시는 **명세 구조를 보여주는 가상 값**이며, 확정되지 않은 제한·동기화 주기·AI 호출 주기를 의미하지 않는다.
 
@@ -523,7 +523,7 @@ Path·Query Parameters 없음. 클라이언트가 userId·기기 ID로 폐기 �
 
 ### 미정 사항
 
-- [ ] 닉네임 중복 허용 여부
+- [x] 닉네임 중복 불가. U15와 같은 확정 정책 및 DB UNIQUE를 따른다.
 - [ ] 8.2 화면의 '연령대' 선택 UI를 생년월일 입력으로 바꿀지 디자인 확인
 - [ ] 요청·응답의 세부 필드 타입, 허용 범위, nullable 규칙 및 실제 JSON 구조 검토
 - [ ] HTTP 성공 코드 및 각 예외의 오류 코드 최종 확정
@@ -1403,225 +1403,113 @@ Path·Query 없음. 모든 제출 필드는 NULL 불가다.
 
 ## U15 회원가입
 
-`POST` `/api/v1/auth/signup`
+`POST` `/api/v1/auth/signup` · 공개 · USR-001
 
-| 항목 | 값 |
-|---|---|
-| 단계 | 1차 MVP |
-| 인증 | 공개 |
-| 관련 요구사항 | USR-001 |
-| 관련 화면 | 1.3 회원가입 (화면 설계 v10) |
-| 미정 사항 | 있음 |
-| 비고 | 화면 설계 v10 대조로 추가. 응답 형식은 ERD 확정 후 갱신 |
-
-### 설명
-
-아이디·비밀번호와 닉네임·생년월일·성별·전화번호·건강정보 수집·이용 동의 값을 모두 받은 뒤 계정을 생성한다. 화면에서 단계별로 입력하더라도 U15 호출 전 수집을 완료하며, 필수값이 없는 임시 회원 행을 만들지 않는다. 러닝 수준·평소 러닝 정보 등의 추가 설정은 기존 API로 진행한다.
-
-### 인증 및 권한
-
-- 공개 호출.
-
-### Path Parameters
-
-없음
-
-### Query Parameters
-
-없음
+2026-10-28 S15P31E105-222 사용자 승인으로 아래 계약을 확정했다. 구현·검증 결과는 별도 기록한다.
 
 ### Request Body
 
-| 필드 | 타입 | 필수 | 설명 |
-|---|---|:---:|---|
-| `nickname` | string | O | users.nickname. 2–10자. 중복 허용 여부는 기존 미정 정책 유지. |
-| `birthDate` | string (YYYY-MM-DD) | O | users.birth_date. 유효한 생년월일, 미래 날짜 불가. 나이 제한 정책은 추가하지 않는다. |
-| `gender` | string | O | users.gender. MALE/FEMALE. |
-| `phoneNumber` | string | O | users.phone_number VARCHAR(20). 숫자 타입이 아니며 형식·정규화·인증 여부는 별도 확정. |
-| `healthDataAccess` | string | O | users.health_data_access. ERD 원본 코드 AGREEE/DISAGREE. 값을 반드시 받되 AGREEE를 가입 필수 조건으로 강제하지 않는다. 실제 건강 측정값이 아님. |
-| `loginId` | string | O | 영문·숫자 4–16자 |
-| `password` | string | O | 8~20자, 공백 문자 불가, 특수문자 허용. 필수 문자 조합 없음. [비밀번호 저장·검증](#비밀번호-저장검증)의 확정 정책 적용 |
+| 필드 | 타입 | 필수 | 규칙 |
+| --- | --- | --- | --- |
+| loginId | string | O | 영문·숫자 4~16자, 대소문자 구분. trim·정규화 없음. 탈퇴 계정 포함 중복 불가 |
+| password | string | O | 공통 비밀번호 정책: Unicode 코드포인트 8~20자, 공백·고립 surrogate 불가, 특수문자 허용 |
+| nickname | string | O | Unicode 코드포인트 2~10자, 공백·고립 surrogate 불가. 대소문자 구분·정규화 없음, DB UNIQUE로 중복 불가 |
+| birthDate | string | O | YYYY-MM-DD의 유효한 날짜, 미래 불가. 나이 제한 없음 |
+| gender | string | O | MALE 또는 FEMALE |
+| phoneNumber | string | O | 국내 휴대전화 010으로 시작하는 숫자 11자리. 하이픈·공백 거절, 인증 절차 없음 |
+| consents | array | O | 아래 네 유형을 각각 정확히 한 번 제출. 누락·중복·알 수 없는 유형 거절 |
 
-```json
-{
-  "loginId": "minjun01",
-  "password": "********",
-  "nickname": "러너",
-  "birthDate": "2000-01-01",
-  "gender": "MALE",
-  "phoneNumber": "01000000000",
-  "healthDataAccess": "AGREEE"
-}
-```
+각 동의는 consentType과 granted(JSON boolean)을 포함한다. 필수3종 중 하나라도 false이면 가입을 거절한다. 약관 버전·동의 시각은 받거나 저장하지 않는다.
 
-### Response
-
-`201 Created (제안)`
-
-```json
-{
-  "user": {
-    "id": 101,
-    "loginId": "minjun01"
-  },
-  "accessToken": "access-token-placeholder",
-  "refreshToken": "refresh-token-placeholder",
-  "expiresInSec": 600,
-  "refreshExpiresAt": "2026-11-26T09:00:00Z",
-  "onboardingCompleted": false
-}
-```
-
-응답 필드 정의(ERD ver.3 대조):
-
-| 필드 | 타입 | 필수 | 설명 |
-|---|---|:---:|---|
-| `user` | object | X | 생성된 사용자(id, loginId) (ERD만으로 응답 형식을 확정하지 않음.) |
-| `accessToken` | string | O | JSON 본문의 JWT. U01~U03 공통 토큰 계약 적용 |
-| `refreshToken` | string | O | JSON 본문의 갱신 토큰. U01~U03 공통 토큰 계약 적용 |
-| `expiresInSec` | integer | O | 접근 토큰의 실제 유효 초. 최대 600 |
-| `refreshExpiresAt` | string (ISO 8601 UTC) | O | 최초 인증수단 발급부터 30일의 절대 상한 |
-
-중첩 객체의 저장 필드 대응(추가 표시·집계 값은 기존 후보를 유지하며 별도 확인):
-
-| 필드 | 타입 | 필수 | 설명 |
-|---|---|:---:|---|
-| `user.id` | integer (int64) | O | `users.id` (BIGINT). 저장 값은 NULL 불가. |
-| `user.loginId` | string | O | `users.login_id` (VARCHAR(16)). 저장 값은 NULL 불가. |
-| `onboardingCompleted` | boolean | O | 가입 직후 false. 러닝 수준과 평소 페이스를 U07에 저장한 뒤 완료 판단 |
-
-**사용 흐름과 응답 판단**
-
-가입 성공 후 초기 설정 페이지로 이동하고, 설정에 필요한 회원 API를 호출한다. 인증수단은 JSON 본문으로 전달하며 [공통 토큰 계약](#공통-토큰-계약)을 따른다. 가입 응답의 토큰 만료시각은 2026-10-27T09:00:00Z 발급 예시다. 초기 설정 완료 기준과 화면 분기는 U01의 초기 설정 정책을 따른다.
-
-위 보완 필드는 호출 목적상 필요한 출력이다. 저장 컬럼 부재는 출력 불필요의 근거가 아니다. 저장·전송 정책 미정 항목은 위 설명의 계약을 확정한 후 구현한다.
-
-**확정된 가입 순서:** 필수 사용자 정보와 건강정보 동의 값을 모두 검증한 뒤 저장·인증수단 발급을 진행한다. 최초 요청 누락을 기본값이나 NULL로 채우지 않는다. 가입 응답의 onboardingCompleted는 false이며, 추가 러닝 설정을 U07에 저장한 뒤에만 true가 된다.
-
-### 오류 응답
-
-**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
-
-| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
-|---|---|---|
-| `409 LOGIN_ID_DUPLICATED` | 중복 | 동일 login_id로 가입이 이미 완료됨. 중복 확인 이후 동시 가입도 포함 |
-| `422 INVALID_PASSWORD_POLICY` | 입력 값 | 비밀번호가 8~20자·공백 불가 정책에 맞지 않음. 특수문자를 이유로 거절하거나 문자 조합을 강제하지 않음. HTTP·오류 코드는 이 절의 초안 상태를 유지 |
-| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
-
-- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
-- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
-
-**응답·복구 행동과의 연결:** 필수값 누락은 400 VALIDATION_ERROR, 값 검증 실패는 400 INVALID_PROFILE(후보)로 필드명을 안내한다. 원문 전화번호·생년월일·비밀번호·동의값은 오류 details에 에코하지 않는다. 응답 유실 시 가입 여부를 확인하고 중복 계정 생성을 반복하지 않는다.
-
-### 처리 규칙
-
-- 비밀번호 확인 입력값 비교는 클라이언트에서 처리하고 서버로 보내지 않는다.
-- 건강정보 동의 값은 가입 요청에서 받아 users.health_data_access에 저장한다. DISAGREE인 경우 건강정보 수집·이용을 허용하지 않는다. W04는 가입 후 동의 변경·철회에 사용한다. 이용약관·개인정보·위치 동의의 기존 필수 구분은 W04를 따른다. 가입 전 일괄 전송 여부와 정책 버전·이력 저장 계약은 별도 검토하며 이번 지시로 기존 필수 구분을 변경하지 않는다.
-- 사용자 소유권·그룹 참가 권한·상태 전이·재요청 여부를 검증한다(적용 범위는 API별로 결정).
-- 예시는 **명세 구조를 보여주는 가상 값**이며, 확정되지 않은 제한·동기화 주기·AI 호출 주기를 의미하지 않는다.
-
-### 상태값
-
-- 해당 없음.
-
-### 미정 사항
-
-- [ ] 이용약관·개인정보·위치 동의의 가입 전 일괄 전송·버전·이력 계약. W04 기존 필수 구분 유지, 건강정보 동의 값의 가입 시 수집은 확정
-- [ ] 응답 필드는 ERD 확정 후 갱신
-- [ ] HTTP 성공 코드 및 각 예외의 오류 코드 최종 확정
-
-
-## U16 아이디 사용 가능 여부 확인
-
-`GET` `/api/v1/auth/login-id/availability`
-
-| 항목 | 값 |
-|---|---|
-| 단계 | 1차 MVP |
-| 인증 | 공개 |
-| 관련 요구사항 | USR-001 |
-| 관련 화면 | 1.3 회원가입(입력 즉시 검증) (화면 설계 v10) |
-| 미정 사항 | 있음 |
-| 비고 | 화면 설계 v10 대조로 추가. 응답 형식은 ERD 확정 후 갱신 |
-
-### 설명
-
-입력한 아이디의 형식과 중복 여부를 즉시 확인한다.
-
-### 인증 및 권한
-
-- 공개 호출. 아이디 수집 남용 방지를 위한 요청 제한 검토.
-
-### Path Parameters
-
-없음
-
-### Query Parameters
-
-| 필드 | 타입 | 필수 | 설명 |
-|---|---|:---:|---|
-| `loginId` | string | O | 확인할 아이디 |
-
-### Request Body
-
-없음
-
-### Response
-
-`200 OK (제안)`
+| consentType | granted |
+| --- | --- |
+| TERMS_OF_SERVICE | true 필수 |
+| PERSONAL_INFO | true 필수 |
+| LOCATION_DATA | true 필수 |
+| HEALTH_DATA | true 또는 false, 미동의 가입 허용 |
 
 ```json
 {
   "loginId": "runner01",
-  "available": true,
-  "reason": null
+  "password": "Example9!",
+  "nickname": "러너",
+  "birthDate": "2000-01-01",
+  "gender": "MALE",
+  "phoneNumber": "01000000000",
+  "consents": [
+    {"consentType":"TERMS_OF_SERVICE","granted":true},
+    {"consentType":"PERSONAL_INFO","granted":true},
+    {"consentType":"LOCATION_DATA","granted":true},
+    {"consentType":"HEALTH_DATA","granted":false}
+  ]
 }
 ```
 
-응답 필드 정의(ERD ver.3 대조):
+예시는 합성 값이다. 비밀번호 예시는 실제 정책 길이에 맞는 값으로 바꾸어 사용한다. 원래 healthDataAccess 직접 입력은 consents로 대체한다. 건강 동의의 단일 원천은 HEALTH_DATA이며 true는 users.health_data_access=AGREEE, false는 DISAGREE로 저장한다.
 
-| 필드 | 타입 | 필수 | 설명 |
-|---|---|:---:|---|
-| `loginId` | string | O | 검사한 원래 아이디. 늦게 도착한 이전 검색 결과를 현재 입력값에 적용하지 않게 구분. |
-| `available` | boolean | O | 아이디 사용 가능 여부. |
-| `reason` | string / null | O | 가능하면 null. 사용 중이면 DUPLICATED. 형식 오류를 INVALID_FORMAT 정상결과/400 중 어디로 전달할지는 결정 필요. |
+### Response
 
+`201 Created`, `Cache-Control: no-store`. 아래 키는 모두 필수·NULL 불가다.
 
-**사용 흐름과 응답 판단**
+| 필드 | 타입 | 의미 |
+| --- | --- | --- |
+| user.id | integer(int64) | 생성된 users.id |
+| user.loginId | string | 저장된 아이디 |
+| accessToken | string | 공통 계약의 JWT |
+| refreshToken | string | 공통 계약의 opaque 갱신 토큰 |
+| expiresInSec | integer | Access Token 실제 유효 초 1~600 |
+| refreshExpiresAt | string(ISO8601 UTC) | 최초 발급부터 30일 절대 상한 |
+| onboardingCompleted | boolean | 가입 직후 false |
 
-입력한 아이디를 사용할 수 있는지 판단한다. 이미 사용 중인 경우는 정상 결과다.
+### 저장과 실패 처리
 
-위 보완 필드는 호출 목적상 필요한 출력이다. 저장 컬럼 부재는 출력 불필요의 근거가 아니다. 저장·전송 정책 미정 항목은 위 설명의 계약을 확정한 후 구현한다.
+- 필수 사용자 값·네 동의를 모두 검증한 뒤 사용자와 user_settings 1행을 같은 PostgreSQL 트랜잭션에 저장한다. 필수3종 동의는 검증만 하며 별도 필드·이력 테이블을 만들지 않는다. HEALTH_DATA만 기존 users.health_data_access에 저장한다. 임시 사용자·user_profiles는 만들지 않는다.
+- 설정 초기값: 음성/BPM/그룹·커뮤니티알림=false, 위치수집 OFF, 공개범위 PRIVATE. 위치 동의와 실제 위치 수집 설정은 별개다.
+- 2026-10-29 사용자 정정: 별도 동의 이력·버전·동의 시각 저장은 제외한다. 이후 동의 변경·철회 API는 W04/W05의 별도 범위다.
+- 비밀번호는 기존 공통 Argon2id 형식으로 저장하고 U01과 호환한다. 원문 비밀번호·전화번호·생년월일·동의 원문·해시·토큰을 로그·오류 details에 노출하지 않는다.
+- 사용자·부속 저장, 발급 또는 커밋이 실패하면 성공 토큰 응답을 보내지 않고 DB 롤백과 Redis 미전달 계열 폐기를 시도한다. 두 저장소의 공동 원자성은 보장하지 않는다. Redis 보상 실패 시 응답하지 않은 계열이 원래 절대 만료까지 남을 수 있다.
+- DB 커밋 결과나 성공 응답 전달이 불명확하면 계정이 존재할 수 있다. 같은 아이디 재요청은 409이며 클라이언트는 로그인을 안내한다. 멱등 성공 재응답은 제공하지 않는다.
+- 아이디·닉네임은 사전 확인과 별개로 DB UNIQUE가 최종 경합을 판정한다. 다른 무결성 오류를 중복 오류로 바꾸지 않는다.
 
 ### 오류 응답
 
-**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+공통 `{code,message,details}` 형식. 원문 입력은 에코하지 않는다.
 
-| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
-|---|---|---|
-| `429 TOO_MANY_REQUESTS` | 요청 제한 | 해당 요청의 호출 빈도 제한 초과. 제한 단위·횟수·시간·응답 헤더는 확인 필요 |
-| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+| HTTP | code | 조건 |
+| --- | --- | --- |
+| 400 | VALIDATION_ERROR | JSON·필수 필드·자료형·날짜 형식·아이디 형식 오류 |
+| 400 | INVALID_PROFILE | 닉네임·전화번호·성별·미래 생일 값 오류 |
+| 422 | INVALID_PASSWORD_POLICY | 문자열 비밀번호 정책 위반 |
+| 422 | INVALID_CONSENT | 네 유형의 누락·중복·미지원 값, 잘못된 granted, 필수 동의 거절 |
+| 409 | LOGIN_ID_DUPLICATED | 기존·탈퇴 아이디 또는 동일 아이디 동시 가입 |
+| 409 | NICKNAME_DUPLICATED | 기존·탈퇴 닉네임 또는 동일 닉네임 동시 가입 |
+| 503 | SERVICE_UNAVAILABLE | 저장·발급·DB/Redis 처리 결과를 확인할 수 없음 |
 
-- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
-- 아이디가 이미 사용 중인 경우는 이 조회의 정상 결과 `available=false`다. 회원가입 U15의 중복 오류와 구분한다.
+## U16 아이디 사용 가능 여부 확인
 
-**응답·복구 행동과의 연결:** DUPLICATED는 available=false 정상 응답. INVALID_FORMAT을 reason으로 표시할지 HTTP400으로 거절할지는 한 방식으로 확정해야 한다.
+`GET` `/api/v1/auth/login-id/availability?loginId=runner01` · 공개 · USR-001
 
-### 처리 규칙
+2026-10-28 사용자 승인으로 계약 확정. loginId는 U15와 같은 영문·숫자 4~16자이며 필수다.
 
-- 최종 중복 검사는 U15에서 다시 수행한다.
-- 사용자 소유권·그룹 참가 권한·상태 전이·재요청 여부를 검증한다(적용 범위는 API별로 결정).
-- 예시는 **명세 구조를 보여주는 가상 값**이며, 확정되지 않은 제한·동기화 주기·AI 호출 주기를 의미하지 않는다.
+### Response
 
-### 상태값
+`200 OK`, `Cache-Control: no-store`. 다음 세 필드는 항상 포함한다.
 
-- 해당 없음.
+| 필드 | 타입 | 의미 |
+| --- | --- | --- |
+| loginId | string | 검사한 원래 아이디 |
+| available | boolean | 미사용 true, 기존·탈퇴 계정이 있으면 false |
+| reason | string/null | 사용 가능하면 null, 중복이면 DUPLICATED |
 
-### 미정 사항
+조회는 가입 예약이 아니며 U15에서 최종 유일성을 확인한다. 조회로 사용자·프로필·예약 행을 생성하지 않는다.
 
-- [ ] 응답 필드는 ERD 확정 후 갱신
-- [ ] HTTP 성공 코드 및 각 예외의 오류 코드 최종 확정
+### 호출 제한과 오류
 
+- IP당 최근 60초 동안 60회까지 허용, 61번째부터 `429 TOO_MANY_REQUESTS`. 이전 허용 요청이 집계에서 빠져 여유가 생기면 다시 허용한다. 서버 인스턴스가 같은 Redis 집계를 사용한다.
+- 형식 오류 요청도 제한에 포함한다. 아이디만 바꾸어 제한을 우회할 수 없다. 고정된 분 경계에서 횟수를 초기화하지 않는다.
+- 직접 연결 IP를 기본 사용하며 명시한 신뢰 프록시에 대해서만 전달 헤더를 해석한다. 설정·위조 방지와 실패 처리는 백엔드 README를 따른다.
+- `400 VALIDATION_ERROR`: 누락·빈값·형식 오류. `503 SERVICE_UNAVAILABLE`: DB 조회·호출 제한 저장소 장애. 저장소 장애를 사용 가능이나 제한 없음으로 처리하지 않는다.
+- 앱은 입력 종료 후 약500ms 뒤 조회를 권장한다. 서버 제한을 대신하지 않는다.
 
 ## U17 회원탈퇴 사전 정보 조회
 

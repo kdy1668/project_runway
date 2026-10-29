@@ -17,7 +17,7 @@
 
 ### 인증 저장소 경계
 
-[ADR-0015](../../adr/0015-redis-refresh-token-store.md)에 따라 사용자·비밀번호 해시·러닝 프로필은 아래 PostgreSQL 모델에 저장하고, Refresh Token 해시·로그인 계열·사용 및 폐기 상태·교체 이력은 Redis에 저장한다. 갱신 권한용 PostgreSQL 테이블을 추가하지 않으며 SQL·테이블 수는 유지한다. 승인된 계열 Hash·사용자 ZSET 인덱스의 키·필드·절대 만료·원자적 처리 및 복구 모델은 [인증 API의 갱신 권한 저장소](../api/users.md#갱신-권한-저장소)를 따른다. 실제 Redis 실행·권한·영속 볼륨 설정은 [백엔드 실행 안내](../../../backend/README.md#8-로그인과-redis)를 따른다.
+[ADR-0015](../../adr/0015-redis-refresh-token-store.md)에 따라 사용자·비밀번호 해시·러닝 프로필은 아래 PostgreSQL 모델에 저장하고, Refresh Token 해시·로그인 계열·사용 및 폐기 상태·교체 이력은 Redis에 저장한다. 갱신 권한용 PostgreSQL 테이블을 추가하지 않으며 이 결정 자체로는 SQL·테이블 수를 늘리지 않는다. 승인된 계열 Hash·사용자 ZSET 인덱스의 키·필드·절대 만료·원자적 처리 및 복구 모델은 [인증 API의 갱신 권한 저장소](../api/users.md#갱신-권한-저장소)를 따른다. 실제 Redis 실행·권한·영속 볼륨 설정은 [백엔드 실행 안내](../../../backend/README.md#8-로그인과-redis)를 따른다.
 
 [ADR-0017](../../adr/0017-redis-login-attempt-store.md)에 따라 193번의 아이디별 로그인 실패 횟수·잠금 상태도 기존 인증용 Redis에 저장한다. 미가입 아이디도 동일하게 집계하며 users 외래키나 실패 제한용 PostgreSQL 테이블·컬럼을 추가하지 않는다. 1~4회 기록의 24시간 만료, 5번째 실패 후 10분 잠금, 성공 초기화 시점과 데이터 유실 복구 예외는 [로그인 연속 실패 제한](../api/users.md#로그인-연속-실패-제한)을 따른다. 이번 결정으로 schema.sql과 기존 마이그레이션을 변경하지 않으며 Redis 실행·검증 방법은 [백엔드 실행 안내](../../../backend/README.md#8-로그인과-redis)를 따른다.
 
@@ -143,7 +143,7 @@
 
 TRUE인 관계만 팔로워·팔로잉 목록과 인원 집계에 포함한다. 비공개 기록은 **본인 또는 follower_id=열람자, followee_id=기록 소유자, is_approved=TRUE인 회원**만 열람한다. 미승인 요청과 반대 방향 관계는 열람 근거가 아니다. 승인/즉시 성립과 조회 권한 검사는 서비스에서 수행한다.
 
-account_visibility와 location_collection_mode는 **NOT NULL**이다. 설정 행 생성 시 각각 PUBLIC/PRIVATE 및 ALWAYS/RUNNING_ONLY/OFF 중 값을 명시하며 임의 기본값은 두지 않았다. 설정 행이 없는 회원을 PUBLIC으로 자동 간주하지 않는다. 공개 범위 변경 시 기존 관계·대기 요청 처리 정책은 미정이다. 계정 기준 정책이며 기록별 공개 범위 컬럼은 추가하지 않았다. 위치 수집 모드와 기록 공개 범위는 별개다.
+account_visibility와 location_collection_mode는 **NOT NULL**이다. 설정 행 생성 시 각각 PUBLIC/PRIVATE 및 ALWAYS/RUNNING_ONLY/OFF 중 값을 명시한다. 2026-10-28 가입 U15 기본 설정은 PRIVATE·OFF이며 음성/BPM/알림은 false로 확정했다. DB 컬럼 기본값을 추가한 것은 아니다. 설정 행이 없는 회원을 PUBLIC으로 자동 간주하지 않는다. 공개 범위 변경 시 기존 관계·대기 요청 처리 정책은 미정이다. 계정 기준 정책이며 기록별 공개 범위 컬럼은 추가하지 않았다. 위치 수집 모드와 기록 공개 범위는 별개다.
 
 ### 크루 정원
 
@@ -197,7 +197,7 @@ V3 이전 세션은 `state_version=0`, `analysis_status=LEGACY`로 구분한다.
 
 | 테이블 | UNIQUE 조합 |
 | --- | --- |
-| users | login_id |
+| users | login_id, nickname 각각 UNIQUE |
 | user_profiles / user_settings | 각각 user_id |
 | daily_health_metrics | user_id, metric_date |
 | daily_readiness | user_id, readiness_date |
@@ -250,3 +250,12 @@ V3 이전 세션은 `state_version=0`, `analysis_status=LEGACY`로 구분한다.
 - 크루 정원 1~200명은 사용자 확정에 따라 DB CHECK로 보장한다. 생리 지표의 허용 범위, 상태별 필수값, 삭제·탈퇴 후 보존 정책은 이번 제약 보완에서 새로 확정하지 않았다.
 - 원본 오타 `users.health_data_access`의 `AGREEE`, `user_profiles.duraction`은 유지했다.
 - 기준 SQL의 실행·정상/거부 동작은 `backend`의 `SchemaIntegrityTest`로 검증한다. 실제 실행 결과와 미실행 여부는 해당 업무 검증 기록에 남긴다. 서비스 Entity 매핑·첫 Flyway 이력 검증과 구분한다.
+
+
+### 가입과 동의 처리 (S15P31E105-222, 2026-10-29 사용자 확정)
+
+- users.nickname은 uq_users_nickname UNIQUE, 대소문자 구분·정규화 없음. 탈퇴 계정 포함 중복 불가. 기존 중복 데이터가 있으면 V4는 실패하며 임의 삭제·개명하지 않는다.
+- 가입 때 users와 user_settings 1행을 같은 트랜잭션에 생성한다. user_profiles는 추가 러닝 설정 전 생성하지 않는다.
+- 이용약관·개인정보·위치·건강정보 동의 네 항목을 모두 받는다. 필수3종 중 하나라도 미동의이면 가입을 거절하며 이3종은 검증만 하고 DB 필드·이력을 추가하지 않는다.
+- 건강정보는 미동의 가입도 허용하며 기존 users.health_data_access에 AGREEE 또는 DISAGREE로만 저장한다. 약관 버전·동의 시각·별도 동의 이력 테이블은 만들지 않는다.
+- V4는 닉네임 UNIQUE만 추가한다. 최신 dev의 세션 제어 테이블은 유지하며 별도 동의 테이블·컬럼·FK는 추가하지 않는다. erd.png·온라인 ERD의 닉네임 유일성 표시는 미갱신일 수 있으므로 정확한 제약은 schema.sql을 따른다.

@@ -1,6 +1,7 @@
 package com.runway.backend.domain.auth;
 
 import com.runway.backend.domain.auth.service.MemberPasswordHasher;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -72,15 +73,16 @@ abstract class AuthIntegrationSupport {
         try (var connection = redis.getConnectionFactory().getConnection()) {
             connection.serverCommands().flushDb();
         }
+        jdbc.update("DELETE FROM user_settings");
         jdbc.update("DELETE FROM user_profiles");
         jdbc.update("DELETE FROM users");
         encoded = passwords.encode("Runner9!");
         user =
                 jdbc.queryForObject(
                         """
-            INSERT INTO users(login_id,password,nickname,birth_date,gender,phone_number,health_data_access)
-            VALUES ('runner01',?,'러너','2000-01-01','MALE','01000000000','DISAGREE') RETURNING id
-            """,
+                        INSERT INTO users(login_id,password,nickname,birth_date,gender,phone_number,health_data_access)
+                        VALUES ('runner01',?,'러너','2000-01-01','MALE','01000000000','DISAGREE') RETURNING id
+                        """,
                         Long.class,
                         encoded);
     }
