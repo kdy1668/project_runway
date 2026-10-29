@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, { Circle, G, Path, Polyline, Rect, Text } from 'react-native-svg';
 import { distanceM, type LngLat } from '../../geo';
-import { palette } from '../../theme';
+import { k1, palette } from '../../theme';
 
 // Stand-in for the real map until the map SDK is chosen (S15P31E105-180). It draws a fixed street
 // pattern and projects GeoJSON [longitude, latitude] points onto it, so screens already pass the
@@ -28,6 +28,24 @@ const looks = {
     minor: '#20242A',
     label: '#4B5260',
   },
+  // The day map in K1 hues (DESIGN.md 2-6 지도 위): no park green.
+  k1: {
+    land: '#D5DEE7',
+    park: '#D5DEE7',
+    water: '#B9C8D6',
+    road: '#FFFFFF',
+    minor: '#E9EEF3',
+    label: k1.mid,
+  },
+  // After sunset: the dark map of DESIGN.md 2-7 (4.2와 같은 지도).
+  k1Night: {
+    land: '#0A111D',
+    park: '#0A111D',
+    water: k1.night,
+    road: '#1A2432',
+    minor: '#131C29',
+    label: k1.mid,
+  },
 };
 
 // The sea along the right edge and a park, roughly where 민락수변공원 sits on the prototype map.
@@ -52,15 +70,22 @@ const minorRoads = [
 
 // Faster segments are a deeper mint, slower ones paler (2.0 범례 빠름 ↔ 느림).
 export const paceColors = ['#1F8F80', '#3FB6A5', '#7FD8CB', '#B8EDE5'];
+// The same scale on the K1 map: black, navy, steel blue.
+export const k1PaceColors = [k1.night, k1.deep, k1.mid];
 
-function paceColor(pace: number, fastest: number, slowest: number) {
+function paceColor(
+  pace: number,
+  fastest: number,
+  slowest: number,
+  scale: string[],
+) {
   if (slowest === fastest) {
-    return paceColors[1];
+    return scale[1];
   }
   const step = Math.round(
-    ((pace - fastest) / (slowest - fastest)) * (paceColors.length - 1),
+    ((pace - fastest) / (slowest - fastest)) * (scale.length - 1),
   );
-  return paceColors[step];
+  return scale[step];
 }
 
 const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
@@ -131,6 +156,7 @@ export function MockMap({
   trail,
   muted = false,
   markers,
+  k1Style = false,
 }: {
   night?: boolean;
   position?: LngLat;
@@ -148,8 +174,15 @@ export function MockMap({
   muted?: boolean;
   // 6.6 그룹런: the other members, drawn as dots with name tags.
   markers?: { position: LngLat; label: string; color: string }[];
+  // 2.0F·2.0: the K1 maps. By day a black position dot and dark pace labels; after sunset the
+  // 2-7 dark map with a white course line and a white dot.
+  k1Style?: boolean;
 }) {
-  const look = looks[night ? 'night' : 'day'];
+  const k1Day = k1Style && !night;
+  const k1Night = k1Style && night;
+  const look =
+    looks[night ? (k1Night ? 'k1Night' : 'night') : k1Day ? 'k1' : 'day'];
+  const scale = k1Day ? k1PaceColors : paceColors;
   const project = projector(
     [...(route ?? []), ...(trail ?? []), ...(position ? [position] : [])],
     route || (trail && trail.length > 1)
@@ -203,13 +236,15 @@ export function MockMap({
           const color = muted
             ? look.label
             : night
-            ? palette.mint
+            ? k1Night
+              ? palette.white
+              : palette.mint
             : segmentPaces
-            ? paceColor(segmentPaces[index], fastest, slowest)
-            : paceColors[1];
+            ? paceColor(segmentPaces[index], fastest, slowest, scale)
+            : scale[1];
           return (
             <G key={`part-${index}`}>
-              {night && !muted ? (
+              {night && !muted && !k1Night ? (
                 <Polyline
                   points={points}
                   stroke={palette.mint}
@@ -342,20 +377,20 @@ export function MockMap({
                     width={68}
                     height={24}
                     rx={12}
-                    fill={palette.white}
+                    fill={k1Day ? k1.night : palette.white}
                   />
                   <Circle
                     cx={middle.x - 22}
                     cy={middle.y}
                     r={8}
-                    fill={palette.ink}
+                    fill={k1Day ? k1.mid : palette.ink}
                   />
                   <Text
                     x={middle.x - 22}
                     y={middle.y + 3.5}
                     fontSize={10}
                     fontWeight="700"
-                    fill={palette.white}
+                    fill={k1Day ? k1.night : palette.white}
                     textAnchor="middle"
                   >
                     {index + 1}
@@ -365,7 +400,7 @@ export function MockMap({
                     y={middle.y + 4}
                     fontSize={11}
                     fontWeight="700"
-                    fill={palette.ink}
+                    fill={k1Day ? palette.white : palette.ink}
                     textAnchor="middle"
                   >
                     {label}
@@ -402,14 +437,16 @@ export function MockMap({
               cx={here.x}
               cy={here.y}
               r={22}
-              fill={palette.mint}
-              opacity={0.25}
+              fill={k1Day ? k1.night : k1Night ? palette.white : palette.mint}
+              opacity={k1Style ? 0.12 : 0.25}
             />
             <Circle
               cx={here.x}
               cy={here.y}
-              r={8}
-              fill={palette.mintDeep}
+              r={k1Night ? 9 : 8}
+              fill={
+                k1Day ? k1.night : k1Night ? palette.white : palette.mintDeep
+              }
               stroke={palette.white}
               strokeWidth={3}
             />

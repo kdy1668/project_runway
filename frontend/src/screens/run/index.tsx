@@ -32,15 +32,15 @@ export function themed(
 // The map screens are light by day (2.0·2.0F) and dark after sunset (2.0N).
 export const dayNight = (night: boolean): ThemeName =>
   night ? 'dark' : 'light';
-// The music card, 4.3 일시정지 and 4.5 결과 are dark in every prototype screen.
+// 4.3 일시정지 and 4.5 결과 are dark in every prototype screen. 2.7·2.8 draw their own K1 card on the light tone.
 export const dark = (): ThemeName => 'dark';
 
 export const runScreens: Partial<Record<RouteName, React.ComponentType>> = {
   RunMode: RunModeScreen,
   FreeRun: themed(FreeRunScreen, 'FreeRunScreen', dayNight),
   CourseRun: themed(CourseRunScreen, 'CourseRunScreen', dayNight),
-  MusicCard: themed(MusicCardScreen, 'MusicCardScreen', dark),
-  MusicSource: themed(MusicSourceScreen, 'MusicSourceScreen', dark),
+  MusicCard: MusicCardScreen,
+  MusicSource: MusicSourceScreen,
   RunProgress: themed(RunProgressScreen, 'RunProgressScreen', dayNight),
   RunPause: themed(RunPauseScreen, 'RunPauseScreen', dark),
   RunResult: themed(RunResultScreen, 'RunResultScreen', dark),
