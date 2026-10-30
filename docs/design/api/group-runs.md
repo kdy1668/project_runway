@@ -850,7 +850,7 @@ group_runs → group_run_participants → running_sessions로 참가자의 개�
 |---|---|:---:|---|
 | `items[].nickname` | string | O | 참가자 회원 표시명. |
 | `items[].isHost` | boolean | O | group_runs.host_id 비교 결과. |
-| `items[].readyStatus` | string (구조 제안) | O | G16에서 변경하는 준비 상태. 저장·복구 계약 확정 필요. |
+| `items[].readyStatus` | string | O | `group_run_participants.ready` 기준. true→READY, false→WAITING. G16에서 변경. |
 
 표시·선택·후속 이동에 필요한 필드 보완안:
 
@@ -954,7 +954,7 @@ group_runs → group_run_participants → running_sessions로 참가자의 개�
 }
 ```
 
-200은 그룹 시작 승인을 뜻하며 워치의 실제 시작 완료를 뜻하지 않는다. 서버는 그룹 행을 먼저, 연결 세션 행을 ID 순서로 잠근 뒤 아래 대상·권한·준비 조건을 확인한다. 최초 승인에서는 그룹을 RUNNING으로 바꾸고 모든 대상의 START를 한 트랜잭션으로 저장한다. 하나라도 불충족이면 그룹 상태와 모든 명령 생성을 함께 롤백한다. 요청 해시·별도 그룹 명령 식별자·준비 상태 컬럼은 추가하지 않는다.
+200은 그룹 시작 승인을 뜻하며 워치의 실제 시작 완료를 뜻하지 않는다. 서버는 그룹 행을 먼저, 연결 세션 행을 ID 순서로 잠근 뒤 아래 대상·권한·준비 조건을 확인한다. 최초 승인에서는 그룹을 RUNNING으로 바꾸고 모든 대상의 START를 한 트랜잭션으로 저장한다. 하나라도 불충족이면 그룹 상태와 모든 명령 생성을 함께 롤백한다. 요청 해시·별도 그룹 명령 식별자는 추가하지 않는다. 대기방 `ready`는 G16 표시용이며 S08 워치 준비·G09 START 승인 근거로 쓰지 않는다.
 
 **시작 대상과 준비 확인**
 
@@ -1598,8 +1598,8 @@ G14는 분석 중·실패를 포함해 `200 OK`로 현재 결과를 반환한다
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
-| `readyStatus` | string | O | group_run_participants에 준비 상태 컬럼 없음. 기존 READY/WAITING 표시의 저장·산출 근거 확인 필요. |
-| `readyCount` | number | O | 준비 상태 저장·산출 근거 미정. 참가 관계 수로 대체하지 않는다. |
+| `readyStatus` | string | O | `group_run_participants.ready` 기준. true→READY, false→WAITING. S08 워치 준비와 별개. |
+| `readyCount` | number | O | 해당 그룹에서 `ready=true`인 참가 관계 수. |
 | `participantCount` | integer | O | group_run_participants의 해당 그룹 참가 관계 수. 실제 시작 인원과 구분한다. |
 
 
