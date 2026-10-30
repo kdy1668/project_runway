@@ -153,8 +153,11 @@ CREATE TABLE "group_run_participants" (
 	"group_run_id"	BIGINT		NOT NULL,
 	"user_id"	BIGINT		NOT NULL,
 	"session_id"	BIGINT		NULL,
-	"joined_at"	TIMESTAMPTZ	DEFAULT now()	NOT NULL
+	"joined_at"	TIMESTAMPTZ	DEFAULT now()	NOT NULL,
+	"ready"	BOOLEAN	DEFAULT false	NOT NULL
 );
+
+COMMENT ON COLUMN "group_run_participants"."ready" IS '대기방 준비 완료 여부. true=READY, false=WAITING. S08 워치 REPORT_PREPARED와 별개.';
 
 CREATE TABLE "running_route_points" (
 	"id"	BIGINT GENERATED ALWAYS AS IDENTITY		NOT NULL,
