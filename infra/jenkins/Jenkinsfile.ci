@@ -3,10 +3,11 @@
 // 무엇을 검사하는가:
 // - backend/만 변경 → 백엔드 에이전트에서 테스트·빌드하고 JAR 보관.
 // - frontend/만 변경 → 모바일 에이전트에서 타입·린트·테스트·ARM64 APK 빌드 검사.
-// - 두 폴더 모두 변경 → 두 에이전트에서 위 검사를 병렬 실행.
-// - infra/jenkins/ 또는 공통 Git 설정 변경 → 백엔드·모바일 모두 검사.
+// - wear/ 변경 → 워치 에이전트에서 제품 :app 단위 테스트·Lint·APK 빌드 검사.
+// - 여러 영역 변경 → 해당 에이전트에서 선택한 검사를 병렬 실행.
+// - infra/jenkins/ 또는 공통 Git 설정 변경 → 백엔드·모바일·워치 모두 검사.
 // - 위 검사 대상 외의 파일만 변경 → 대상 브랜치와 병합 가능한지만 확인.
-// - 수동 실행 → dev 코드로 백엔드·모바일 모두 검사.
+// - 수동 실행 → dev 코드로 백엔드·모바일·워치 모두 검사.
 //
 // 각 검사는 MR 코드와 대상 브랜치를 합친 코드로 수행한다.
 // 하나라도 실패하면 통합 CI도 실패하며, GitLab에는 runway-ci 결과 하나를 전달한다.
@@ -26,7 +27,7 @@ def checkoutCode(String revision) {
     ])
 }
 
-// 두 에이전트가 준비 단계에서 고정한 동일한 코드 조합을 검사한다.
+// 각 에이전트가 준비 단계에서 고정한 동일한 코드 조합을 검사한다.
 def mergeTarget() {
     sh '''
         git -c user.name='RunWay CI' -c user.email='ci@runway.invalid' \
@@ -52,20 +53,26 @@ pipeline {
                 // 준비·병합·각 영역 검사 결과를 하나의 GitLab 상태로 전달한다.
                 gitlabCommitStatus(name: 'runway-ci') {
                     script {
-                        // 수동 실행은 두 영역을 모두 검사하고, MR 실행은 아래에서 변경 영역을 선택한다.
+                        // 에이전트 대기 중에도 어떤 MR인지 빌드 이력에서 구분한다.
+                        def mrId = env.gitlabMergeRequestIid
+                        if (mrId && !(mrId ==~ /[0-9]+/)) {
+                            error('잘못된 MR 번호')
+                        }
+                        def mrTitle = (env.gitlabMergeRequestTitle ?: '제목 없음').replaceAll(/\s+/, ' ').trim()
+                        currentBuild.displayName = mrId
+                            ? "#${env.BUILD_NUMBER} · MR !${mrId} · ${mrTitle}"
+                            : "#${env.BUILD_NUMBER} · 수동 · dev"
+                        // 수동 실행은 세 영역을 모두 검사하고, MR 실행은 아래에서 변경 영역을 선택한다.
                         def checkBackend = true
                         def checkMobile = true
+                        def checkWatch = true
                         // 1. MR 코드와 대상 브랜치를 확인하고 합친 상태를 준비한다.
                         stage('Prepare') {
                             node('backend') {
                                 // GitLab MR 알림으로 실행되면 해당 MR을, 수동 실행이면 dev를 선택한다.
-                                def mrId = env.gitlabMergeRequestIid
                                 def target = 'dev'
                                 def revision = 'refs/remotes/origin/dev'
                                 if (mrId) {
-                                    if (!(mrId ==~ /[0-9]+/)) {
-                                        error('잘못된 MR 번호')
-                                    }
                                     target = env.gitlabTargetBranch?.trim()
                                     if (!(target in ['dev', 'master'])) {
                                         error('dev 또는 master 대상 MR만 검사합니다.')
@@ -73,7 +80,7 @@ pipeline {
                                     revision = "refs/remotes/origin/mr/${mrId}"
                                 }
                                 checkoutCode(revision)
-                                // 실행 중 새 커밋이 올라와도 두 에이전트가 같은 버전을 검사하도록 고정한다.
+                                // 실행 중 새 커밋이 올라와도 각 에이전트가 같은 버전을 검사하도록 고정한다.
                                 env.CI_SOURCE_SHA = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
                                 env.CI_TARGET_REF = "refs/remotes/origin/${target}"
                                 env.CI_TARGET_SHA = sh(script: 'git rev-parse "$CI_TARGET_REF"', returnStdout: true).trim()
@@ -86,7 +93,7 @@ pipeline {
                                         script: 'git diff --name-only --no-renames -z "$CI_TARGET_SHA...$CI_SOURCE_SHA"',
                                         returnStdout: true
                                     ).tokenize('\u0000')
-                                    // 공통 Jenkins 설정 변경은 양쪽 검사에 영향을 줄 수 있어 모두 실행한다.
+                                    // 공통 Jenkins 설정 변경은 모든 영역의 검사에 영향을 줄 수 있어 모두 실행한다.
                                     def common = files.any {
                                         it.startsWith('infra/jenkins/') ||
                                         it in ['.gitattributes', '.gitmodules']
@@ -95,8 +102,10 @@ pipeline {
                                     checkBackend = common || files.any { it.startsWith('backend/') }
                                     // 프론트엔드 코드 또는 공통 설정이 바뀌었으면 모바일 CI 실행 대상으로 선택한다.
                                     checkMobile = common || files.any { it.startsWith('frontend/') }
+                                    // 제품 워치 코드는 wear/ 변경 시 전용 에이전트에서 검사한다.
+                                    checkWatch = common || files.any { it.startsWith('wear/') }
                                 }
-                                echo "검사 선택: backend=${checkBackend}, mobile=${checkMobile}"
+                                echo "검사 선택: backend=${checkBackend}, mobile=${checkMobile}, watch=${checkWatch}"
                                 echo "검사 버전: ${env.CI_SOURCE_SHA} + ${env.CI_TARGET_SHA}"
                             }
                         }
@@ -149,9 +158,28 @@ pipeline {
                                 }
                             }
                         }
+                        // wear/ 또는 공통 설정 변경 시 실행: 제품 워치 테스트·Lint·APK 검사.
+                        if (checkWatch) {
+                            checks['Watch'] = {
+                                node('watch') {
+                                    stage('Watch') {
+                                        checkoutCode(env.CI_SOURCE_SHA)
+                                        mergeTarget()
+                                        try {
+                                            sh 'sh infra/jenkins/build-watch-apk.sh'
+                                        } finally {
+                                            junit allowEmptyResults: true,
+                                                testResults: 'wear/app/build/test-results/testDebugUnitTest/*.xml'
+                                            archiveArtifacts allowEmptyArchive: true,
+                                                artifacts: 'wear/build/reports/profile/**,wear/app/build/reports/lint-results-debug.*'
+                                        }
+                                    }
+                                }
+                            }
+                        }
                         // 4. 검사 대상이 없으면 병합 확인으로 끝내고, 있으면 선택한 검사를 병렬 실행한다.
                         if (checks.isEmpty()) {
-                            echo '백엔드·모바일 변경 없음: 임시 병합 확인 후 종료합니다.'
+                            echo '백엔드·모바일·워치 변경 없음: 임시 병합 확인 후 종료합니다.'
                         } else {
                             // 선택된 모든 검사가 끝난 뒤 위 gitlabCommitStatus가 통합 결과를 전달한다.
                             parallel checks
