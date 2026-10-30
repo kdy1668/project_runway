@@ -1,5 +1,6 @@
 package com.runway.watch.navigation
 
+import com.runway.watch.run.RecordComparison
 import com.runway.watch.run.RunMode
 import com.runway.watch.run.RunSnapshot
 import com.runway.watch.run.RunState
@@ -7,8 +8,10 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class WatchNavigationTest {
+    private val compared = RecordComparison.Result(2384.0, 852_000, 873_000, targetLabel = "10.13")
+
     private fun snapshot(state: RunState?, phone: Boolean = true, mode: RunMode = RunMode.PERSONAL) =
-        RunSnapshot(state = state, mode = mode, phoneConnected = phone)
+        RunSnapshot(state = state, mode = mode, phoneConnected = phone, comparison = compared)
 
     @Test fun confirmedStateDecidesTheScreen() {
         val nav = NavState()
@@ -47,8 +50,25 @@ class WatchNavigationTest {
     }
 
     @Test fun pagesDifferOnlyByModeAfterTheStatusPage() {
-        assertEquals(listOf(RunPage.STATUS, RunPage.PACE_COACHING, RunPage.RECORD_COMPARE), WatchNavigation.pages(RunMode.PERSONAL))
-        assertEquals(listOf(RunPage.STATUS, RunPage.GROUP_PACE, RunPage.GROUP_POSITION), WatchNavigation.pages(RunMode.GROUP))
+        assertEquals(listOf(RunPage.STATUS, RunPage.PACE_COACHING, RunPage.RECORD_COMPARE), WatchNavigation.pages(snapshot(RunState.RUNNING)))
+        assertEquals(listOf(RunPage.STATUS, RunPage.GROUP_PACE, RunPage.GROUP_POSITION),
+            WatchNavigation.pages(snapshot(RunState.RUNNING, mode = RunMode.GROUP)))
+    }
+
+    @Test fun runWithoutAComparisonHasNoComparisonPage() {
+        val personal = listOf(RunPage.STATUS, RunPage.PACE_COACHING)
+        for (c in listOf(RecordComparison.NotSelected, compared.copy(targetLabel = null), compared.copy(targetLabel = " "))) {
+            assertEquals(personal, WatchNavigation.pages(snapshot(RunState.RUNNING).copy(comparison = c)))
+        }
+        // A chosen comparison keeps its page even when it has no result or stops.
+        for (c in listOf(RecordComparison.NoRecord, RecordComparison.Waiting, RecordComparison.Unavailable)) {
+            assertEquals(3, WatchNavigation.pages(snapshot(RunState.RUNNING).copy(comparison = c)).size)
+        }
+    }
+
+    @Test fun droppingTheComparisonMovesOffTheRemovedPage() {
+        val dropped = snapshot(RunState.RUNNING).copy(comparison = RecordComparison.NotSelected)
+        assertEquals(1, WatchNavigation.reconcile(dropped, NavState(page = 2)).page)
     }
 
     @Test fun backNeverLeavesAnActiveRun() {

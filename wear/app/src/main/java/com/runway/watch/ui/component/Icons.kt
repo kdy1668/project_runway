@@ -14,7 +14,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 
 /** Minimal line icons drawn from the 9.x wireframe SVGs, so the module needs no icon library. */
-enum class WatchIcon { PLAY, STOP, CHECK, CLOSE }
+enum class WatchIcon { PLAY, STOP, CHECK, CLOSE, CLOCK }
 
 @Composable
 fun Icon(icon: WatchIcon, color: Color, size: Int = 18) {
@@ -32,6 +32,13 @@ fun Icon(icon: WatchIcon, color: Color, size: Int = 18) {
             WatchIcon.CLOSE -> {
                 drawLine(color, Offset(w * .25f, w * .25f), Offset(w * .75f, w * .75f), stroke.width, StrokeCap.Round)
                 drawLine(color, Offset(w * .75f, w * .25f), Offset(w * .25f, w * .75f), stroke.width, StrokeCap.Round)
+            }
+            WatchIcon.CLOCK -> {
+                val thin = Stroke(width = w * .075f, cap = StrokeCap.Round)
+                drawCircle(color, w * .375f, style = thin)
+                drawPath(Path().apply {
+                    moveTo(w * .5f, w * .29f); lineTo(w * .5f, w * .5f); lineTo(w * .625f, w * .58f)
+                }, color, style = thin)
             }
         }
     }

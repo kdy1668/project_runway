@@ -81,7 +81,7 @@ private fun StandbyScreen(snapshot: RunSnapshot, onStart: () -> Unit) {
 
 @Composable
 private fun RunPager(snapshot: RunSnapshot, page: Int, onPage: (Int) -> Unit, onPause: () -> Unit) {
-    val pages = WatchNavigation.pages(snapshot.mode)
+    val pages = WatchNavigation.pages(snapshot)
     val pager = rememberPagerState(initialPage = page) { pages.size }
     LaunchedEffect(page) { if (pager.currentPage != page) pager.animateScrollToPage(page) }
     LaunchedEffect(pager) { snapshotFlow { pager.currentPage }.collect(onPage) }
@@ -89,6 +89,7 @@ private fun RunPager(snapshot: RunSnapshot, page: Int, onPage: (Int) -> Unit, on
         val visible = pager.currentPage == index
         when (pages[index]) {
             RunPage.STATUS -> RunStatusPage(snapshot, pages.size, index, visible, onPause)
+            RunPage.RECORD_COMPARE -> RecordComparePage(snapshot, pages.size, index, visible)
             else -> PendingPage(pages[index], pages.size, index, visible)
         }
     }

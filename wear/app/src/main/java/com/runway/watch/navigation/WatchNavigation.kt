@@ -5,6 +5,7 @@ import com.runway.watch.run.RunIntent
 import com.runway.watch.run.RunMode
 import com.runway.watch.run.RunSnapshot
 import com.runway.watch.run.RunState
+import com.runway.watch.run.compared
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -24,8 +25,10 @@ data class BackResult(val nav: NavState, val handled: Boolean)
  * screens can never start, pause or end a run by itself.
  */
 object WatchNavigation {
-    fun pages(mode: RunMode): List<RunPage> = when (mode) {
-        RunMode.PERSONAL -> listOf(RunPage.STATUS, RunPage.PACE_COACHING, RunPage.RECORD_COMPARE)
+    /** A personal run without a comparison has no comparison page at all. */
+    fun pages(snapshot: RunSnapshot): List<RunPage> = when (snapshot.mode) {
+        RunMode.PERSONAL -> listOfNotNull(RunPage.STATUS, RunPage.PACE_COACHING,
+            RunPage.RECORD_COMPARE.takeIf { snapshot.comparison.compared })
         RunMode.GROUP -> listOf(RunPage.STATUS, RunPage.GROUP_PACE, RunPage.GROUP_POSITION)
     }
 
@@ -40,7 +43,7 @@ object WatchNavigation {
     /** Drops screen-local choices that no longer fit the current state. */
     fun reconcile(snapshot: RunSnapshot, nav: NavState): NavState = NavState(
         endConfirmOpen = nav.endConfirmOpen && snapshot.state == RunState.PAUSED,
-        page = if (snapshot.state == RunState.RUNNING) nav.page.coerceIn(0, pages(snapshot.mode).lastIndex) else 0,
+        page = if (snapshot.state == RunState.RUNNING) nav.page.coerceIn(0, pages(snapshot).lastIndex) else 0,
     )
 
     /** Back or a swipe to the right may close the app only outside a run (standby, connection issue, result). */

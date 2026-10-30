@@ -13,7 +13,7 @@ applicationId가 달라 두 앱을 한 기기에 함께 설치할 수 있다. �
 
 | 패키지 | 역할 |
 | ------ | ---- |
-| `run` | 운동 상태(READY·RUNNING·PAUSED·COMPLETED·CANCELLED·INTERRUPTED), 측정값, 사용자 요청(`RunIntent`), 실행 제어 인터페이스(`RunControl`) |
+| `run` | 운동 상태(READY·RUNNING·PAUSED·COMPLETED·CANCELLED·INTERRUPTED), 측정값, 과거 기록 비교 결과(`RecordComparison`), 사용자 요청(`RunIntent`), 실행 제어 인터페이스(`RunControl`) |
 | `navigation` | 화면 이동 규칙. 화면은 **확정된 운동 상태**로 정해지고, 화면 이동은 운동을 시작·종료하지 않는다 |
 | `ui/theme` | 색·글꼴. 모바일 디자인 기준([frontend/DESIGN.md](../frontend/DESIGN.md) 1-1·2-5)을 따른다 |
 | `ui/component` | 공통 UI: 원형 화면(`RoundScreen`), 버튼, 측정값·단위, 상태 줄, 칩, 쪽 표시, 가장자리 링, 안내 화면 |
@@ -25,6 +25,7 @@ applicationId가 달라 두 앱을 한 기기에 함께 설치할 수 있다. �
 
 - 하단 버튼(뒤로): 러닝 중·일시정지·종료 확인에서는 앱을 닫거나 운동을 끝내지 않는다. 종료 확인에서는 일시정지 화면으로, 러닝 페이지에서는 첫 페이지로 돌아간다.
 - 오른쪽으로 쓸어 넘겨 닫기: 대기·연결 문제·결과 화면에서만 앱을 닫는다. 러닝 중·일시정지·종료 확인에서는 좌우 넘기기 페이지와 겹치거나 실수로 닫히지 않도록 막는다(시스템 스와이프 닫기는 끄고 앱에서 화면별로 켠다).
+- 기록 비교(9.6·9.6b)는 받은 비교 결과만 표시한다. 비교 대상 선택·시간 차이 계산과 워치로 결과를 전달하는 계약은 아직 정하지 않았으며(S15P31E105-267 범위 밖), 실제 연동 전에 `RecordComparison`의 입력 경로를 확정해야 한다. 비교를 고르지 않았거나 비교 기록 이름(`targetLabel`)이 없으면 비교하지 않는 러닝으로 보고 기록 비교 페이지를 빼서(개인 러닝 2쪽) 비교 문구를 표시하지 않는다.
 - debug 빌드는 합성 데이터로 상태를 바로 바꾸는 `SimulatedRunControl`로 화면을 확인한다. 앱을 열 때마다 새 러닝으로 시작하므로 결과 화면에서 뒤로 버튼이나 오른쪽 쓸어 넘기기로 나간 뒤 다시 열면 대기 화면이 나온다. 실제 운동 제어는 S15P31E105-256에서 붙인다. release 빌드는 제어기가 없어 대기 화면만 보인다.
 
 ## 빠른 빌드
@@ -39,6 +40,8 @@ SDK 경로를 `local.properties` 또는 `ANDROID_HOME`으로 설정하고 Androi
 # 실험 앱
 .\gradlew.bat :demo:testDebugUnitTest :demo:lintDebug :demo:assembleDebug
 ```
+
+`connectedDebugAndroidTest`는 AGP 내장 테스트 플랫폼(`gradle.properties`의 `android.experimental.androidTest.builtin_test_platform`)으로 실행한다. 기본 UTP는 AGP 9.4.1에서 Wi-Fi 디버깅 워치(`ip:port` 시리얼)의 결과를 찾지 못해 모든 테스트가 통과해도 작업을 실패로 끝낸다. 실기기 화면이 꺼지면 테스트 화면이 뜨지 않아 실패하므로 실행 중에는 화면을 켜 둔다.
 
 설치 APK: `app/build/outputs/apk/debug/app-debug.apk`, `demo/build/outputs/apk/debug/demo-debug.apk`
 
