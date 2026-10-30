@@ -35,6 +35,8 @@ data class RunSnapshot(
     val pendingCommand: Boolean = false,
     val title: String? = null,
     val metrics: RunMetrics = RunMetrics(),
+    /** Save, analysis and goal state after the end; null until the controller reports any. */
+    val result: RunResult? = null,
 )
 
 /** User requests. Only these reach the run controller; screen changes follow the confirmed state. */

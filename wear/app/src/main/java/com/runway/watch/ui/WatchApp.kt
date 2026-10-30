@@ -19,6 +19,7 @@ import com.runway.watch.navigation.WatchRoute
 import com.runway.watch.run.*
 import com.runway.watch.ui.component.*
 import com.runway.watch.ui.format.MetricFormat
+import com.runway.watch.ui.screen.ResultScreen
 import com.runway.watch.ui.theme.RunwayColors
 import com.runway.watch.ui.theme.RunwayType
 import com.runway.watch.ui.theme.RunwayWatchTheme
@@ -140,22 +141,5 @@ private fun EndConfirmScreen(snapshot: RunSnapshot, onCancel: () -> Unit, onEnd:
             RoundButton("취소", onCancel, kind = ButtonKind.SECONDARY) { Icon(WatchIcon.CLOSE, it, 18) }
             RoundButton("종료", onEnd, enabled = !snapshot.pendingCommand) { Icon(WatchIcon.CHECK, it, 20) }
         }
-    }
-}
-
-@Composable
-private fun ResultScreen(snapshot: RunSnapshot) {
-    val m = snapshot.metrics
-    RoundScreen {
-        Text(if (snapshot.state == RunState.INTERRUPTED) "기록이 중단됐어요" else "러닝 종료",
-            style = RunwayType.Caption, color = RunwayColors.ContentSecondary)
-        MetricValue(MetricFormat.distance(m.distanceMeters), 36)
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            MetricValue(MetricFormat.duration(m.elapsedMs), 13, emphasized = false)
-            MetricValue(MetricFormat.pace(m.paceSecondsPerKm), 13, emphasized = false)
-            MetricValue(MetricFormat.heartRate(m.heartRate), 13, emphasized = false)
-        }
-        // Korean wraps per syllable by default, so break between words explicitly.
-        Text("자세한 결과는\n휴대폰에서 확인하세요", style = RunwayType.Body, color = RunwayColors.ContentSecondary, textAlign = TextAlign.Center)
     }
 }
