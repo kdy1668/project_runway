@@ -9,10 +9,10 @@
 | [U03](#u03-로그아웃) | 로그아웃 | POST | `/auth/logout` | 1차 MVP | Refresh Token |
 | [U04](#u04-내-프로필-조회) | 내 프로필 조회 | GET | `/users/me` | 1차 MVP | 회원 |
 | [U05](#u05-내-프로필-수정) | 내 프로필 수정 | PATCH | `/users/me` | 1차 MVP | 회원 |
-| [U06](#u06-러닝-수준-조회) | 러닝 수준 조회 | GET | `/users/me/running-profile` | 1차 MVP | 회원 |
-| [U07](#u07-러닝-수준-설정) | 러닝 수준 설정 | PUT | `/users/me/running-profile` | 1차 MVP | 회원 |
-| [U08](#u08-평소-러닝-정보-조회) | 평소 러닝 정보 조회 | GET | `/users/me/running-baseline` | 1차 MVP | 회원 |
-| [U09](#u09-평소-러닝-정보-설정) | 평소 러닝 정보 설정 | PUT | `/users/me/running-baseline` | 1차 MVP | 회원 |
+| [U06](#u06-러닝-프로필-조회) | 러닝 프로필 조회 | GET | `/users/me/running-profile` | 1차 MVP | 회원 |
+| [U07](#u07-러닝-프로필-저장부분-수정) | 러닝 프로필 저장·부분 수정 | PATCH | `/users/me/running-profile` | 1차 MVP | 회원 |
+| [U08](#u08-평소-러닝-정보-조회) | 평소 러닝 정보 조회 (U06 통합) | — | — | 1차 MVP | 회원 |
+| [U09](#u09-평소-러닝-정보-설정) | 평소 러닝 정보 설정 (U07 통합) | — | — | 1차 MVP | 회원 |
 | [U10](#u10-러닝-환경-유형-조회) | 러닝 환경 유형 조회 | GET | `/environments` | 1차 MVP | 회원 |
 | [U11](#u11-선호-환경-조회) | 선호 환경 조회 | GET | `/users/me/preferences` | 1차 MVP | 회원 |
 | [U12](#u12-선호-환경-설정) | 선호 환경 설정 | PUT | `/users/me/preferences` | 1차 MVP | 회원 |
@@ -436,7 +436,7 @@ Path·Query Parameters 없음. 클라이언트가 userId·기기 ID로 폐기 �
 
 ### 설명
 
-초기 설정 1/2(닉네임·성별·생년월일)와 프로필 수정(사진·닉네임·성별·생년월일)에 사용한다. 러닝 수준은 [U07](#u07-러닝-수준-설정)로 따로 저장한다.
+초기 설정 1/2(닉네임·성별·생년월일)와 프로필 수정(사진·닉네임·성별·생년월일)에 사용한다. 러닝 수준은 [U07](#u07-러닝-프로필-저장부분-수정)로 따로 저장한다.
 
 ### 인증 및 권한
 
@@ -530,390 +530,144 @@ Path·Query Parameters 없음. 클라이언트가 userId·기기 ID로 폐기 �
 - [ ] 접근 권한과 데이터 정합성의 구체적인 처리 조건 확정
 
 
-## U06 러닝 수준 조회
+## U06 러닝 프로필 조회
 
-`GET` `/api/v1/users/me/running-profile`
-
-| 항목 | 값 |
-|---|---|
-| 단계 | 1차 MVP |
-| 인증 | 회원 |
-| 관련 요구사항 | USR-001~007 / SYS-002 |
-| 미정 사항 | 있음 |
-| 비고 | API 요청/응답 필드와 값 제한은 검토용 제안 |
-
-### 설명
-
-사용자 설정 수준과 시스템 추정 수준을 구분.
-
-### 인증 및 권한
-
-- 로그인 사용자 본인 또는 서비스 리소스 접근 권한 검사.
-- 건강정보·실시간 위치·타인 기록 조회 시 동의 상태 및 공개 범위가 우선한다.
-
-### Path Parameters
-
-없음
-
-### Query Parameters
-
-없음
-
-### Request Body
-
-없음
-
-
-### Response
-
-`200 OK (제안)`
-
-```json
-{
-  "selfReportedLevel": "BEGINNER"
-}
-```
-
-응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
-
-| 필드 | 타입 | 필수 | 설명 |
-|---|---|:---:|---|
-| `selfReportedLevel` | string | O | 기존 자기보고 수준 BEGINNER/INTERMEDIATE/ADVANCED. 기능상 필수이나 별도 추정 수준과의 저장 매핑 결정 필요. |
-| `assessedLevel` | string / object (확인 필요) | X | 별도 추정 수준 컬럼 없음. user_profiles.running_level을 자기보고/추정 두 값으로 복제하지 않는다. |
-| `assessedAt` | string (ISO 8601) | X | 독립 평가 시각 컬럼 없음. created_at/updated_at을 평가 시각으로 치환할 근거 확인 필요. |
-
-
-**사용 흐름과 응답 판단**
-
-수준 화면을 표시하거나 저장 후 선택값을 확인해야 한다. 단일 ERD 수준과 자기보고/추정 수준 구분은 해결할 계약이다.
-
-위 보완 필드는 호출 목적상 필요한 출력이다. 저장 컬럼 부재는 출력 불필요의 근거가 아니다. 저장·전송 정책 미정 항목은 위 설명의 계약을 확정한 후 구현한다.
-
-### 오류 응답
-
-**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
-
-| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
-|---|---|---|
-| `404 PROFILE_NOT_SET` | 데이터 없음 | 본인 user_profiles 행이 아직 없어 러닝 수준을 조회할 수 없음 |
-| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
-| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
-| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
-
-- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
-
-### 처리 규칙
-
-- 사용자 설정 수준과 시스템 추정 수준을 구분.
-- 사용자 소유권·그룹 참가 권한·상태 전이·재요청 여부를 검증한다(적용 범위는 API별로 결정).
-- 예시는 **명세 구조를 보여주는 가상 값**이며, 확정되지 않은 제한·동기화 주기·AI 호출 주기를 의미하지 않는다.
-
-### 상태값
-
-- PUBLIC / PRIVATE 또는 기능별 ERD CHECK 값, 해당 없으면 별도 상태 없음.
-
-### 미정 사항
-
-- [ ] 요청·응답의 세부 필드 타입, 허용 범위, nullable 규칙 및 실제 JSON 구조 검토
-- [ ] HTTP 성공 코드 및 각 예외의 오류 코드 최종 확정
-- [ ] 접근 권한과 데이터 정합성의 구체적인 처리 조건 확정
-
-
-## U07 러닝 수준 설정
-
-`PUT /api/v1/users/me/running-profile`
+`GET /api/v1/users/me/running-profile`
 
 | 항목 | 값 |
 |---|---|
 | 단계·인증 | 1차 MVP · 회원 Bearer JWT |
-| 관련 | USR-003·USR-007, U01 초기 설정 정책 |
-| 상태 | 최초 초기 설정 저장과 기존 수준 수정 계약 확정 |
+| 관련 | USR-003·USR-007, U07, 기존 U08 통합 |
+| 상태 | 2026-10-30 S15P31E105-223 사용자 승인으로 수준·평소 페이스 조회 통합 확정 |
 
-### 설명
-
-최초 초기 설정에서는 러닝 수준과 평소 페이스를 한 번에 저장한다. 화면 단계의 임시 입력은 서버 저장 성공이 아니다. 초기 설정 이후에는 이 API로 수준만 수정할 수 있고, 평소 페이스의 개별 수정은 U09를 사용한다.
-
-### Request Body
-
-Path·Query 없음. 모든 제출 필드는 NULL 불가다.
-
-| 필드 | 타입 | 필수 | 설명 |
-|---|---|:---:|---|
-| `selfReportedLevel` | string | O | BEGINNER / INTERMEDIATE / ADVANCED |
-| `inputType` | string | 최초 O | PACE / DISTANCE_TIME. 프로필 존재 시 생략 가능 |
-| `usualPaceSecPerKm` | number | 조건부 | PACE이면 양수인 초/km |
-| `baselineDistanceM` | integer (int32) | 조건부 | DISTANCE_TIME이면 양수인 미터 |
-| `baselineDurationSec` | integer (int32) | 조건부 | DISTANCE_TIME이면 양수인 초 |
-
-- 최초 생성에는 수준과 완전한 페이스 입력 묶음이 모두 필요하다. 수준만 제출하면 422이며 행을 생성하지 않는다.
-- PACE는 usualPaceSecPerKm만, DISTANCE_TIME은 거리·시간 두 값을 받는다. 혼합 입력은 422다. 입력 누락·조합 불일치는 422, NULL·잘못된 자료형·JSON 구문은 400이다. selfReportedLevel 누락은 400이다.
-- 기존 프로필에서는 inputType과 모든 페이스 필드를 함께 생략하면 수준만 바꾼다. 일부 페이스 필드만 제출할 수 없다.
-- DISTANCE_TIME은 `baselineDurationSec * 1000 / baselineDistanceM`으로 페이스를 계산한다. 저장 시 NUMERIC(10,2)에 맞춰 소수 둘째 자리로 반올림(HALF_UP)하며 0 이하·범위 초과·NaN·무한대는 거절한다. PACE도 같은 저장 정밀도와 범위 검증을 적용한다.
-- PACE 저장 시 이전 거리·시간은 NULL로 정리한다. 수준과 입력 묶음을 함께 제출하면 해당 값을 한 번에 반영한다.
-
-```json
-{
-  "selfReportedLevel": "BEGINNER",
-  "inputType": "DISTANCE_TIME",
-  "baselineDistanceM": 5000,
-  "baselineDurationSec": 1800
-}
-```
-
-기존 프로필의 수준만 수정할 때:
-```json
-{ "selfReportedLevel": "INTERMEDIATE" }
-```
+본인의 러닝 수준과 평소 페이스·거리·시간을 하나의 프로필로 조회한다. Path·Query·Body는 없다. 회원 ID는 JWT에서만 얻으며 요청 본문·쿼리·헤더로 다른 회원을 선택하지 않는다.
 
 ### Response
 
-`200 OK`. 생성·수정 모두 같은 응답. 필드는 모두 필수이며 거리·시간만 NULL 허용.
+`200 OK`. U07 저장 응답과 같은 구조이며 모든 필드를 포함한다. 거리·시간만 null을 허용한다.
 
 ```json
 {
   "selfReportedLevel": "BEGINNER",
   "baselineDistanceM": 5000,
   "baselineDurationSec": 1800,
-  "usualPaceSecPerKm": 360,
+  "usualPaceSecPerKm": 360.00,
   "onboardingCompleted": true,
-  "updatedAt": "2026-10-27T09:00:00Z"
+  "updatedAt": "2026-10-30T00:00:00Z"
 }
 ```
 
-| 필드 | 타입 | 저장·판정 |
+| 필드 | 타입 | 의미 |
 |---|---|---|
-| `selfReportedLevel` | string | 이번에 저장한 user_profiles.running_level |
-| `baselineDistanceM` | integer / null | user_profiles.distance |
-| `baselineDurationSec` | integer / null | user_profiles.duraction (기존 컬럼명 유지) |
-| `usualPaceSecPerKm` | number | user_profiles.average_pace |
-| `onboardingCompleted` | boolean | 수준과 유효 페이스의 저장 성공 후 true |
-| `updatedAt` | string (ISO 8601 UTC) | user_profiles.updated_at |
+| selfReportedLevel | string | user_profiles.running_level, BEGINNER / INTERMEDIATE / ADVANCED |
+| baselineDistanceM | integer(int32) / null | user_profiles.distance, 미터 |
+| baselineDurationSec | integer(int32) / null | user_profiles.duraction, 초. 기존 DB 컬럼명 유지 |
+| usualPaceSecPerKm | number | user_profiles.average_pace, 초/km |
+| onboardingCompleted | boolean | 프로필에 수준과 양수·유한 페이스가 모두 있으면 true. U01과 동일 판정 |
+| updatedAt | string (ISO 8601 UTC) | DB에서 관리하는 user_profiles.updated_at |
 
-독립적인 assessedLevel 값은 생성하지 않는다. 누적 기록으로 수준을 갱신하는 별도 기능의 규약을 이번 계약으로 확정하지 않는다.
+거리·시간 방식은 입력 거리·시간과 프론트가 계산해 제출한 페이스를 반환한다. 직접 페이스 방식은 거리·시간이 null이며 임의의 거리·시간을 생성하거나 null을 0으로 바꾸지 않는다. inputType은 응답하지 않는다. 화면에서는 저장 방식과 관계없이 두 입력 방식을 항상 제공한다. assessedLevel·assessedAt을 임의 생성하지 않는다.
 
 ### 오류 응답
 
 | HTTP·코드 | 조건 |
 |---|---|
-| `400 VALIDATION_ERROR` | JSON·자료형·정수 범위 오류, selfReportedLevel 누락, 제출 필드 NULL |
-| `422 INVALID_LEVEL` | 수준이 허용 코드가 아님 |
-| `422 INVALID_RUNNING_BASELINE` | 최초 페이스 누락, 부분·혼합 입력, 입력 방식 코드 오류, 양수·저장 범위 조건 위반 |
-| `401 UNAUTHORIZED` | 회원 JWT 누락·만료·위변조 |
-| `403 FORBIDDEN` | 해당 작업 접근 권한 없음 |
-| `503 SERVICE_UNAVAILABLE` | 저장소 장애로 저장 완료를 확인할 수 없음 |
+| 404 PROFILE_NOT_SET | 본인 프로필 행 없음. 선택 거리·시간의 null과 구분 |
+| 401 UNAUTHORIZED | 회원 JWT 누락·만료·위변조 |
+| 403 FORBIDDEN | 해당 자원·작업 접근 권한 없음 |
+| 503 SERVICE_UNAVAILABLE | 조회 저장소 장애 |
 
-공통 안전한 오류 본문을 사용한다. 실패한 입력 원문을 응답·로그에 넣지 않는다.
+건강정보 동의는 회원가입 U15에서 저장한다. 이 API는 동의를 다시 받거나 수정하지 않으며 동의 여부는 초기 설정 완료 조건에 포함하지 않는다.
 
-### 저장·재시도 규칙
+## U07 러닝 프로필 저장·부분 수정
 
-- 회원의 user_profiles에 수준과 유효한 페이스를 원자적으로 저장하고 커밋 뒤 성공 응답한다. 두 컬럼의 NOT NULL과 user_id 유일성 제약을 유지한다.
-- 일부만 반영된 최초 프로필·기본값 임시 행을 만들지 않는다. 검증 실패나 저장 실패 시 최초 프로필 생성은 롤백한다.
-- 같은 사용자 최초 요청이 동시에 들어와도 프로필은 한 행만 생성하며 요청별 저장을 직렬화한다. 동일 값 재요청은 같은 업무 상태를 만들고 200을 반환하되 updatedAt의 동일성은 보장하지 않는다.
-- 응답 유실 시 같은 입력으로 재시도할 수 있다. 앱은 동일 프로필의 저장 요청을 순차 처리한다. 더 최신 수정 뒤 오래된 요청을 무조건 재전송하지 않는다.
-- U09와 교차 수정되면 같은 프로필 단위로 순서를 보장한다. 수준만 수정하는 U07은 이미 저장된 페이스를 덮어쓰지 않는다. 전체 입력을 제출한 U07은 확정된 처리 순서에 따라 수준·페이스를 함께 반영한다.
-- 가입 U15는 프로필을 만들지 않고 false를 반환한다. U07 저장 성공 후 홈으로 이동한다. 미저장 상태의 재로그인은 다시 설정 페이지로 이동한다.
-
-
-## U08 평소 러닝 정보 조회
-
-`GET` `/api/v1/users/me/running-baseline`
+`PATCH /api/v1/users/me/running-profile`
 
 | 항목 | 값 |
 |---|---|
-| 단계 | 1차 MVP |
-| 인증 | 회원 |
-| 관련 요구사항 | USR-001~007 / SYS-002 |
-| 미정 사항 | 있음 |
-| 비고 | API 요청/응답 필드와 값 제한은 검토용 제안 |
+| 단계·인증 | 1차 MVP · 회원 Bearer JWT |
+| 관련 | USR-003·USR-007, U01 초기 설정 정책, 기존 U09 통합 |
+| 상태 | 2026-10-30 S15P31E105-223 사용자 승인으로 최초 생성·부분 수정 통합 확정 |
 
-### 설명
-
-사용자가 프로필에 등록한 평소 러닝 정보를 조회한다. 이 정보는 개인화 추천의 기준값이며 특정 러닝 세션의 목표로 자동 확정되지 않는다.
-
-### 인증 및 권한
-
-- 로그인 사용자 본인 또는 서비스 리소스 접근 권한 검사.
-- 건강정보·실시간 위치·타인 기록 조회 시 동의 상태 및 공개 범위가 우선한다.
-
-### Path Parameters
-
-없음
-
-### Query Parameters
-
-없음
+프로필이 없으면 수준과 페이스를 함께 저장해 생성한다. 기존 프로필이 있으면 제출한 항목만 수정한다. 생성·수정 모두 200과 U06의 전체 프로필 구조를 반환한다. PATCH의 최초 생성 동작은 이 API에서 명시적으로 허용한다. 임시 행이나 가짜 기본값은 만들지 않는다.
 
 ### Request Body
 
-없음
+Content-Type은 application/json이다. 별도 JSON Patch 연산 배열을 사용하지 않는다. Path·Query는 없다. 제출한 필드의 명시적 null은 허용하지 않으며 필드 생략은 기존 값 보존을 의미한다.
 
+| 필드 | 타입 | 조건 |
+|---|---|---|
+| selfReportedLevel | string | 최초 생성 시 필수. BEGINNER / INTERMEDIATE / ADVANCED. 기존 페이스만 수정하면 생략 |
+| inputType | string | 페이스를 제출할 때 필수. PACE / DISTANCE_TIME |
+| usualPaceSecPerKm | number | 두 입력 방식 모두 필수, 양수 초/km. 프론트에서 계산한 값을 제출. PACE일 때 거리·시간 생략 |
+| baselineDistanceM | integer(int32) | DISTANCE_TIME이면 필수, 양수 미터. 직접 페이스는 생략 |
+| baselineDurationSec | integer(int32) | DISTANCE_TIME이면 필수, 양수 초 |
 
-### Response
+- 최초 생성은 수준과 완전한 페이스 입력을 모두 요구한다. 수준 누락은 422 INVALID_LEVEL, 페이스 묶음 전체 누락은 422 INVALID_RUNNING_BASELINE이며 행을 생성하지 않는다.
+- 기존 프로필에서는 수준만, 페이스 묶음만, 또는 둘 다 제출할 수 있다. 수준 생략 시 수준을 보존하고 페이스 관련 네 필드 전체 생략 시 페이스·거리·시간을 보존한다.
+- 빈 객체는 400 VALIDATION_ERROR다. 제출 필드 null·잘못된 자료형·int32 범위 초과·JSON 구문 오류도 400이다.
+- PACE는 inputType과 usualPaceSecPerKm만, DISTANCE_TIME은 inputType과 거리·시간·페이스 세 값을 모두 제출한다. 부분·혼합 입력, 미지원 방식, inputType 없이 페이스 필드 제출은 422다.
+- 페이스 계산 책임은 프론트에 있다. 백엔드는 두 방식 모두 제출한 usualPaceSecPerKm의 자료형·양수·저장 범위를 검증한 뒤 NUMERIC(10,2)에 맞춰 소수 둘째 자리 HALF_UP으로 저장한다. 거리·시간으로 페이스를 재계산하거나 비교·덮어쓰기하지 않는다. 거리·시간은 각각 양수 int32인지 검사한다.
+- 원값과 최종 반올림값 모두 0 초과·99999999.99 이하여야 한다. 0.004는 거절, 0.005는 0.01로 허용, 99999999.994는 원값 초과로 거절한다. 극소 지수 수치는 반올림 전에 0.005 하한으로 검사하여 과도한 계산을 방지한다. 비표준 NaN·Infinity JSON은 형식 오류다.
+- PACE로 변경하면 기존 거리·시간은 서버에서 모두 null로 정리한다. 클라이언트는 이를 위해 null을 보내지 않는다.
 
-`200 OK (제안)`
+최초 생성 또는 전체 수정:
 
 ```json
 {
-  "baselineDistanceM": null,
-  "baselineDurationSec": null,
+  "selfReportedLevel": "BEGINNER",
+  "inputType": "DISTANCE_TIME",
+  "baselineDistanceM": 5000,
+  "baselineDurationSec": 1800,
   "usualPaceSecPerKm": 360
 }
 ```
 
-응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
-
-| 필드 | 타입 | 필수 | 설명 |
-|---|---|:---:|---|
-| `baselineDistanceM` | integer / null | O | `user_profiles.distance` (INTEGER). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
-| `baselineDurationSec` | integer / null | O | `user_profiles.duraction` (INTEGER). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
-| `usualPaceSecPerKm` | number | O | `user_profiles.average_pace` (NUMERIC(10,2)). 저장 값은 NULL 불가. |
-| `inputType` | string | 확인 필요 | user_profiles에 입력 방식 컬럼 없음. distance/duraction의 NULL만으로 기존 입력 방식을 복원할지는 확인 필요. |
-
-
-**사용 흐름과 응답 판단**
-
-거리·시간 또는 페이스 입력을 복원하고 서버가 계산해 저장한 페이스를 보여준다.
-
-### 오류 응답
-
-**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
-
-| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
-|---|---|---|
-| `404 RUNNING_BASELINE_NOT_SET` | 데이터 없음 | 평소 러닝 정보가 아직 등록되지 않음. NULL인 선택 거리·시간과 프로필 전체 부재는 구분 |
-| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
-| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
-| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
-
-- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
-
-### 처리 규칙
-
-- 평소 러닝 정보는 개인화 추천에 활용하되 기존 또는 신규 러닝 세션의 목표를 자동으로 변경하지 않는다.
-- 사용자 소유권·그룹 참가 권한·상태 전이·재요청 여부를 검증한다(적용 범위는 API별로 결정).
-- 예시는 **명세 구조를 보여주는 가상 값**이며, 확정되지 않은 제한·동기화 주기·AI 호출 주기를 의미하지 않는다.
-
-### 상태값
-
-- 입력 방식은 `PACE` 또는 `DISTANCE_TIME`이다.
-
-### 미정 사항
-
-- [ ] 요청·응답의 세부 필드 타입, 허용 범위, nullable 규칙 및 실제 JSON 구조 검토
-- [ ] HTTP 성공 코드 및 각 예외의 오류 코드 최종 확정
-- [ ] 접근 권한과 데이터 정합성의 구체적인 처리 조건 확정
-
-
-## U09 평소 러닝 정보 설정
-
-`PUT` `/api/v1/users/me/running-baseline`
-
-| 항목 | 값 |
-|---|---|
-| 단계 | 1차 MVP |
-| 인증 | 회원 |
-| 관련 요구사항 | USR-001~007 / SYS-002 |
-| 미정 사항 | 있음 |
-| 비고 | API 요청/응답 필드와 값 제한은 검토용 제안 |
-
-### 설명
-
-초기 설정을 마친 기존 프로필의 평소 페이스를 수정한다. 최초 초기 설정은 U07에서 수준과 페이스를 함께 저장한다. 기준 거리·시간을 입력하면 평소 페이스를 계산한다.
-
-### 인증 및 권한
-
-- 로그인 사용자 본인 또는 서비스 리소스 접근 권한 검사.
-- 건강정보·실시간 위치·타인 기록 조회 시 동의 상태 및 공개 범위가 우선한다.
-
-### Path Parameters
-
-없음
-
-### Query Parameters
-
-없음
-
-### Request Body
-
-| 필드 | 타입 | 필수 | 설명 |
-|---|---|:---:|---|
-| `inputType` | string | O | PACE/DISTANCE_TIME 중 하나 |
-| `usualPaceSecPerKm` | number | 조건부 | PACE 선택 시 필수인 평소 페이스, 초/km, 양수 |
-| `baselineDistanceM` | integer (int32) | 조건부 | DISTANCE_TIME 선택 시 필수인 기준 거리, 미터, 양수 |
-| `baselineDurationSec` | integer (int32) | 조건부 | DISTANCE_TIME 선택 시 필수인 평소 완주 시간, 초, 양수 |
+기존 프로필의 수준만 수정:
 
 ```json
-{
-  "inputType": "DISTANCE_TIME",
-  "baselineDistanceM": 5000,
-  "baselineDurationSec": 1800
-}
+{ "selfReportedLevel": "INTERMEDIATE" }
+```
+
+기존 프로필의 페이스만 수정:
+
+```json
+{ "inputType": "PACE", "usualPaceSecPerKm": 400 }
 ```
 
 ### Response
 
-`200 OK (제안)`
-
-```json
-{
-  "baselineDistanceM": 5000,
-  "baselineDurationSec": 1800,
-  "usualPaceSecPerKm": 360,
-  "inputType": "DISTANCE_TIME"
-}
-```
-
-응답 필드 정의(저장 필드는 ERD ver.3에 대응, 파생·미정 값은 설명에 구분):
-
-| 필드 | 타입 | 필수 | 설명 |
-|---|---|:---:|---|
-| `baselineDistanceM` | integer / null | O | `user_profiles.distance` (INTEGER). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
-| `baselineDurationSec` | integer / null | O | `user_profiles.duraction` (INTEGER). NULL 허용; 미설정·미측정·미발생을 0/false/빈 문자열로 대체하지 않는다. |
-| `usualPaceSecPerKm` | number | O | `user_profiles.average_pace` (NUMERIC(10,2)). 저장 값은 NULL 불가. |
-| `inputType` | string | 확인 필요 | user_profiles에 입력 방식 컬럼 없음. distance/duraction의 NULL만으로 기존 입력 방식을 복원할지는 확인 필요. |
-
-
-**사용 흐름과 응답 판단**
-
-거리·시간 또는 페이스 입력을 복원하고 서버가 계산해 저장한 페이스를 보여준다.
+`200 OK`. 생성·부분 수정 모두 U06과 동일한 전체 프로필을 반환한다. 부분 수정 시에도 보존한 필드를 함께 반환한다. 정상 저장 후 onboardingCompleted는 true이며 updatedAt은 DB 갱신 시각이다. inputType은 반환하지 않는다.
 
 ### 오류 응답
 
-**상태: 오류 계약 초안.** 기존 오류 코드에 발생 조건을 보완했다. HTTP 상태·코드는 기존 제안을 유지하며, 추가 후보는 아래에 구분한다. 이 표만으로 미정 정책을 확정하지 않는다.
+| HTTP·코드 | 조건 |
+|---|---|
+| 400 VALIDATION_ERROR | 빈 요청, JSON·자료형·정수 범위 오류, 제출 필드 null |
+| 422 INVALID_LEVEL | 미허용 수준 코드 또는 최초 생성 시 수준 누락 |
+| 422 INVALID_RUNNING_BASELINE | 최초 페이스 누락, 부분·혼합·방식 오류, 양수·저장 범위 위반 |
+| 404 PROFILE_NOT_SET | JWT가 가리키는 회원 행이 없어 저장할 소유자가 없음 |
+| 401 UNAUTHORIZED | 회원 JWT 누락·만료·위변조 |
+| 403 FORBIDDEN | 해당 작업 접근 권한 없음 |
+| 503 SERVICE_UNAVAILABLE | 저장소·커밋 실패 또는 잠금 대기 실패 |
 
-| HTTP·코드 | 오류 종류 | 발생 조건·주의사항 |
-|---|---|---|
-| `404 PROFILE_NOT_SET` | 초기 설정 없음 | 프로필 부재. U07에서 최초 초기 설정 필요 |
-| `422 INVALID_RUNNING_BASELINE` | 입력 값 | 평소 페이스·거리·시간이 양수 조건에 맞지 않거나 입력 조합·계산 관계가 맞지 않음 |
-| `401 UNAUTHORIZED` | 인증 | 인증이 필요한 요청에 토큰이 없거나 만료·위변조되어 사용자를 확인할 수 없음 |
-| `403 FORBIDDEN` | 권한 | 인증된 사용자가 해당 자원·작업에 필요한 권한을 갖지 않음 |
-| `400 VALIDATION_ERROR` | 입력 형식 | JSON 구문·필수 필드·자료형·날짜 형식 또는 Path 식별자 형식이 맞지 않음. 서버 BIGINT 식별자의 소수·UUID·범위 초과 포함 |
+프로필 부재는 유효한 최초 생성 요청을 거절하는 사유가 아니다. 입력 오류가 여러 개이면 형식400을 먼저 검사하고, 업무 입력 오류는 수준 코드·페이스 조합을 검사한다. 최초 생성의 필수값 검사는 잠금 뒤 프로필 부재 확인 후 수준→페이스 순서로 수행한다. 오류에는 입력 원문·토큰·SQL을 노출하지 않는다. 형식 오류는 공통 Bean Validation의 message/details.fields 응답을 사용한다.
 
-- 공통 입력·서버 장애와 재시도 판단은 [오류 분류와 재시도 기준](README.md#오류-분류와-재시도-기준)을 함께 적용한다.
-- **중복·경합 점검:** 통신 시간초과는 저장 실패를 뜻하지 않는다. 동일 요청 재전송·다른 요청과의 충돌을 구분한다. 기존 멱등 처리 기준이 없는 경우 성공 재응답/409/재조회 선택은 확인 필요다.
+### 저장·재시도·동시성
 
-### 처리 규칙
+- 같은 회원의 users 행을 먼저 잠그고 user_profiles를 조회·생성·수정한다. users→profile 순서를 유지하며 잠금 대기는 최대 2초, 실패503이다. 조회 API는 쓰기 잠금을 사용하지 않는다.
+- 최초 생성·전체 수정·부분 수정 모두 단일 트랜잭션이다. 실패하면 변경 전체를 롤백하고 커밋 성공 뒤에만 성공 응답을 반환한다. 수준·페이스 NOT NULL과 user_id UNIQUE는 그대로 유지한다.
+- 동시 최초 요청은 한 행만 만든다. 수준만 변경하는 요청과 페이스만 변경하는 요청이 교차해도 서로의 값을 보존한다. 전체 변경과 부분 변경은 잠금 획득 순서대로 반영한다.
+- 같은 입력 재요청은 같은 업무 상태와200을 반환하되 updatedAt 동일성은 보장하지 않는다. 응답 유실을 저장 실패로 단정하지 않는다. 앱은 같은 프로필의 저장 요청을 순차 처리하고 최신 수정 뒤 오래된 요청을 무조건 재전송하지 않는다.
+- U15 가입은 프로필을 만들지 않고 onboardingCompleted=false다. U07 최초 저장 성공 뒤 true가 되며 U01 로그인도 같은 저장값으로 판정한다. 건강 동의·선호·과거 기록은 완료 조건이 아니다.
 
-- 최초 프로필이 없으면 404 PROFILE_NOT_SET이며 U07 초기 설정으로 안내한다. U09만으로 수준 기본값을 넣어 프로필을 생성하지 않는다.
-- U07과 같은 페이스 계산·정밀도·유효범위 검증을 적용한다. PACE 변경 시 기존 거리·시간을 NULL로 정리하며 running_level은 보존한다.
-- 같은 프로필의 U07/U09 쓰기는 순서를 보장하고 지정한 필드만 원자적으로 반영한다.
+## U08 평소 러닝 정보 조회
 
+2026-10-30 사용자 승인으로 **U06 러닝 프로필 조회에 통합**했다. 독립 API와 `/api/v1/users/me/running-baseline` 경로는 제공하지 않는다. 기존 요구사항 번호 추적을 위해 이 절만 유지한다.
 
-- 평소 러닝 정보와 이번 러닝의 목표를 분리한다. 이번 목표는 코스 추천 조건과 러닝 세션 생성 요청에서 전달한다.
-- `PACE` 입력은 `usualPaceSecPerKm`만 저장한다. `DISTANCE_TIME` 입력은 기준 거리와 시간을 저장하고 `usualPaceSecPerKm`를 계산하여 함께 저장한다.
-- 사용자 소유권·그룹 참가 권한·상태 전이·재요청 여부를 검증한다(적용 범위는 API별로 결정).
-- 예시는 **명세 구조를 보여주는 가상 값**이며, 확정되지 않은 제한·동기화 주기·AI 호출 주기를 의미하지 않는다.
+## U09 평소 러닝 정보 설정
 
-### 상태값
-
-- `PACE`이면 기준 거리·시간을 받지 않고, `DISTANCE_TIME`이면 두 값을 모두 받아야 한다.
-
-### 미정 사항
-
-- [ ] 요청·응답의 세부 필드 타입, 허용 범위, nullable 규칙 및 실제 JSON 구조 검토
-- [ ] HTTP 성공 코드 및 각 예외의 오류 코드 최종 확정
-- [ ] 접근 권한과 데이터 정합성의 구체적인 처리 조건 확정
-
+2026-10-30 사용자 승인으로 **U07 러닝 프로필 저장·부분 수정에 통합**했다. 독립 API는 제공하지 않으며 페이스만 수정할 때도 PATCH running-profile을 사용한다. 기존 요구사항 번호 추적을 위해 이 절만 유지한다. PUT running-profile 및 기존 running-baseline 쓰기 경로는 제공하지 않는다.
 
 ## U10 러닝 환경 유형 조회
 

@@ -6,6 +6,7 @@ import com.runway.backend.domain.auth.repository.AuthUserRepository.Account;
 import com.runway.backend.domain.auth.repository.LoginAttemptStore;
 import com.runway.backend.domain.auth.repository.RefreshTokenStore;
 import com.runway.backend.domain.auth.service.RefreshTokenFactory.IssuedRefreshToken;
+import com.runway.backend.domain.user.service.OnboardingStatusService;
 import com.runway.backend.global.security.JwtAccessTokenService;
 
 import org.springframework.stereotype.Service;
@@ -17,16 +18,19 @@ public class LoginIssuanceService {
     private final RefreshTokenStore store;
     private final JwtAccessTokenService accessTokens;
     private final LoginAttemptStore attempts;
+    private final OnboardingStatusService onboarding;
 
     public LoginIssuanceService(
             AuthUserRepository users,
             RefreshTokenStore store,
             JwtAccessTokenService accessTokens,
-            LoginAttemptStore attempts) {
+            LoginAttemptStore attempts,
+            OnboardingStatusService onboarding) {
         this.users = users;
         this.store = store;
         this.accessTokens = accessTokens;
         this.attempts = attempts;
+        this.onboarding = onboarding;
     }
 
     @Transactional
@@ -36,7 +40,7 @@ public class LoginIssuanceService {
                 || !current.active()
                 || !current.passwordHash().equals(verified.passwordHash()))
             throw AuthErrors.credentialFailure(attempts.recordFailure(verified.loginId()));
-        boolean onboarding = users.onboardingCompleted(current.id());
+        boolean completed = onboarding.isCompleted(current.id());
         var access = accessTokens.issue(current.id(), refresh.expiresAt());
         store.createForLogin(refresh, current.loginId());
         return new LoginResponse(
@@ -45,6 +49,6 @@ public class LoginIssuanceService {
                 refresh.value(),
                 access.expiresInSec(),
                 refresh.expiresAt(),
-                onboarding);
+                completed);
     }
 }

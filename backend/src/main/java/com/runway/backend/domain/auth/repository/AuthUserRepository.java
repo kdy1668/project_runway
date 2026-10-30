@@ -1,8 +1,9 @@
 package com.runway.backend.domain.auth.repository;
 
-import java.util.Optional;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+
+import java.util.Optional;
 
 @Repository
 public class AuthUserRepository {
@@ -15,7 +16,8 @@ public class AuthUserRepository {
     public Optional<Account> findByLoginId(String loginId) {
         return jdbc
                 .query(
-                        "SELECT id, login_id, password, account_status::text FROM users WHERE login_id = ?",
+                        "SELECT id, login_id, password, account_status::text FROM users WHERE"
+                                + " login_id = ?",
                         (rs, n) ->
                                 new Account(
                                         rs.getLong(1),
@@ -31,7 +33,8 @@ public class AuthUserRepository {
         jdbc.execute("SET LOCAL lock_timeout = '2s'");
         return jdbc
                 .query(
-                        "SELECT id, login_id, password, account_status::text FROM users WHERE id = ? FOR UPDATE",
+                        "SELECT id, login_id, password, account_status::text FROM users WHERE id ="
+                                + " ? FOR UPDATE",
                         (rs, n) ->
                                 new Account(
                                         rs.getLong(1),
@@ -41,18 +44,6 @@ public class AuthUserRepository {
                         userId)
                 .stream()
                 .findFirst();
-    }
-
-    public boolean onboardingCompleted(long userId) {
-        return Boolean.TRUE.equals(
-                jdbc.queryForObject(
-                        """
-            SELECT EXISTS (SELECT 1 FROM user_profiles WHERE user_id = ?
-                AND running_level IS NOT NULL AND average_pace > 0
-                AND average_pace NOT IN ('NaN'::numeric, 'Infinity'::numeric, '-Infinity'::numeric))
-            """,
-                        Boolean.class,
-                        userId));
     }
 
     public record Account(long id, String loginId, String passwordHash, String status) {
