@@ -152,10 +152,10 @@ U02는 Refresh Token을 교체하고 이전 토큰 재사용 시 해당 로그�
 | U03 | [로그아웃](./users.md#u03-로그아웃) | POST | `/auth/logout` | [users.md](./users.md) |
 | U04 | [내 프로필 조회](./users.md#u04-내-프로필-조회) | GET | `/users/me` | [users.md](./users.md) |
 | U05 | [내 프로필 수정](./users.md#u05-내-프로필-수정) | PATCH | `/users/me` | [users.md](./users.md) |
-| U06 | [러닝 수준 조회](./users.md#u06-러닝-수준-조회) | GET | `/users/me/running-profile` | [users.md](./users.md) |
-| U07 | [러닝 수준 설정](./users.md#u07-러닝-수준-설정) | PUT | `/users/me/running-profile` | [users.md](./users.md) |
-| U08 | [평소 러닝 정보 조회](./users.md#u08-평소-러닝-정보-조회) | GET | `/users/me/running-baseline` | [users.md](./users.md) |
-| U09 | [평소 러닝 정보 설정](./users.md#u09-평소-러닝-정보-설정) | PUT | `/users/me/running-baseline` | [users.md](./users.md) |
+| U06 | [러닝 프로필 조회](./users.md#u06-러닝-프로필-조회) | GET | `/users/me/running-profile` | [users.md](./users.md) |
+| U07 | [러닝 프로필 저장·부분 수정](./users.md#u07-러닝-프로필-저장부분-수정) | PATCH | `/users/me/running-profile` | [users.md](./users.md) |
+| U08 | [평소 러닝 정보 조회 (U06 통합)](./users.md#u08-평소-러닝-정보-조회) | — | — | [users.md](./users.md) |
+| U09 | [평소 러닝 정보 설정 (U07 통합)](./users.md#u09-평소-러닝-정보-설정) | — | — | [users.md](./users.md) |
 | U10 | [러닝 환경 유형 조회](./users.md#u10-러닝-환경-유형-조회) | GET | `/environments` | [users.md](./users.md) |
 | U11 | [선호 환경 조회](./users.md#u11-선호-환경-조회) | GET | `/users/me/preferences` | [users.md](./users.md) |
 | U12 | [선호 환경 설정](./users.md#u12-선호-환경-설정) | PUT | `/users/me/preferences` | [users.md](./users.md) |
