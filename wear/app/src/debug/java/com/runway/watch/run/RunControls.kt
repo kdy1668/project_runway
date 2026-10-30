@@ -20,6 +20,7 @@ class SimulatedRunControl(
             distanceMeters = 2384.0, elapsedMs = 852_000, paceSecondsPerKm = 356, guidePaceSecondsPerKm = 358,
             heartRate = HeartRate(152), cadenceSpm = 171, rhythm = RhythmBpm(172), goalProgress = .476f,
         ),
+        comparison = RecordComparison.Result(2384.0, currentElapsedMs = 852_000, pastElapsedMs = 873_000, targetLabel = "10.13"),
     ),
 ) : RunControl {
     private val state = MutableStateFlow(initial)

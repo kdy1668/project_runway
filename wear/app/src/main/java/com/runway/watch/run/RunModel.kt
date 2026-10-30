@@ -26,6 +26,44 @@ data class RunMetrics(
     val feeds: MetricFeeds = MetricFeeds(),
 )
 
+/**
+ * REC-005 comparison with one of the runner's own past runs, kept apart from the goal in [RunMetrics].
+ * The watch only shows what it is given: choosing the record, computing the gap and how the result
+ * reaches the watch are outside this model, and the delivery contract is not agreed yet.
+ */
+sealed interface RecordComparison {
+    /** No past run was chosen for this run; the comparison page is left out. */
+    data object NotSelected : RecordComparison
+    /** A comparison was asked for but there is no past run it can use. */
+    data object NoRecord : RecordComparison
+    /** A past run is chosen but no result has arrived (yet, or any more). */
+    data object Waiting : RecordComparison
+    /** The chosen run can no longer be read (e.g. deleted mid-run); comparison stops, the run goes on. */
+    data object Unavailable : RecordComparison
+
+    /**
+     * Times to reach the same [distanceMeters] now and in the past run. [targetLabel] names the past
+     * run (e.g. its date); without it the run is treated as not compared (see [compared]).
+     */
+    data class Result(
+        val distanceMeters: Double,
+        val currentElapsedMs: Long,
+        val pastElapsedMs: Long,
+        val targetLabel: String? = null,
+    ) : RecordComparison
+}
+
+/**
+ * False when the run goes on without a comparison: nothing was chosen, or a result does not name the
+ * past run. Then the watch shows nothing about comparing.
+ */
+val RecordComparison.compared: Boolean
+    get() = when (this) {
+        RecordComparison.NotSelected -> false
+        is RecordComparison.Result -> !targetLabel.isNullOrBlank()
+        else -> true
+    }
+
 data class RunSnapshot(
     /** Null until the phone has handed over a prepared session. */
     val state: RunState? = null,
@@ -35,6 +73,7 @@ data class RunSnapshot(
     val pendingCommand: Boolean = false,
     val title: String? = null,
     val metrics: RunMetrics = RunMetrics(),
+    val comparison: RecordComparison = RecordComparison.NotSelected,
     /** Save, analysis and goal state after the end; null until the controller reports any. */
     val result: RunResult? = null,
 )
