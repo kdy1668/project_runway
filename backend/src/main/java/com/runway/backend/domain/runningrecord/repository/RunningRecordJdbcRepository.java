@@ -1,10 +1,12 @@
 package com.runway.backend.domain.runningrecord.repository;
 
 import java.math.BigDecimal;
+import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -149,6 +151,159 @@ public class RunningRecordJdbcRepository {
                                 rs.getBigDecimal("average_heart_rate"),
                                 rs.getBigDecimal("average_cadence")),
                 sessionId);
+    }
+
+    /**
+     * H06/H07용 COMPLETED·미삭제 세션 집계 행. {@code started_at}은 {@code [fromInclusive,
+     * toExclusive)}.
+     */
+    public List<StatsSessionRow> findStatsSessions(
+            long userId,
+            Instant fromInclusive,
+            Instant toExclusive,
+            RunTypeFilter runType) {
+        StringBuilder sql =
+                new StringBuilder(
+                        """
+                        SELECT rs.id,
+                               rs.started_at,
+                               rs.total_distance,
+                               rs.moving_duration,
+                               rs.average_pace
+                        FROM running_sessions rs
+                        WHERE rs.user_id = ?
+                          AND rs.status = 'COMPLETED'::running_sessions_status_enum
+                          AND rs.deleted_at IS NULL
+                          AND rs.started_at >= ?
+                          AND rs.started_at < ?
+                        """);
+        List<Object> args = new ArrayList<>();
+        args.add(userId);
+        args.add(Timestamp.from(fromInclusive));
+        args.add(Timestamp.from(toExclusive));
+        appendRunTypeFilter(sql, runType);
+        sql.append(" ORDER BY rs.started_at ASC, rs.id ASC");
+        return jdbcTemplate.query(
+                sql.toString(), (rs, rowNum) -> mapStatsSessionRow(rs), args.toArray());
+    }
+
+    /** 기간 내 세션의 측정 심박(null 제외). */
+    public List<BigDecimal> findHeartRateSamplesInPeriod(
+            long userId,
+            Instant fromInclusive,
+            Instant toExclusive,
+            RunTypeFilter runType) {
+        StringBuilder sql =
+                new StringBuilder(
+                        """
+                        SELECT rms.heart_rate
+                        FROM running_metric_samples rms
+                        INNER JOIN running_sessions rs ON rs.id = rms.running_session_id
+                        WHERE rs.user_id = ?
+                          AND rs.status = 'COMPLETED'::running_sessions_status_enum
+                          AND rs.deleted_at IS NULL
+                          AND rs.started_at >= ?
+                          AND rs.started_at < ?
+                          AND rms.heart_rate IS NOT NULL
+                        """);
+        List<Object> args = new ArrayList<>();
+        args.add(userId);
+        args.add(Timestamp.from(fromInclusive));
+        args.add(Timestamp.from(toExclusive));
+        appendRunTypeFilter(sql, runType);
+        return jdbcTemplate.query(
+                sql.toString(), (rs, rowNum) -> rs.getBigDecimal("heart_rate"), args.toArray());
+    }
+
+    /**
+     * {@code metric_date <= baseDate} 이면서 해당 컬럼이 있는 최근 행. 없으면 empty.
+     */
+    public Optional<BigDecimal> findHealthMetricOnOrBefore(
+            long userId, LocalDate baseDate, String column) {
+        requireHealthMetricColumn(column);
+        List<BigDecimal> rows =
+                jdbcTemplate.query(
+                        """
+                        SELECT %s AS value
+                        FROM daily_health_metrics
+                        WHERE user_id = ?
+                          AND metric_date <= ?
+                          AND %s IS NOT NULL
+                        ORDER BY metric_date DESC
+                        LIMIT 1
+                        """
+                                .formatted(column, column),
+                        (rs, rowNum) -> rs.getBigDecimal("value"),
+                        userId,
+                        Date.valueOf(baseDate));
+        return rows.stream().findFirst();
+    }
+
+    /** 해당 컬럼이 있는 전체 기간 중 최신 행. */
+    public Optional<BigDecimal> findLatestHealthMetric(long userId, String column) {
+        requireHealthMetricColumn(column);
+        List<BigDecimal> rows =
+                jdbcTemplate.query(
+                        """
+                        SELECT %s AS value
+                        FROM daily_health_metrics
+                        WHERE user_id = ?
+                          AND %s IS NOT NULL
+                        ORDER BY metric_date DESC
+                        LIMIT 1
+                        """
+                                .formatted(column, column),
+                        (rs, rowNum) -> rs.getBigDecimal("value"),
+                        userId);
+        return rows.stream().findFirst();
+    }
+
+    public Optional<LocalDate> findBirthDate(long userId) {
+        List<LocalDate> rows =
+                jdbcTemplate.query(
+                        "SELECT birth_date FROM users WHERE id = ?",
+                        (rs, rowNum) -> rs.getDate("birth_date").toLocalDate(),
+                        userId);
+        return rows.stream().findFirst();
+    }
+
+    private static void appendRunTypeFilter(StringBuilder sql, RunTypeFilter runType) {
+        switch (runType) {
+            case SOLO ->
+                    sql.append(
+                            """
+                             AND NOT EXISTS (
+                               SELECT 1 FROM group_run_participants grp
+                               WHERE grp.session_id = rs.id
+                             )
+                            """);
+            case GROUP ->
+                    sql.append(
+                            """
+                             AND EXISTS (
+                               SELECT 1 FROM group_run_participants grp
+                               WHERE grp.session_id = rs.id
+                             )
+                            """);
+            case ALL -> {
+                // no extra filter
+            }
+        }
+    }
+
+    private static void requireHealthMetricColumn(String column) {
+        if (!"max_heart_rate".equals(column) && !"rhr_bpm".equals(column)) {
+            throw new IllegalArgumentException("unsupported health metric column: " + column);
+        }
+    }
+
+    private static StatsSessionRow mapStatsSessionRow(ResultSet rs) throws SQLException {
+        return new StatsSessionRow(
+                rs.getLong("id"),
+                toInstant(rs.getTimestamp("started_at")),
+                rs.getBigDecimal("total_distance"),
+                getNullableInteger(rs, "moving_duration"),
+                rs.getBigDecimal("average_pace"));
     }
 
     private static void appendOrderBy(StringBuilder sql, SortType sort) {
@@ -361,4 +516,11 @@ public class RunningRecordJdbcRepository {
             BigDecimal pace,
             BigDecimal averageHeartRate,
             BigDecimal averageCadence) {}
+
+    public record StatsSessionRow(
+            long id,
+            Instant startedAt,
+            BigDecimal totalDistance,
+            Integer movingDuration,
+            BigDecimal averagePace) {}
 }

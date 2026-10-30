@@ -459,10 +459,37 @@
 | `totalDistanceM` | number | O | 누적 거리 (ERD만으로 응답 형식을 확정하지 않음.) |
 | `totalDurationSec` | number | O | 총 시간 (ERD만으로 응답 형식을 확정하지 않음.) |
 | `averagePaceSecPerKm` | number / null | O | 평균 페이스 (ERD만으로 응답 형식을 확정하지 않음.) |
-| `breakdown` | array | O | 요일별(홈 차트)·주별(5.3 주별 거리) 거리 (ERD만으로 응답 형식을 확정하지 않음.) |
-| `heartRateZones` | array | O | 심박 구간 1~5 비율 (ERD만으로 응답 형식을 확정하지 않음.) |
-| `previousPeriod` | object / null | O | 직전 기간 횟수·거리·평균 페이스와 차이 (ERD만으로 응답 형식을 확정하지 않음.) |
+| `breakdown` | array | O | 기간(`period`)별 거리 분포. WEEK=요일, MONTH=주, YEAR=월. |
+| `heartRateZones` | array | O | 심박 구간 1~5 비율(아래 카르보넨 산식). 산정 불가 시 빈 배열. |
+| `previousPeriod` | object / null | O | 직전 동일 길이 기간의 횟수·거리·평균 페이스와 차이. 비교 불가 시 null. |
 
+`breakdown` 항목(확정):
+
+| period | 항목 필드 | 설명 |
+|---|---|---|
+| WEEK | `day` (MON..SUN), `distanceM` | 해당 주의 요일별 누적 거리 |
+| MONTH | `week` (1..), `distanceM` | 해당 월의 주 순서별 누적 거리 |
+| YEAR | `month` (YYYY-MM), `distanceM` | 해당 연의 월별 누적 거리 |
+
+`heartRateZones` 항목: `zone` (1..5), `ratio` (0~1, 해당 기간 심박 샘플 비율).
+
+**심박 Zone 산식 (카르보넨, 확정)**
+
+1. `HRmax`: 조회 기준일에 가장 가까운 `daily_health_metrics.max_heart_rate`. 없으면 `220 - 만 나이`(`users.birth_date`).
+2. `RHR`: 동일 기준으로 `daily_health_metrics.rhr_bpm`.
+3. `HRR = HRmax - RHR`.
+4. 목표 심박 = `(HRR × 운동 강도 %) + RHR`.
+5. Zone 강도: 1=50–60%, 2=60–70%, 3=70–80%, 4=80–90%, 5=90–100%. 경계 bpm은 상위 Zone에 포함한다(예: 60% 경계는 Zone2).
+6. RHR/`HRmax` 산정 불가 또는 기간 내 심박 샘플이 없으면 `heartRateZones`는 `[]`.
+
+**평균 페이스 집계 (확정)**
+
+기간 내 세션의 `running_sessions.average_pace` 중 null이 아닌 값의 산술 평균. 거리·시간은 각각 `total_distance`·`moving_duration` 합산. 페이스 계산 불가면 `averagePaceSecPerKm=null`(횟수 0과 구분).
+
+**기간·시간대 (확정)**
+
+- `period`+`baseDate`로 달력 주/월/년 경계를 잡는다. 주 시작은 월요일.
+- 사용자 timezone 컬럼이 없으므로 MVP 기본 시간대는 `Asia/Seoul`이다.
 
 **사용 흐름과 응답 판단**
 
@@ -499,9 +526,9 @@
 
 ### 미정 사항
 
-- [ ] 심박 구간 경계(최대 심박 계산식) 확정
-- [ ] 요일별/주별 breakdown 단위를 period별로 고정할지
-- [ ] 응답 필드는 ERD 확정 후 갱신
+- [x] 심박 구간 경계(카르보넨 + `daily_health_metrics` / `birth_date`) — 위 산식 확정
+- [x] 요일별/주별/월별 breakdown 단위를 period별로 고정 — WEEK/MONTH/YEAR 매핑 확정
+- [ ] `previousPeriod` 세부 필드명 최종 표기
 - [ ] HTTP 성공 코드 및 각 예외의 오류 코드 최종 확정
 
 
@@ -574,8 +601,10 @@
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|:---:|---|
 | `items[].month` | string (YYYY-MM) | O | 차트의 기준 월. |
-| `items[].averagePaceSecPerKm` | number / null | O | 해당 월 계산 가능 평균페이스. 집계 산식 확인 필요. |
+| `items[].averagePaceSecPerKm` | number / null | O | 해당 월 세션 `average_pace`의 산술 평균. 계산 불가면 null. |
 | `items[].runCount` | integer | O | 해당 월 집계 러닝 수. |
+
+월 경계는 H06과 동일하게 MVP 기본 시간대 `Asia/Seoul`. 기록 없는 월도 `runCount=0`, `averagePaceSecPerKm=null`로 포함한다. `changeSecPerKm`은 첫 달·마지막 달 모두 페이스가 있을 때만 마지막−첫 달 차이, 아니면 null.
 
 ### 오류 응답
 
