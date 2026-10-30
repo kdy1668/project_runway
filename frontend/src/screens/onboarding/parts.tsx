@@ -27,7 +27,7 @@ import {
 
 export { Logo, Segmented } from '../../components';
 
-// The 1.x header (DESIGN.md 2-5): back button, the R symbol in the middle, and 1 / 2 on the right for 1.5·1.6.
+// The 1.x header (DESIGN.md 2-5): back button, the loop symbol in the middle, and 1 / 2 on the right for 1.5·1.6.
 export function OnboardingHeader({
   onBack,
   step,

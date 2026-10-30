@@ -16,7 +16,7 @@ export function ScreenHeader({
   onBack?: () => void;
   backLabel?: string;
   right?: React.ReactNode;
-  // 2.x screens (DESIGN.md 2-6): the black R symbol in the middle and a large light title below.
+  // 2.x screens (DESIGN.md 2-6): the black loop symbol in the middle and a large light title below.
   symbol?: boolean;
 }) {
   const back = (

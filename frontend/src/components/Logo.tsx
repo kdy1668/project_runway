@@ -4,7 +4,7 @@ import { useTheme } from '../theme';
 import { logoPath, logoViewBox, symbolPath, symbolViewBox } from './logoPath';
 
 // The RUNWAY wordmark in the text color: white on dark screens, ink on light ones.
-// `symbol` draws the R mark alone, as in the middle of the 1.x header.
+// `symbol` draws the course loop mark alone, as in the middle of the 1.x and 2.x headers.
 export function Logo({
   width,
   symbol = false,
