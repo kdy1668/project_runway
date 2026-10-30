@@ -59,6 +59,33 @@ services:
       - mobile_android_sdk:/opt/android-sdk
       - mobile_gradle_cache:/home/jenkins/.gradle
 
+  watch-builder:
+    image: runway-watch-agent:android
+    profiles: ["watch"]
+    init: true
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/opt/start-agent.sh"]
+    mem_limit: 4g
+    cpus: 1
+    environment:
+      JENKINS_JAVA_OPTS: "-Xmx256m"
+    volumes:
+      - type: bind
+        source: ./watch-agent/start-agent.sh
+        target: /opt/start-agent.sh
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./secrets/watch-builder-secret
+        target: /run/secrets/watch-builder-secret
+        read_only: true
+        bind:
+          create_host_path: false
+      - watch_agent_work:/home/jenkins/agent
+      - watch_android_sdk:/opt/android-sdk
+      - watch_gradle_cache:/home/jenkins/.gradle
+
 volumes:
   jenkins_home:
     external: true
@@ -71,3 +98,10 @@ volumes:
     external: true
     name: runway-ci_mobile_android_sdk
   mobile_gradle_cache:
+  watch_agent_work:
+    external: true
+    name: runway-ci_watch_agent_work
+  watch_android_sdk:
+    external: true
+    name: runway-ci_watch_android_sdk
+  watch_gradle_cache:
